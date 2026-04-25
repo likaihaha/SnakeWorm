@@ -1,0 +1,923 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SnakeWorm v0.2 - 自噬与分裂（修复版）</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #1a1a2e;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            font-family: 'Microsoft YaHei', 'PingFang SC', sans-serif;
+            color: #eee;
+        }
+        h1 { margin-bottom: 10px; font-size: 24px; color: #4ecca3; }
+        #gameCanvas {
+            border: 2px solid #4ecca3;
+            background: #2d2d3a;
+            cursor: crosshair;
+        }
+        #ui {
+            margin-top: 10px;
+            display: flex;
+            gap: 25px;
+            font-size: 14px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        #ui span { color: #4ecca3; }
+        #ui .value { color: #fff; font-weight: bold; }
+        #controls {
+            margin-top: 8px;
+            font-size: 12px;
+            color: #888;
+            text-align: center;
+            max-width: 800px;
+            line-height: 1.6;
+        }
+        #gameOver {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.9);
+            padding: 30px 50px;
+            border-radius: 10px;
+            border: 2px solid #ff6b6b;
+            text-align: center;
+            display: none;
+            z-index: 100;
+        }
+        #gameOver h2 { color: #ff6b6b; margin-bottom: 15px; }
+        #gameOver button {
+            margin-top: 15px;
+            padding: 10px 30px;
+            font-size: 16px;
+            background: #4ecca3;
+            color: #1a1a2e;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        #gameOver button:hover { background: #3db892; }
+        #startScreen, #pauseScreen {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.9);
+            padding: 40px 60px;
+            border-radius: 10px;
+            border: 2px solid #4ecca3;
+            text-align: center;
+            z-index: 100;
+        }
+        #startScreen h2 { color: #4ecca3; margin-bottom: 20px; font-size: 28px; }
+        #pauseScreen h2 { color: #ffe66d; margin-bottom: 20px; font-size: 28px; }
+        #startScreen button, #pauseScreen button {
+            margin-top: 20px;
+            padding: 12px 40px;
+            font-size: 18px;
+            background: #4ecca3;
+            color: #1a1a2e;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        #startScreen button:hover, #pauseScreen button:hover { background: #3db892; }
+        .split-notice {
+            position: absolute;
+            top: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255, 193, 7, 0.9);
+            color: #1a1a2e;
+            padding: 8px 20px;
+            border-radius: 20px;
+            font-weight: bold;
+            display: none;
+            animation: fadeInOut 2s ease-in-out;
+        }
+        @keyframes fadeInOut {
+            0% { opacity: 0; transform: translateX(-50%) translateY(-10px); }
+            20% { opacity: 1; transform: translateX(-50%) translateY(0); }
+            80% { opacity: 1; transform: translateX(-50%) translateY(0); }
+            100% { opacity: 0; transform: translateX(-50%) translateY(-10px); }
+        }
+    </style>
+</head>
+<body>
+    <h1>🐍 SnakeWorm v0.2 - 自噬与分裂（修复版）</h1>
+    <div style="position:relative;">
+        <canvas id="gameCanvas" width="800" height="600"></canvas>
+        <div class="split-notice" id="splitNotice">⚡ 分裂！新蚯蚓诞生！</div>
+        <div id="startScreen">
+            <h2>🐍 SnakeWorm</h2>
+            <p>鼠标控制方向 · 吃食物增长 · 自噬会分裂</p>
+            <p>⚠️ 头碰到其他蚯蚓会被吞噬！</p>
+            <button onclick="game.startGame()">开始游戏</button>
+        </div>
+        <div id="pauseScreen" style="display: none;">
+            <h2>⏸️ 游戏暂停</h2>
+            <p>按 ESC 继续游戏</p>
+            <button onclick="game.resumeGame()">继续游戏</button>
+        </div>
+    </div>
+    <div id="ui">
+        <div>玩家长度: <span class="value" id="lengthDisplay">3</span></div>
+        <div>分数: <span class="value" id="scoreDisplay">0</span></div>
+        <div>速度: <span class="value" id="speedDisplay">5</span></div>
+        <div>分裂体: <span class="value" id="splitCount">0</span></div>
+        <div>总蚯蚓数: <span class="value" id="wormCount">1</span></div>
+    </div>
+    <div id="controls">
+        🖱️ 鼠标移动控制方向 | 🟢 吃绿色食物增长 | ⚠️ <b>头碰自己身体 → 分裂</b>（不结束游戏！）<br>
+        分裂后断尾保持原位 → 逐渐变色+闪光（无敌）→ 新头长出 → 新蚯蚓慢慢移动10秒 → 进入正常状态 | 💀 <b>头被其他蚯蚓吃掉 → 游戏结束</b>
+    </div>
+    <div id="gameOver">
+        <h2>💀 被吞噬了！</h2>
+        <p>最终长度: <span id="finalLength">0</span></p>
+        <p>最终分数: <span id="finalScore">0</span></p>
+        <p>分裂体数量: <span id="finalSplits">0</span></p>
+        <button onclick="game.restart()">重新开始</button>
+    </div>
+
+    <script>
+        /**
+         * SnakeWorm v0.2 - 自噬与分裂原型（修复版）
+         *
+         * 核心机制:
+         * - 自噬不结束游戏，而是触发分裂
+         * - 分裂后：原蚯蚓保留前半段，断尾保持原位不动
+         * - 断尾逐渐变色+闪光（无敌状态）
+         * - 新头长出后，新蚯蚓慢慢移动5秒，期间继续闪光
+         * - 5秒后闪光停止，进入正常状态
+         */
+
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        const CONFIG = {
+            CANVAS_WIDTH: 800, CANVAS_HEIGHT: 600,
+            SEGMENT_RADIUS: 8, SEGMENT_SPACING: 14,
+            BASE_SPEED: 5, MIN_SPEED: 2, SPEED_DECAY: 0.02,
+            FOOD_RADIUS: 6, FOOD_COUNT: 5,
+            WORM_INITIAL_LENGTH: 3, GROWTH_PER_FOOD: 2,
+            WALL_MARGIN: 10,
+            // v0.2 配置
+            SPLIT_COLOR_DURATION: 3.0,  // 变色时间（秒）
+            SPLIT_GROW_HEAD_TIME: 2.0,  // 长头时间（秒）
+            SPLIT_INVINCIBLE_TIME: 13.0,  // 总无敌时间（变色3秒+长头2秒+移动10秒）
+            SPLIT_COLORS: ['#ff6b6b', '#4ecdc4', '#ffe66d', '#a8e6cf', '#ff8b94', '#c7ceea'],
+            MAX_WORMS: 15,
+            AI_BASE_SPEED: 3.5,
+            AI_WANDER_CHANGE: 2.0
+        };
+
+        /* ========== 向量工具类 ========== */
+        class Vector {
+            constructor(x, y) { this.x = x; this.y = y; }
+            add(v) { return new Vector(this.x + v.x, this.y + v.y); }
+            sub(v) { return new Vector(this.x - v.x, this.y - v.y); }
+            mult(n) { return new Vector(this.x * n, this.y * n); }
+            mag() { return Math.sqrt(this.x * this.x + this.y * this.y); }
+            normalize() {
+                const m = this.mag();
+                return m === 0 ? new Vector(0, 0) : new Vector(this.x / m, this.y / m);
+            }
+            dist(v) {
+                const dx = this.x - v.x, dy = this.y - v.y;
+                return Math.sqrt(dx * dx + dy * dy);
+            }
+            static randomDir() {
+                const angle = Math.random() * Math.PI * 2;
+                return new Vector(Math.cos(angle), Math.sin(angle));
+            }
+        }
+
+        /* ========== 食物类 ========== */
+        class Food {
+            constructor(x, y) {
+                this.pos = new Vector(x, y);
+                this.radius = CONFIG.FOOD_RADIUS;
+                this.pulsePhase = Math.random() * Math.PI * 2;
+            }
+            static random() {
+                const margin = CONFIG.WALL_MARGIN + CONFIG.FOOD_RADIUS;
+                return new Food(
+                    margin + Math.random() * (CONFIG.CANVAS_WIDTH - margin * 2),
+                    margin + Math.random() * (CONFIG.CANVAS_HEIGHT - margin * 2)
+                );
+            }
+            update(dt) { this.pulsePhase += dt * 3; }
+            draw(ctx) {
+                const pulse = Math.sin(this.pulsePhase) * 2;
+                const r = this.radius + pulse;
+                ctx.shadowBlur = 10; ctx.shadowColor = '#4ecca3';
+                ctx.beginPath();
+                ctx.arc(this.pos.x, this.pos.y, r, 0, Math.PI * 2);
+                ctx.fillStyle = '#4ecca3'; ctx.fill();
+                ctx.shadowBlur = 0;
+                ctx.beginPath();
+                ctx.arc(this.pos.x - 2, this.pos.y - 2, r * 0.4, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(255,255,255,0.5)'; ctx.fill();
+            }
+        }
+
+        /* ========== 蚯蚓类 ========== */
+        class Worm {
+            constructor(x, y, length, color = '#4ecca3', isPlayer = true) {
+                this.segments = [];
+                this.color = color;
+                this.targetLength = length;
+                this.isPlayer = isPlayer;
+                this.isAlive = true;
+                this.velocity = new Vector(1, 0);
+                this.speed = isPlayer ? CONFIG.BASE_SPEED : CONFIG.AI_BASE_SPEED;
+                this.invincibleTimer = 0;  // 无敌时间计时器
+                this.activationTimer = 0;  // 激活计时器（新蚯蚓需要时间激活）
+
+                for (let i = 0; i < length; i++) {
+                    this.segments.push(new Vector(x - i * CONFIG.SEGMENT_SPACING, y));
+                }
+
+                this.aiTarget = null;
+                this.aiWanderTimer = 0;
+                this.aiWanderDir = Vector.randomDir();
+            }
+
+            get head() { return this.segments[0]; }
+            get length() { return this.segments.length; }
+
+            updateSpeed() {
+                const speedReduction = (this.length - CONFIG.WORM_INITIAL_LENGTH) * CONFIG.SPEED_DECAY;
+                const base = this.isPlayer ? CONFIG.BASE_SPEED : CONFIG.AI_BASE_SPEED;
+                this.speed = Math.max(CONFIG.MIN_SPEED, base - speedReduction);
+            }
+
+            grow(amount) { this.targetLength += amount; }
+
+            update(targetPos, dt, allFoods = [], allWorms = []) {
+                // 更新计时器
+                if (this.invincibleTimer > 0) this.invincibleTimer -= dt;
+                if (this.activationTimer > 0) this.activationTimer -= dt;
+
+                this.updateSpeed();
+
+                let moveTarget = targetPos;
+
+                if (!this.isPlayer && this.isAlive) {
+                    moveTarget = this.aiThink(allFoods, allWorms, dt);
+                }
+
+                const head = this.segments[0];
+                
+                // 如果moveTarget为null，跳过移动
+                if (!moveTarget) {
+                    return;
+                }
+                
+                const direction = moveTarget.sub(head).normalize();
+
+                if (direction.mag() > 0) {
+                    this.velocity = direction;
+                }
+
+                const moveStep = this.velocity.mult(this.speed * dt * 60);
+                this.segments[0] = head.add(moveStep);
+
+                for (let i = 1; i < this.segments.length; i++) {
+                    const prev = this.segments[i - 1];
+                    const curr = this.segments[i];
+                    const dir = prev.sub(curr);
+                    const dist = dir.mag();
+
+                    if (dist > CONFIG.SEGMENT_SPACING) {
+                        const targetPos = prev.sub(dir.normalize().mult(CONFIG.SEGMENT_SPACING));
+                        const lerpFactor = 0.3;
+                        this.segments[i] = new Vector(
+                            curr.x + (targetPos.x - curr.x) * lerpFactor,
+                            curr.y + (targetPos.y - curr.y) * lerpFactor
+                        );
+                    }
+                }
+
+                while (this.segments.length < this.targetLength) {
+                    const tail = this.segments[this.segments.length - 1];
+                    this.segments.push(new Vector(tail.x, tail.y));
+                }
+            }
+
+            aiThink(foods, allWorms, dt) {
+                this.aiWanderTimer -= dt;
+                if (this.aiWanderTimer <= 0) {
+                    this.aiWanderTimer = CONFIG.AI_WANDER_CHANGE + Math.random() * 2;
+                    this.aiWanderDir = Vector.randomDir();
+                }
+
+                let nearestFood = null;
+                let minDist = Infinity;
+                for (const food of foods) {
+                    const d = this.head.dist(food.pos);
+                    if (d < minDist) {
+                        minDist = d;
+                        nearestFood = food;
+                    }
+                }
+
+                if (nearestFood && minDist < 300) {
+                    return nearestFood.pos;
+                }
+
+                return this.head.add(this.aiWanderDir.mult(100));
+            }
+
+            checkWallCollision() {
+                const head = this.segments[0];
+                const margin = CONFIG.WALL_MARGIN + CONFIG.SEGMENT_RADIUS;
+                return head.x < margin || head.x > CONFIG.CANVAS_WIDTH - margin ||
+                       head.y < margin || head.y > CONFIG.CANVAS_HEIGHT - margin;
+            }
+
+            checkFoodCollision(foods) {
+                const head = this.segments[0];
+                const eatDist = CONFIG.SEGMENT_RADIUS + CONFIG.FOOD_RADIUS;
+                for (let i = 0; i < foods.length; i++) {
+                    if (head.dist(foods[i].pos) < eatDist) return i;
+                }
+                return -1;
+            }
+
+            /**
+             * 检测自噬：头部是否碰到自己的身体段
+             * 关键：从第10段开始检测，避免分裂后立刻再次触发
+             */
+            checkSelfCollision() {
+                const head = this.segments[0];
+                const collisionDist = CONFIG.SEGMENT_RADIUS * 1.5;
+
+                for (let i = 10; i < this.segments.length; i++) {
+                    if (head.dist(this.segments[i]) < collisionDist) {
+                        return i;
+                    }
+                }
+                return -1;
+            }
+
+            /**
+             * 检测头部是否碰到其他蚯蚓的身体段
+             * 关键：跳过无敌状态的蚯蚓
+             */
+            checkOtherWormCollision(otherWorms) {
+                const head = this.segments[0];
+                const collisionDist = CONFIG.SEGMENT_RADIUS * 1.2;
+
+                for (const other of otherWorms) {
+                    if (other === this || !other.isAlive) continue;
+                    // 跳过无敌状态的蚯蚓
+                    if (other.invincibleTimer > 0) continue;
+                    // 跳过正在激活的蚯蚓
+                    if (other.activationTimer > 0) continue;
+
+                    for (let i = 0; i < other.segments.length; i++) {
+                        if (head.dist(other.segments[i]) < collisionDist) {
+                            return { worm: other, segmentIndex: i };
+                        }
+                    }
+                }
+                return null;
+            }
+
+            draw(ctx) {
+                if (!this.isAlive && this.segments.length === 0) return;
+
+                for (let i = this.segments.length - 1; i >= 0; i--) {
+                    const seg = this.segments[i];
+                    const isHead = i === 0;
+                    const sizeRatio = isHead ? 1.0 : (0.7 + 0.3 * (1 - i / this.segments.length));
+                    const radius = CONFIG.SEGMENT_RADIUS * sizeRatio;
+
+                    ctx.beginPath();
+                    ctx.arc(seg.x, seg.y, radius, 0, Math.PI * 2);
+
+                    if (isHead) {
+                        ctx.fillStyle = this.color;
+                        ctx.shadowBlur = 8;
+                        ctx.shadowColor = this.color;
+                    } else {
+                        const alpha = 0.4 + 0.6 * (1 - i / this.segments.length);
+                        ctx.fillStyle = this.hexToRgba(this.color, alpha);
+                        ctx.shadowBlur = 0;
+                    }
+
+                    ctx.fill();
+                    ctx.shadowBlur = 0;
+
+                    if (isHead) this.drawEyes(ctx, seg);
+                }
+            }
+
+            drawEyes(ctx, headPos) {
+                const eyeOffset = 3, eyeRadius = 2.5;
+                const angle = Math.atan2(this.velocity.y, this.velocity.x);
+                const a1 = angle - 0.5, a2 = angle + 0.5;
+
+                const e1 = new Vector(headPos.x + Math.cos(a1) * eyeOffset, headPos.y + Math.sin(a1) * eyeOffset);
+                const e2 = new Vector(headPos.x + Math.cos(a2) * eyeOffset, headPos.y + Math.sin(a2) * eyeOffset);
+
+                ctx.fillStyle = '#fff';
+                ctx.beginPath(); ctx.arc(e1.x, e1.y, eyeRadius, 0, Math.PI * 2); ctx.fill();
+                ctx.beginPath(); ctx.arc(e2.x, e2.y, eyeRadius, 0, Math.PI * 2); ctx.fill();
+
+                ctx.fillStyle = '#000';
+                ctx.beginPath(); ctx.arc(e1.x, e1.y, 1, 0, Math.PI * 2); ctx.fill();
+                ctx.beginPath(); ctx.arc(e2.x, e2.y, 1, 0, Math.PI * 2); ctx.fill();
+            }
+
+            hexToRgba(hex, alpha) {
+                const r = parseInt(hex.slice(1, 3), 16);
+                const g = parseInt(hex.slice(3, 5), 16);
+                const b = parseInt(hex.slice(5, 7), 16);
+                return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+            }
+        }
+
+        /* ========== 断尾类（保持原位，变色+闪光） ========== */
+        class BrokenTail {
+            constructor(segments, originalColor) {
+                // 保持原始位置，不做任何移动
+                this.segments = segments.map(s => new Vector(s.x, s.y));
+                this.originalColor = originalColor;
+                this.newColor = CONFIG.SPLIT_COLORS[Math.floor(Math.random() * CONFIG.SPLIT_COLORS.length)];
+                
+                // 计时器
+                this.colorTimer = CONFIG.SPLIT_COLOR_DURATION;  // 变色计时器
+                this.growHeadTimer = CONFIG.SPLIT_GROW_HEAD_TIME;  // 长头计时器
+                this.totalTimer = CONFIG.SPLIT_INVINCIBLE_TIME;  // 总无敌计时器
+                
+                // 状态
+                this.colorProgress = 0;  // 变色进度 (0-1)
+                this.hasNewHead = false;  // 是否已长出新头
+                this.isFinished = false;  // 是否已完成（可以生成新蚯蚓）
+                this.flashPhase = 0;  // 闪光相位
+            }
+
+            update(dt) {
+                if (this.isFinished) return true;
+
+                // 更新计时器
+                this.colorTimer -= dt;
+                this.growHeadTimer -= dt;
+                this.totalTimer -= dt;
+                this.flashPhase += dt * 8;  // 闪光频率
+
+                // 变色进度
+                if (this.colorTimer <= 0) {
+                    this.colorProgress = 1;
+                } else {
+                    this.colorProgress = 1 - (this.colorTimer / CONFIG.SPLIT_COLOR_DURATION);
+                }
+
+                // 长头
+                if (!this.hasNewHead && this.growHeadTimer <= 0) {
+                    this.hasNewHead = true;
+                }
+
+                // 完成
+                if (this.totalTimer <= 0) {
+                    this.isFinished = true;
+                }
+
+                return this.isFinished;
+            }
+
+            /**
+             * 获取当前颜色（过渡中的颜色）
+             */
+            getCurrentColor() {
+                return this.interpolateColor(this.originalColor, this.newColor, this.colorProgress);
+            }
+
+            /**
+             * 颜色插值
+             */
+            interpolateColor(from, to, t) {
+                const r1 = parseInt(from.slice(1, 3), 16);
+                const g1 = parseInt(from.slice(3, 5), 16);
+                const b1 = parseInt(from.slice(5, 7), 16);
+                const r2 = parseInt(to.slice(1, 3), 16);
+                const g2 = parseInt(to.slice(3, 5), 16);
+                const b2 = parseInt(to.slice(5, 7), 16);
+                const r = Math.round(r1 + (r2 - r1) * t);
+                const g = Math.round(g1 + (g2 - g1) * t);
+                const b = Math.round(b1 + (b2 - b1) * t);
+                return `rgb(${r}, ${g}, ${b})`;
+            }
+
+            /**
+             * 绘制断尾（保持原位，变色+闪光）
+             */
+            draw(ctx) {
+                const color = this.getCurrentColor();
+                const flashIntensity = Math.sin(this.flashPhase) * 0.5 + 0.5;  // 0-1
+                const flashAlpha = 0.3 + flashIntensity * 0.7;  // 闪光透明度
+
+                for (let i = this.segments.length - 1; i >= 0; i--) {
+                    const seg = this.segments[i];
+                    const isHead = i === 0;
+                    const headMultiplier = (isHead && this.hasNewHead) ? 1.3 : 1.0;
+                    const r = CONFIG.SEGMENT_RADIUS * headMultiplier;
+
+                    ctx.beginPath();
+                    ctx.arc(seg.x, seg.y, r, 0, Math.PI * 2);
+
+                    if (isHead && this.hasNewHead) {
+                        // 新头：发光效果
+                        ctx.shadowBlur = 15;
+                        ctx.shadowColor = color;
+                        ctx.fillStyle = color;
+                    } else {
+                        // 身体：闪光效果
+                        ctx.shadowBlur = flashIntensity * 10;
+                        ctx.shadowColor = color;
+                        ctx.fillStyle = this.hexToRgba(color, flashAlpha * 0.8);
+                    }
+
+                    ctx.fill();
+                    ctx.shadowBlur = 0;
+
+                    // 新头画眼睛
+                    if (isHead && this.hasNewHead) {
+                        this.drawEyes(ctx, seg, color);
+                    }
+                }
+            }
+
+            drawEyes(ctx, headPos, color) {
+                // 断尾的新头朝向：从第1段指向第0段的方向
+                const dir = this.segments.length > 1
+                    ? this.segments[0].sub(this.segments[1]).normalize()
+                    : new Vector(1, 0);
+
+                const angle = Math.atan2(dir.y, dir.x);
+                const eyeOffset = 3, eyeRadius = 2.5;
+                const a1 = angle - 0.5, a2 = angle + 0.5;
+
+                const e1 = new Vector(headPos.x + Math.cos(a1) * eyeOffset, headPos.y + Math.sin(a1) * eyeOffset);
+                const e2 = new Vector(headPos.x + Math.cos(a2) * eyeOffset, headPos.y + Math.sin(a2) * eyeOffset);
+
+                ctx.fillStyle = '#fff';
+                ctx.beginPath(); ctx.arc(e1.x, e1.y, eyeRadius, 0, Math.PI * 2); ctx.fill();
+                ctx.beginPath(); ctx.arc(e2.x, e2.y, eyeRadius, 0, Math.PI * 2); ctx.fill();
+
+                ctx.fillStyle = '#000';
+                ctx.beginPath(); ctx.arc(e1.x, e1.y, 1, 0, Math.PI * 2); ctx.fill();
+                ctx.beginPath(); ctx.arc(e2.x, e2.y, 1, 0, Math.PI * 2); ctx.fill();
+            }
+
+            hexToRgba(hex, alpha) {
+                if (hex.startsWith('rgb')) {
+                    return hex.replace('rgb', 'rgba').replace(')', `, ${alpha})`);
+                }
+                const r = parseInt(hex.slice(1, 3), 16);
+                const g = parseInt(hex.slice(3, 5), 16);
+                const b = parseInt(hex.slice(5, 7), 16);
+                return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+            }
+
+            /**
+             * 生成新蚯蚓（无敌时间结束后调用）
+             */
+            spawnWorm() {
+                if (this.segments.length < 3) return null;
+
+                const headPos = this.segments[0];
+                const newLength = this.segments.length;
+
+                const worm = new Worm(headPos.x, headPos.y, newLength, this.newColor, false);
+                // 复制断尾的所有段位置到新蚯蚓
+                for (let i = 0; i < this.segments.length && i < worm.segments.length; i++) {
+                    worm.segments[i] = new Vector(this.segments[i].x, this.segments[i].y);
+                }
+                worm.targetLength = newLength;
+
+                // 新蚯蚓的初始方向：从尾部指向头部
+                if (this.segments.length > 1) {
+                    worm.velocity = this.segments[0].sub(this.segments[1]).normalize();
+                }
+
+                // 新蚯蚓出生后激活计时器（10秒移动+闪光，确保玩家有足够时间离开）
+                worm.activationTimer = 10.0;
+                worm.invincibleTimer = 10.0;  // 10秒无敌
+
+                return worm;
+            }
+        }
+
+        /* ========== 游戏主类 ========== */
+        class Game {
+            constructor() {
+                this.worms = [];
+                this.brokenTails = [];
+                this.foods = [];
+                this.mousePos = new Vector(CONFIG.CANVAS_WIDTH / 2, CONFIG.CANVAS_HEIGHT / 2);
+                this.score = 0;
+                this.isRunning = false;
+                this.isPaused = false;
+                this.isGameOver = false;
+                this.lastTime = 0;
+                this.splitCount = 0;
+                this.splitCooldown = 0;
+
+                this.setupInput();
+                // 不立即开始,等待用户点击开始按钮
+            }
+
+            setupInput() {
+                this.mouseInCanvas = false;
+                canvas.addEventListener('mousemove', (e) => {
+                    const rect = canvas.getBoundingClientRect();
+                    this.mousePos = new Vector(e.clientX - rect.left, e.clientY - rect.top);
+                    this.mouseInCanvas = true;
+                });
+                canvas.addEventListener('touchmove', (e) => {
+                    e.preventDefault();
+                    const rect = canvas.getBoundingClientRect();
+                    const touch = e.touches[0];
+                    this.mousePos = new Vector(touch.clientX - rect.left, touch.clientY - rect.top);
+                    this.mouseInCanvas = true;
+                });
+                // 鼠标离开窗口时，暂停鼠标控制，避免蚯蚓立刻撞墙
+                canvas.addEventListener('mouseleave', () => {
+                    this.mouseInCanvas = false;
+                    console.log('[调试] 鼠标离开窗口，暂停控制');
+                });
+                canvas.addEventListener('mouseenter', () => {
+                    this.mouseInCanvas = true;
+                });
+                // ESC键暂停/继续
+                document.addEventListener('keydown', (e) => {
+                    if (e.key === 'Escape') {
+                        if (this.isRunning && !this.isGameOver) {
+                            this.pauseGame();
+                        } else if (this.isPaused) {
+                            this.resumeGame();
+                        }
+                    }
+                });
+            }
+
+           startGame() {
+                document.getElementById('startScreen').style.display = 'none';
+                this.restart();
+                this.loop(0);
+            }
+
+            pauseGame() {
+                this.isPaused = true;
+                document.getElementById('pauseScreen').style.display = 'block';
+            }
+
+            resumeGame() {
+                this.isPaused = false;
+                document.getElementById('pauseScreen').style.display = 'none';
+                this.lastTime = 0; // 重置时间,防止暂停后时间跳跃
+            }
+
+            restart() {
+                this.worms = [];
+                this.brokenTails = [];
+                this.foods = [];
+                this.score = 0;
+                this.splitCount = 0;
+                this.splitCooldown = 0;
+                this.isRunning = true;
+                this.isPaused = false;
+                this.isGameOver = false;
+
+                const player = new Worm(
+                    CONFIG.CANVAS_WIDTH / 2,
+                    CONFIG.CANVAS_HEIGHT / 2,
+                    CONFIG.WORM_INITIAL_LENGTH,
+                    '#4ecca3',
+                    true
+                );
+                this.worms.push(player);
+
+                for (let i = 0; i < CONFIG.FOOD_COUNT; i++) {
+                    this.foods.push(Food.random());
+                }
+
+                document.getElementById('gameOver').style.display = 'none';
+                this.updateUI();
+            }
+
+            updateUI() {
+                const player = this.worms[0];
+                document.getElementById('lengthDisplay').textContent = player.length;
+                document.getElementById('scoreDisplay').textContent = this.score;
+                document.getElementById('speedDisplay').textContent = player.speed.toFixed(1);
+                document.getElementById('splitCount').textContent = this.splitCount;
+                document.getElementById('wormCount').textContent = this.worms.filter(w => w.isAlive).length;
+            }
+
+        loop(timestamp) {
+                const deltaTime = this.lastTime ? (timestamp - this.lastTime) / 1000 : 1 / 60;
+                this.lastTime = timestamp;
+
+                if (this.isRunning && !this.isGameOver && !this.isPaused) {
+                    this.update(deltaTime);
+                }
+
+                this.draw();
+                requestAnimationFrame((t) => this.loop(t));
+            }
+
+            update(deltaTime) {
+                const dt = Math.min(deltaTime, 1 / 30);
+                const player = this.worms[0];
+
+                // 更新分裂冷却
+                if (this.splitCooldown > 0) {
+                    this.splitCooldown -= dt;
+                }
+
+                // 1. 更新所有蚯蚓
+                for (const worm of this.worms) {
+                    if (!worm.isAlive) continue;
+
+                    if (worm.isPlayer) {
+                        // 鼠标在窗口内时才使用鼠标控制
+                        if (this.mouseInCanvas) {
+                            worm.update(this.mousePos, dt, this.foods, this.worms);
+                        } else {
+                            // 鼠标离开窗口，继续朝当前方向前进
+                            worm.update(null, dt, this.foods, this.worms);
+                        }
+                    } else {
+                        worm.update(null, dt, this.foods, this.worms);
+
+                        // AI撞墙反弹
+                        if (worm.checkWallCollision()) {
+                            worm.aiWanderDir = Vector.randomDir();
+                            const margin = CONFIG.WALL_MARGIN + CONFIG.SEGMENT_RADIUS;
+                            worm.segments[0].x = Math.max(margin, Math.min(CONFIG.CANVAS_WIDTH - margin, worm.segments[0].x));
+                            worm.segments[0].y = Math.max(margin, Math.min(CONFIG.CANVAS_HEIGHT - margin, worm.segments[0].y));
+                        }
+                    }
+                }
+
+                // 2. 玩家撞墙（鼠标离开窗口时不判定死亡）
+                if (this.mouseInCanvas && player.checkWallCollision()) {
+                    this.gameOver();
+                    return;
+                }
+
+                // 3. 吃食物
+                for (const worm of this.worms) {
+                    if (!worm.isAlive) continue;
+                    const eatenIndex = worm.checkFoodCollision(this.foods);
+                    if (eatenIndex !== -1) {
+                        this.foods.splice(eatenIndex, 1);
+                        worm.grow(CONFIG.GROWTH_PER_FOOD);
+                        if (worm.isPlayer) this.score += 10;
+                        this.foods.push(Food.random());
+                    }
+                }
+
+                // 4. 玩家自噬检测（有冷却时间）
+                if (this.splitCooldown <= 0) {
+                    const selfCollisionIndex = player.checkSelfCollision();
+                    if (selfCollisionIndex !== -1) {
+                        console.log(`[分裂调试] 检测到自噬！collisionIndex=${selfCollisionIndex}, 原长度=${player.segments.length}`);
+                        this.handleSplit(player, selfCollisionIndex);
+                        this.splitCooldown = 2.0; // 2秒冷却
+                        console.log(`[分裂调试] 分裂完成，brokenTails.length=${this.brokenTails.length}`);
+                    }
+                }
+
+                // 5. 玩家被其他蚯蚓吞噬（只检测已完全激活的蚯蚓）
+                const activeWorms = this.worms.slice(1).filter(w => 
+                    w.isAlive && w.invincibleTimer <= 0 && w.activationTimer <= 0
+                );
+                const otherCollision = player.checkOtherWormCollision(activeWorms);
+                if (otherCollision) {
+                    this.gameOver();
+                    return;
+                }
+
+                // 6. 更新断尾
+                for (let i = this.brokenTails.length - 1; i >= 0; i--) {
+                    const tail = this.brokenTails[i];
+                    const finished = tail.update(dt);
+
+                    if (finished) {
+                        // 无敌时间结束，生成新蚯蚓
+                        const newWorm = tail.spawnWorm();
+                        console.log(`[分裂调试] 断尾完成，新蚯蚓长度=${newWorm ? newWorm.length : 'null'}, worms.length=${this.worms.length}, MAX_WORMS=${CONFIG.MAX_WORMS}`);
+                        if (newWorm && this.worms.length < CONFIG.MAX_WORMS) {
+                            this.worms.push(newWorm);
+                            this.splitCount++;
+                            console.log(`[分裂调试] 新蚯蚓已添加，splitCount=${this.splitCount}, worms.length=${this.worms.length}`);
+                            this.showSplitNotice();
+                        } else {
+                            console.warn(`[分裂调试] 新蚯蚓未添加，原因：${!newWorm ? 'newWorm为null' : `worms.length(${this.worms.length}) >= MAX_WORMS(${CONFIG.MAX_WORMS})`}`);
+                        }
+                        this.brokenTails.splice(i, 1);
+                    }
+                }
+
+                // 7. 更新食物动画
+                this.foods.forEach(food => food.update(dt));
+
+                // 8. 更新UI
+                this.updateUI();
+            }
+
+            /**
+             * 处理分裂：一分为二
+             * 关键：原蚯蚓不做任何位置调整，断尾保持原位
+             */
+            handleSplit(worm, collisionIndex) {
+                // 保留头部到碰撞点之前
+                const keptSegments = worm.segments.slice(0, collisionIndex);
+                // 断尾从碰撞点开始
+                const tailSegments = worm.segments.slice(collisionIndex);
+
+                if (tailSegments.length < 3) return;
+
+                // 更新原蚯蚓：只保留前半段，不做位置调整
+                worm.segments = keptSegments;
+                worm.targetLength = keptSegments.length;
+
+                // 创建断尾（保持原位，变色+闪光）
+                const brokenTail = new BrokenTail(tailSegments, worm.color);
+                this.brokenTails.push(brokenTail);
+            }
+
+            showSplitNotice() {
+                const notice = document.getElementById('splitNotice');
+                notice.style.display = 'block';
+                notice.style.animation = 'none';
+                notice.offsetHeight;
+                notice.style.animation = 'fadeInOut 2s ease-in-out';
+                setTimeout(() => { notice.style.display = 'none'; }, 2000);
+            }
+
+            draw() {
+                ctx.fillStyle = '#2d2d3a';
+                ctx.fillRect(0, 0, CONFIG.CANVAS_WIDTH, CONFIG.CANVAS_HEIGHT);
+
+                this.drawGrid();
+
+                // 绘制断尾
+                this.brokenTails.forEach(t => t.draw(ctx));
+
+                // 绘制食物
+                this.foods.forEach(food => food.draw(ctx));
+
+                // 绘制所有蚯蚓
+                for (const worm of this.worms) {
+                    if (worm.isAlive) worm.draw(ctx);
+                }
+
+                this.drawWalls();
+            }
+
+            drawGrid() {
+                ctx.strokeStyle = 'rgba(78, 204, 163, 0.05)';
+                ctx.lineWidth = 1;
+                const gridSize = 40;
+                for (let x = 0; x < CONFIG.CANVAS_WIDTH; x += gridSize) {
+                    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, CONFIG.CANVAS_HEIGHT); ctx.stroke();
+                }
+                for (let y = 0; y < CONFIG.CANVAS_HEIGHT; y += gridSize) {
+                    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(CONFIG.CANVAS_WIDTH, y); ctx.stroke();
+                }
+            }
+
+            drawWalls() {
+                ctx.strokeStyle = 'rgba(255, 107, 107, 0.3)';
+                ctx.lineWidth = 2;
+                const m = CONFIG.WALL_MARGIN;
+                ctx.strokeRect(m, m, CONFIG.CANVAS_WIDTH - m * 2, CONFIG.CANVAS_HEIGHT - m * 2);
+            }
+
+            gameOver() {
+                this.isGameOver = true;
+                document.getElementById('finalLength').textContent = this.worms[0].length;
+                document.getElementById('finalScore').textContent = this.score;
+                document.getElementById('finalSplits').textContent = this.splitCount;
+                document.getElementById('gameOver').style.display = 'block';
+            }
+        }
+
+        const game = new Game();
+    </script>
+</body>
+</html>

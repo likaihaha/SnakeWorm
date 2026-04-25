@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>水晶序曲试听</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #1a1a2e;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            font-family: 'Microsoft YaHei', sans-serif;
+            color: #eee;
+        }
+        h1 { margin-bottom: 20px; color: #c77dff; }
+        button {
+            padding: 15px 40px;
+            font-size: 20px;
+            background: #c77dff;
+            color: #1a1a2e;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: bold;
+            margin: 10px;
+        }
+        button:hover { background: #a855f7; }
+        #status { margin-top: 20px; font-size: 16px; color: #888; }
+        #now-playing { margin-top: 10px; font-size: 14px; color: #c77dff; }
+    </style>
+</head>
+<body>
+    <h1>🎵 最终幻想水晶序曲 - 试听</h1>
+    <button id="playBtn" onclick="playSong()">播放水晶序曲</button>
+    <button id="stopBtn" onclick="stopSong()" disabled>停止</button>
+    <div id="status">点击按钮播放</div>
+    <div id="now-playing"></div>
+
+    <script>
+        let audioContext = null;
+        let isPlaying = false;
+        let currentNotes = [];
+
+        const song = {
+            name: '水晶序曲',
+            notes: [
+                { freq: 392.00, duration: 400, note: 'G4' },
+                { freq: 440.00, duration: 400, note: 'A4' },
+                { freq: 523.25, duration: 400, note: 'C5' },
+                { freq: 587.33, duration: 400, note: 'D5' },
+                { freq: 659.25, duration: 800, note: 'E5' },
+                { freq: 587.33, duration: 400, note: 'D5' },
+                { freq: 523.25, duration: 400, note: 'C5' },
+                { freq: 440.00, duration: 400, note: 'A4' },
+                { freq: 392.00, duration: 800, note: 'G4' },
+                { freq: 440.00, duration: 400, note: 'A4' },
+                { freq: 523.25, duration: 400, note: 'C5' },
+                { freq: 659.25, duration: 800, note: 'E5' },
+                { freq: 523.25, duration: 400, note: 'C5' },
+                { freq: 440.00, duration: 400, note: 'A4' },
+                { freq: 392.00, duration: 400, note: 'G4' },
+                { freq: 330.00, duration: 400, note: 'E4' },
+                { freq: 294.00, duration: 800, note: 'D4' },
+            ]
+        };
+
+        function playNote(freq, duration, startTime) {
+            const osc1 = audioContext.createOscillator();
+            osc1.type = 'sine';
+            osc1.frequency.setValueAtTime(freq, startTime);
+
+            const osc2 = audioContext.createOscillator();
+            osc2.type = 'sine';
+            osc2.frequency.setValueAtTime(freq * 2, startTime);
+
+            const gainNode = audioContext.createGain();
+            gainNode.gain.setValueAtTime(0, startTime);
+            gainNode.gain.linearRampToValueAtTime(0.25, startTime + 0.02);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, startTime + duration * 2.5 / 1000);
+
+            const gainNode2 = audioContext.createGain();
+            gainNode2.gain.setValueAtTime(0, startTime);
+            gainNode2.gain.linearRampToValueAtTime(0.08, startTime + 0.02);
+            gainNode2.gain.exponentialRampToValueAtTime(0.01, startTime + duration * 1.5 / 1000);
+
+            osc1.connect(gainNode);
+            osc2.connect(gainNode2);
+            gainNode.connect(audioContext.destination);
+            gainNode2.connect(audioContext.destination);
+
+            osc1.start(startTime);
+            osc2.start(startTime);
+            osc1.stop(startTime + duration * 2.5 / 1000 + 0.2);
+            osc2.stop(startTime + duration * 1.5 / 1000 + 0.2);
+
+            currentNotes.push({ osc1, osc2, startTime, duration });
+        }
+
+        function playSong() {
+            if (!audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            
+            isPlaying = true;
+            currentNotes = [];
+            document.getElementById('playBtn').disabled = true;
+            document.getElementById('stopBtn').disabled = false;
+            document.getElementById('status').textContent = '正在播放...';
+
+            let currentTime = audioContext.currentTime + 0.1;
+            const gap = 0.05;  // 音符间隔 50ms
+
+            song.notes.forEach((item, index) => {
+                playNote(item.freq, item.duration, currentTime);
+                document.getElementById('now-playing').textContent = `正在播放: ${item.note}`;
+                
+                setTimeout(() => {
+                    if (isPlaying) {
+                        document.getElementById('now-playing').textContent = `正在播放: ${item.note}`;
+                    }
+                }, (currentTime - audioContext.currentTime) * 1000);
+
+                currentTime += item.duration / 1000 + gap;
+            });
+
+            setTimeout(() => {
+                if (isPlaying) {
+                    isPlaying = false;
+                    document.getElementById('playBtn').disabled = false;
+                    document.getElementById('stopBtn').disabled = true;
+                    document.getElementById('status').textContent = '播放完成';
+                    document.getElementById('now-playing').textContent = '';
+                }
+            }, currentTime * 1000);
+        }
+
+        function stopSong() {
+            isPlaying = false;
+            currentNotes.forEach(({ osc1, osc2 }) => {
+                try { osc1.stop(); osc2.stop(); } catch(e) {}
+            });
+            currentNotes = [];
+            document.getElementById('playBtn').disabled = false;
+            document.getElementById('stopBtn').disabled = true;
+            document.getElementById('status').textContent = '已停止';
+            document.getElementById('now-playing').textContent = '';
+        }
+    </script>
+</body>
+</html>
