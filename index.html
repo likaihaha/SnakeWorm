@@ -2972,9 +2972,15 @@
                 const dt = Math.min(deltaTime, 1 / 30);
                 const player = this.worms[0];
 
-                // 等待玩家控制阶段：只更新蚯蚓出场动画，暂停其他游戏逻辑
+                // 等待玩家控制阶段：执行出场动画，暂停其他游戏逻辑
                 if (this.waitingForPlayer) {
-                    // 只更新蚯蚓出场动画
+                    // 确保出场动画启动
+                    if (player && !player.isEntering) {
+                        player.isEntering = true;
+                        player.enterPhase = 0;
+                        player.enterTime = 0;
+                    }
+                    // 更新蚯蚓出场动画
                     if (player && player.isEntering) {
                         player.updateEntering(dt);
                     }
