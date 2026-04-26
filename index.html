@@ -1190,7 +1190,7 @@
                 ctx.restore();
             }
 
-            /**
+         /**
              * 吃豆人头部绘制
              * 使用 Canvas 的 arc() 绘制带缺口的圆形，嘴巴开口角度根据速度动态调整
              * 速度越快，嘴巴张得越大
@@ -1198,16 +1198,13 @@
              * 去掉发光效果，使用 hexToRgba 与身体亮度一致
              * 加上眼睛和嘴部张合动画
              * 头部半径加大到虚线圆环大小（radius + 2）
+             * 嘴巴扇形缺口最大 120 度（约 2.09 弧度），闭合时完全闭合
              */
             drawPacmanHead(ctx, headPos, radius) {
                 if (!this.isAlive) return;
                 
                 // 头部半径加大到虚线圆环大小
                 const drawRadius = radius + 2;
-                
-                // 嘴巴开口角度根据速度动态调整
-                // 基础开口 0.3 弧度，速度越快开口越大，最大 1.5 弧度（加大！）
-                const mouthOpen = Math.min(1.5, 0.3 + this.speed * 0.1);
                 
                 // 嘴巴方向基于 head 到 segments[1] 的向量（平滑连续变化）
                 let mouthAngle = Math.atan2(this.velocity.y, this.velocity.x);
@@ -1219,8 +1216,12 @@
                 }
                 
                 // 动画效果：嘴巴一张一合（周期约 0.3 秒）
+                // animPhase: 0~1 循环
                 const animPhase = (Math.sin(performance.now() / 150) + 1) / 2;  // 0~1
-                const animMouthOpen = mouthOpen * (0.5 + animPhase * 0.5);  // 动画放大开口
+                
+                // 嘴巴开口角度：从 0（完全闭合）到 2.09 弧度（120 度扇形）
+                const maxMouthOpen = 2.09;  // 120 度 = π * 2/3 ≈ 2.09 弧度
+                const animMouthOpen = maxMouthOpen * animPhase;  // 0 ~ 2.09 弧度
                 
                 // 绘制带缺口的圆形（吃豆人形状）
                 // arc(x, y, radius, startAngle, endAngle, counterclockwise)
