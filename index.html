@@ -2571,12 +2571,13 @@
                 // 每段独立的速度，避免共用velocity导致异常累积
                 this.velocities = segments.map(() => new Vector(0, 0));
                 this.isFinished = false;
-                this.hasEmitted = false;  // 是否已发射宝珠
             }
 
             update(dt, canvasHeight) {
+                const emitted = [];  // 记录本次碰底需要发射的宝珠
+
                 // 柔软无力地下沉：缓慢向下移动 + 轻微摆动
-                for (let i = 0; i < this.segments.length; i++) {
+                for (let i = this.segments.length - 1; i >= 0; i--) {
                     const seg = this.segments[i];
                     const vel = this.velocities[i];
                     
@@ -2592,28 +2593,31 @@
                     
                     seg.x += vel.x * dt;
                     seg.y += vel.y * dt;
-                }
-
-                // 检查是否有段碰到框体底部
-                for (const seg of this.segments) {
+                    
+                    // 碰底检测：该段尸体转化为宝珠向上发射
                     if (seg.y >= canvasHeight - CONFIG.WALL_MARGIN) {
-                        // 碰到底部，发射宝珠
-                        if (!this.hasEmitted) {
-                            this.hasEmitted = true;
-                            return 'emit';  // 返回特殊标记，通知主类发射宝珠
-                        }
+                        // 随机选择宝珠类型（优先显眼类型）
+                        const preferredTypes = CONFIG.FOOD_TYPES.filter(t => t.score >= 30 && t.score !== 300);
+                        const type = preferredTypes.length > 0
+                            ? preferredTypes[Math.floor(Math.random() * preferredTypes.length)]
+                            : CONFIG.FOOD_TYPES[0];
+                        
+                        emitted.push({ x: seg.x, y: seg.y, type });
+                        
+                        // 从尸体中移除该段（变成宝珠飞走了）
+                        this.segments.splice(i, 1);
+                        this.velocities.splice(i, 1);
                     }
                 }
 
-                // 如果所有段都超出底部，标记为完成
-                const allOutOfBounds = this.segments.every(seg => 
+                // 如果所有段都转化完毕或超出底部，标记为完成
+                if (this.segments.length === 0 || this.segments.every(seg => 
                     seg.y > canvasHeight + 50 || seg.x < -50 || seg.x > CONFIG.CANVAS_WIDTH + 50
-                );
-                if (allOutOfBounds) {
+                )) {
                     this.isFinished = true;
                 }
 
-                return null;
+                return emitted;
             }
 
             draw(ctx) {
@@ -3417,11 +3421,20 @@
                 // 9. 更新尸体下沉动画
                 for (let i = this.deadBodies.length - 1; i >= 0; i--) {
                     const body = this.deadBodies[i];
-                    const result = body.update(dt, CONFIG.CANVAS_HEIGHT);
+                    const emitted = body.update(dt, CONFIG.CANVAS_HEIGHT);
 
-                    // 如果碰到底部，发射宝珠（update内部已检查hasEmitted，此处直接触发）
-                    if (result === 'emit') {
-                        this.emitFoodFromBottom();
+                    // 每一段碰底的尸体转化为宝珠，从该段位置向上发射
+                    for (const emit of emitted) {
+                        const food = new Food(emit.x, emit.y, emit.type);
+                        food.velocity.y = -(3.0 + Math.random() * 3.0);  // 向上速度
+                        food.velocity.x = (Math.random() - 0.5) * 4.0;   // 随机左右偏移
+                        food.fromBottom = true;
+                        this.foods.push(food);
+                        
+                        // 添加粒子特效（尸体段变宝珠的转化效果）
+                        for (let j = 0; j < 6; j++) {
+                            this.particles.push(new Particle(emit.x, emit.y, emit.type.color));
+                        }
                     }
 
                     if (body.isFinished) {
@@ -3544,16 +3557,6 @@
 
                 // 8. 更新食物动画
                 this.foods.forEach(food => food.update(dt));
-
-                // 调试：追踪底部发射宝珠的位置（每10帧输出一次）
-                if (this.frameCount % 10 === 0) {
-                    const bottomFoods = this.foods.filter(f => f.fromBottom);
-                    if (bottomFoods.length > 0) {
-                        bottomFoods.forEach(f => {
-                            console.log(`[底部宝珠追踪] 类型=${f.type.score}, pos=(${f.pos.x.toFixed(1)}, ${f.pos.y.toFixed(1)}), vel.y=${f.velocity.y.toFixed(2)}`);
-                        });
-                    }
-                }
 
                 // 9. 按类型刷新宝珠 + 清理出画布的宝珠（底部消散特效）
                 const deathMargin = CONFIG.WALL_MARGIN * 2 + CONFIG.SEGMENT_RADIUS * 2;
@@ -3958,31 +3961,6 @@
                 notice.offsetHeight;
                 notice.style.animation = 'fadeInOut 2s ease-in-out';
                 setTimeout(() => { notice.style.display = 'none'; }, 2000);
-            }
-
-            /**
-             * 从底部随机发射一颗宝珠
-             */
-            emitFoodFromBottom() {
-                // 优先选择显眼的宝珠类型（红/黄/橙），确保玩家能看到
-                const preferredTypes = CONFIG.FOOD_TYPES.filter(t => t.score >= 30 && t.score !== 300);
-                const type = preferredTypes.length > 0
-                    ? preferredTypes[Math.floor(Math.random() * preferredTypes.length)]
-                    : CONFIG.FOOD_TYPES[0];
-                
-                // 随机x位置
-                const x = CONFIG.WALL_MARGIN + Math.random() * (CONFIG.CANVAS_WIDTH - 2 * CONFIG.WALL_MARGIN);
-                
-                // 创建宝珠（从底部下方生成，给一个足够快的向上初速度）
-                const food = new Food(x, CONFIG.CANVAS_HEIGHT + 30, type);
-                food.velocity.y = -(5.0 + Math.random() * 3.0);  // 向上初速度-5~-8，确保快速飞入画面
-                food.fromBottom = true;  // 标记为底部发射，draw中可特殊处理
-                this.foods.push(food);
-                
-                // 添加浮动文字提示，让玩家注意到
-                this.floatingTexts.push(new FloatingText(x, CONFIG.CANVAS_HEIGHT - 30, '💎 尸体释放宝珠！', type.color));
-                
-                console.log(`[底部发射] 宝珠类型=${type.score}, 位置=(${x.toFixed(1)}, ${CONFIG.CANVAS_HEIGHT + 30}), 初速度=${food.velocity.y.toFixed(2)}`);
             }
 
             /**
