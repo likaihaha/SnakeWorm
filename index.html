@@ -549,19 +549,23 @@
                 <div class="start-instructions">
                     <div class="inst-row inst-main">
                         <span class="inst-icon">🖱️</span>
-                        <span>鼠标控制方向 · 点击鼠标发射子弹</span>
+                        <span>鼠标控制方向，点击鼠标发射子弹（吃红后）</span>
                     </div>
                     <div class="inst-row inst-rule">
                         <span class="inst-icon">🔴</span>
-                        <span>任何虫咬其他虫的尾部 → 被咬者断尾分裂</span>
+                        <span>任何虫咬其他虫颈部 → 被咬者死</span>
+                    </div>
+                    <div class="inst-row inst-rule">
+                        <span class="inst-icon">⚡</span>
+                        <span>任何虫咬中虫的尾部 → 被咬者断尾分裂</span>
                     </div>
                     <div class="inst-row inst-rule">
                         <span class="inst-icon">🔮</span>
-                        <span>🟢绿(+分) → 🟡黄(长2节+旋律) → 🔴红(子弹) → 🟠橙(磁力吸引)</span>
+                        <span>🟢绿(+1节) → 🟡黄(+2节+旋律) → 🔴红(发射减速子弹) → 🟠橙(磁力吸引)</span>
                     </div>
                     <div class="inst-row inst-danger">
                         <span class="inst-icon">💀</span>
-                        <span>死亡：头碰自己身体 · 头碰红色死亡线</span>
+                        <span>死亡：头部喷边框死</span>
                     </div>
                 </div>
                 <button id="startBtn" onclick="game.startGame()">开始游戏</button>
@@ -593,9 +597,9 @@
         <div id="rhythmHint" style="color:#ffd700; font-size:10px; margin-top:3px;"></div>
     </div>
     <div id="controls">
-        🖱️ 鼠标移动控制方向 | 🔮 <b>宝珠渐进解锁：🟢绿→🟡黄(30s)→🔴红(60s+身长20)→🟠橙(90s)</b><br>
-        🔴 <b>咬尾巴 → 断尾分裂</b>（只咬尾巴才分裂，咬身体不触发）<br>
-        🎵 <b>吃黄宝珠后等待旋律播完再出现下一颗</b> | 🎨 <b>Screen 混合模式</b>
+        🖱️ 鼠标控制方向，点击鼠标发射子弹（吃红后） | 🔮 <b>宝珠渐进解锁：🟢绿(+1节)→🟡黄(+2节+旋律)→🔴红(发射减速子弹)→🟠橙(磁力吸引)</b><br>
+        🔴 <b>咬颈部→被咬死</b> | ⚡ <b>咬尾巴→断尾分裂</b><br>
+        💀 <b>死亡：头部喷边框死</b> | 🎵 <b>吃黄宝珠后等待旋律播完再出现下一颗</b>
     </div>
     <div id="gameOver">
         <h2>💀 被吞噬了！</h2>
