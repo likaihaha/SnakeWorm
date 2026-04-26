@@ -6,7 +6,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="format-detection" content="telephone=no">
-    <title>SnakeWorm - 吃豆人蚯蚓</title>
+    <title>SnakeWorm v0.21 - 吃豆人蚯蚓</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -987,18 +987,27 @@
                         direction = this.velocity.clone();
                     }
                     
-                    // 目标位置：在当前尾部后方一个间距的位置
-                    const currentTail = this.segments.length > 0 
-                        ? this.segments[this.segments.length - 1] 
-                        : new Vector(0, 0);
-                    const targetPos = currentTail.add(direction.mult(CONFIG.SEGMENT_SPACING));
+                    // 考虑已在生长队列中的节，找到真正的"末端"位置
+                    let basePos;
+                    if (this.growingSegments.length > 0) {
+                        // 从最后一个正在生长的节的目标位置继续
+                        basePos = this.growingSegments[this.growingSegments.length - 1].targetPos;
+                    } else {
+                        // 从当前尾部位置开始
+                        basePos = this.segments.length > 0 
+                            ? this.segments[this.segments.length - 1] 
+                            : new Vector(0, 0);
+                    }
+                    
+                    // 目标位置：在基础位置后方一个间距的位置
+                    const targetPos = basePos.add(direction.mult(CONFIG.SEGMENT_SPACING));
                     
                     // 添加到生长队列
                     this.growingSegments.push({
                         targetPos: targetPos,
                         progress: 0,
                         direction: direction,
-                        startPos: new Vector(currentTail.x, currentTail.y)
+                        startPos: new Vector(basePos.x, basePos.y)
                     });
                 }
                 this.targetLength += amount;
