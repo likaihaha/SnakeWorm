@@ -2678,6 +2678,28 @@
                     if (x >= 0 && x <= CONFIG.CANVAS_WIDTH && y >= 0 && y <= CONFIG.CANVAS_HEIGHT) {
                         this.mousePos = new Vector(x, y);
                         this.mouseInCanvas = true;
+                        
+                        // 等待玩家控制阶段：检测鼠标是否移入白圈
+                        if (this.waitingForPlayer) {
+                            const centerX = CONFIG.CANVAS_WIDTH / 2;
+                            const centerY = CONFIG.CANVAS_HEIGHT / 2;
+                            const cursorRadius = 18;  // 白圈半径
+                            const dx = x - centerX;
+                            const dy = y - centerY;
+                            const distance = Math.sqrt(dx * dx + dy * dy);
+                            
+                            // 鼠标进入白圈范围（白圈直径24px，半径12px内）
+                            if (distance <= cursorRadius + 5) {
+                                this.waitingForPlayer = false;
+                                // 开始控制蚯蚓：执行出场动画
+                                const player = this.worms[0];
+                                player.isEntering = true;
+                                player.enterPhase = 0;
+                                player.enterTime = 0;
+                                // 更新鼠标位置为目标位置
+                                this.mousePos = new Vector(x, y);
+                            }
+                        }
                     } else {
                         this.mouseInCanvas = false;
                     }
@@ -2769,10 +2791,16 @@
                             musicSystem.audioContext.resume();
                         }
                     }
-                    // 隐藏加载提示，开始游戏
+                    // 隐藏加载提示
                     document.getElementById('startScreen').style.display = 'none';
                     this.resizeCanvas();
                     this.restart();
+                    
+                    // 设置初始状态：白圈在画面中央，等待玩家鼠标移入
+                    this.mousePos = new Vector(CONFIG.CANVAS_WIDTH / 2, CONFIG.CANVAS_HEIGHT / 2);
+                    this.mouseInCanvas = true;
+                    this.waitingForPlayer = true;  // 等待玩家鼠标移入白圈
+                    
                     this.lastTime = performance.now();
                     this.loop(this.lastTime);
                 };
@@ -2851,8 +2879,9 @@
                 this.isRunning = true;
                 this.isPaused = false;
                 this.isGameOver = false;
+                this.waitingForPlayer = true;  // 等待玩家鼠标移入白圈
 
- // 玩家蚯蚓从框外左边开始（完全不可见）
+                // 玩家蚯蚓从框外左边开始（完全不可见）
                 const player = new Worm(
                     CONFIG.CANVAS_WIDTH / 2,  // 目标位置（中间）
                     CONFIG.CANVAS_HEIGHT / 2,
@@ -2942,6 +2971,15 @@
     update(deltaTime) {
                 const dt = Math.min(deltaTime, 1 / 30);
                 const player = this.worms[0];
+
+                // 等待玩家控制阶段：只更新蚯蚓出场动画，暂停其他游戏逻辑
+                if (this.waitingForPlayer) {
+                    // 只更新蚯蚓出场动画
+                    if (player && player.isEntering) {
+                        player.updateEntering(dt);
+                    }
+                    return;
+                }
 
                 if (this.splitCooldown > 0) {
                     this.splitCooldown -= dt;
@@ -3756,10 +3794,16 @@
                 if (!this.mouseInCanvas) return;
                 if (this.isTouchDevice) return;  // 触摸设备不显示光标
                 
-                const cursorX = this.mousePos.x;
-                const cursorY = this.mousePos.y;
+                let cursorX = this.mousePos.x;
+                let cursorY = this.mousePos.y;
                 const player = this.worms[0];
                 const hasRedSegments = player && player.redSegments > 0;
+                
+                // 等待玩家控制阶段：白圈固定在画面中央
+                if (this.waitingForPlayer) {
+                    cursorX = CONFIG.CANVAS_WIDTH / 2;
+                    cursorY = CONFIG.CANVAS_HEIGHT / 2;
+                }
                 
                 if (hasRedSegments) {
                     // 瞄准镜图样（红色）
@@ -3814,6 +3858,16 @@
                     ctx.font = 'bold 16px Arial';
                     ctx.textAlign = 'center';
                     ctx.fillText('🎯 点击鼠标发射子弹！', cursorX, cursorY - 40);
+                    ctx.restore();
+                }
+                
+                // 等待玩家控制阶段：显示提示文字
+                if (this.waitingForPlayer) {
+                    ctx.save();
+                    ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+                    ctx.font = 'bold 18px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('移动鼠标到白圈开始游戏', cursorX, cursorY + 40);
                     ctx.restore();
                 }
             }
