@@ -1336,12 +1336,21 @@
                 }
                 
                 // 主球体
-                ctx.shadowBlur = this.type.score >= 120 ? 15 : 10;
+                const baseBlur = this.type.score >= 120 ? 15 : 10;
+                ctx.shadowBlur = this.fromBottom ? baseBlur + 10 : baseBlur;  // 底部发射的宝珠更亮
                 ctx.shadowColor = this.type.color;
                 ctx.beginPath();
                 ctx.arc(this.pos.x, this.pos.y, r, 0, Math.PI * 2);
                 ctx.fillStyle = this.type.color;
                 ctx.fill();
+                
+                // 底部发射的宝珠添加向上箭头提示
+                if (this.fromBottom) {
+                    ctx.fillStyle = 'rgba(255,255,255,0.8)';
+                    ctx.font = 'bold 10px sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('▲', this.pos.x, this.pos.y + 3);
+                }
                 
                 // 高光
                 ctx.shadowBlur = 0;
@@ -2654,6 +2663,7 @@
                 this.foodRespawnTimers = {};  // 宝珠刷新计时器
                 this.yellowCooldown = 0;  // 黄色宝珠冷却计时器
                 this.gameTime = 0;  // 游戏时间（秒）
+                this.frameCount = 0;  // 帧计数器
                 this.rhythmNotified = {};  // 节奏解锁通知追踪
                 this.joystickDirection = new Vector(0, 0);  // 摇杆方向
                 this.playerDeadWaitingForBodies = false;  // 玩家死亡等待尸体处理
@@ -3016,6 +3026,7 @@
                 this.splitCooldown = 0;
                 this.yellowCooldown = 0;
                 this.gameTime = 0;
+                this.frameCount = 0;
                 this.rhythmNotified = {};  // 重置节奏通知
                 this.showCrosshairHint = false;  // 重置瞄准镜提示
                 this.crosshairHintTimer = 0;
@@ -3112,8 +3123,9 @@
                 requestAnimationFrame((t) => this.loop(t));
             }
 
-    update(deltaTime) {
+            update(deltaTime) {
                 const dt = Math.min(deltaTime, 1 / 30);
+                this.frameCount++;
                 const player = this.worms[0];
 
                 // 等待玩家控制阶段：执行出场动画，暂停其他游戏逻辑
@@ -3533,6 +3545,16 @@
                 // 8. 更新食物动画
                 this.foods.forEach(food => food.update(dt));
 
+                // 调试：追踪底部发射宝珠的位置（每10帧输出一次）
+                if (this.frameCount % 10 === 0) {
+                    const bottomFoods = this.foods.filter(f => f.fromBottom);
+                    if (bottomFoods.length > 0) {
+                        bottomFoods.forEach(f => {
+                            console.log(`[底部宝珠追踪] 类型=${f.type.score}, pos=(${f.pos.x.toFixed(1)}, ${f.pos.y.toFixed(1)}), vel.y=${f.velocity.y.toFixed(2)}`);
+                        });
+                    }
+                }
+
                 // 9. 按类型刷新宝珠 + 清理出画布的宝珠（底部消散特效）
                 const deathMargin = CONFIG.WALL_MARGIN * 2 + CONFIG.SEGMENT_RADIUS * 2;
                 for (let i = this.foods.length - 1; i >= 0; i--) {
@@ -3942,19 +3964,25 @@
              * 从底部随机发射一颗宝珠
              */
             emitFoodFromBottom() {
-                // 随机选择宝珠类型
-                const typeIndex = Math.floor(Math.random() * CONFIG.FOOD_TYPES.length);
-                const type = CONFIG.FOOD_TYPES[typeIndex];
+                // 优先选择显眼的宝珠类型（红/黄/橙），确保玩家能看到
+                const preferredTypes = CONFIG.FOOD_TYPES.filter(t => t.score >= 30 && t.score !== 300);
+                const type = preferredTypes.length > 0
+                    ? preferredTypes[Math.floor(Math.random() * preferredTypes.length)]
+                    : CONFIG.FOOD_TYPES[0];
                 
                 // 随机x位置
                 const x = CONFIG.WALL_MARGIN + Math.random() * (CONFIG.CANVAS_WIDTH - 2 * CONFIG.WALL_MARGIN);
                 
-                // 创建宝珠（从底部下方生成，给一个向上的初速度）
-                const food = new Food(x, CONFIG.CANVAS_HEIGHT + 20, type);
-                food.velocity.y = -(2.0 + Math.random() * 1.5);  // 向上初速度，确保能飞入画面
+                // 创建宝珠（从底部下方生成，给一个足够快的向上初速度）
+                const food = new Food(x, CONFIG.CANVAS_HEIGHT + 30, type);
+                food.velocity.y = -(5.0 + Math.random() * 3.0);  // 向上初速度-5~-8，确保快速飞入画面
+                food.fromBottom = true;  // 标记为底部发射，draw中可特殊处理
                 this.foods.push(food);
                 
-                console.log(`[底部发射] 宝珠类型=${type.score}, 位置=(${x.toFixed(1)}, ${CONFIG.CANVAS_HEIGHT + 20})`);
+                // 添加浮动文字提示，让玩家注意到
+                this.floatingTexts.push(new FloatingText(x, CONFIG.CANVAS_HEIGHT - 30, '💎 尸体释放宝珠！', type.color));
+                
+                console.log(`[底部发射] 宝珠类型=${type.score}, 位置=(${x.toFixed(1)}, ${CONFIG.CANVAS_HEIGHT + 30}), 初速度=${food.velocity.y.toFixed(2)}`);
             }
 
             /**
