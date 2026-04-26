@@ -472,59 +472,44 @@
                 this.noteIndex = 0;
                 this.currentSong = null;
                 
-                // 预设歌曲（音符序列）- 按曲谱主旋律
+                // 预设歌曲（音符序列）- 水晶序曲经典琶音
                 this.songs = {
-                    // 最终幻想水晶序曲 - 按曲谱简化
+                    // 最终幻想水晶序曲 - C-E-G 琶音上行下行（经典模式）
                     '水晶序曲': [
-                        // 第 1 小节：G 大调分解和弦上行
-                        { freq: 392.00, duration: 150 },  // G4
-                        { freq: 493.88, duration: 150 },  // B4
-                        { freq: 659.25, duration: 150 },  // E5
-                        { freq: 783.99, duration: 150 },  // G5
-                        { freq: 987.77, duration: 150 },  // B5
-                        { freq: 1174.66, duration: 150 }, // D6
-                        { freq: 1318.51, duration: 150 }, // E6
-                        { freq: 1567.98, duration: 150 }, // G6
+                        // C 大调琶音上行（3个八度）
+                        { freq: 261.63, duration: 120 },  // C4
+                        { freq: 329.63, duration: 120 },  // E4
+                        { freq: 392.00, duration: 120 },  // G4
+                        { freq: 523.25, duration: 120 },  // C5
+                        { freq: 659.25, duration: 120 },  // E5
+                        { freq: 783.99, duration: 120 },  // G5
+                        { freq: 1046.50, duration: 120 }, // C6
+                        { freq: 1318.51, duration: 120 }, // E6
+                        { freq: 1567.98, duration: 120 }, // G6
                         // 下行
-                        { freq: 1318.51, duration: 150 }, // E6
-                        { freq: 1174.66, duration: 150 }, // D6
-                        { freq: 987.77, duration: 150 },  // B5
-                        { freq: 783.99, duration: 150 },  // G5
-                        { freq: 659.25, duration: 150 },  // E5
-                        { freq: 493.88, duration: 150 },  // B4
-                        { freq: 392.00, duration: 300 },  // G4
-                        // 第二段：C 大调分解和弦
-                        { freq: 261.63, duration: 150 },  // C4
-                        { freq: 329.63, duration: 150 },  // E4
-                        { freq: 392.00, duration: 150 },  // G4
-                        { freq: 523.25, duration: 150 },  // C5
-                        { freq: 659.25, duration: 150 },  // E5
-                        { freq: 783.99, duration: 150 },  // G5
-                        { freq: 987.77, duration: 150 },  // B5
-                        { freq: 1046.50, duration: 150 }, // C6
-                        { freq: 987.77, duration: 150 },  // B5
-                        { freq: 783.99, duration: 150 },  // G5
-                        { freq: 659.25, duration: 150 },  // E5
-                        { freq: 523.25, duration: 150 },  // C5
-                        { freq: 392.00, duration: 150 },  // G4
-                        { freq: 329.63, duration: 150 },  // E4
-                        { freq: 261.63, duration: 300 },  // C4
-                        // 第三段：回到 G 大调
-                        { freq: 392.00, duration: 150 },  // G4
-                        { freq: 493.88, duration: 150 },  // B4
-                        { freq: 659.25, duration: 150 },  // E5
-                        { freq: 783.99, duration: 150 },  // G5
-                        { freq: 987.77, duration: 150 },  // B5
-                        { freq: 1174.66, duration: 150 }, // D6
-                        { freq: 1318.51, duration: 150 }, // E6
-                        { freq: 1567.98, duration: 150 }, // G6
-                        { freq: 1318.51, duration: 300 }, // E6
-                        { freq: 1174.66, duration: 300 }, // D6
-                        { freq: 987.77, duration: 300 },  // B5
-                        { freq: 783.99, duration: 300 },  // G5
-                        { freq: 659.25, duration: 300 },  // E5
-                        { freq: 493.88, duration: 300 },  // B4
-                        { freq: 392.00, duration: 600 },  // G4
+                        { freq: 1318.51, duration: 120 }, // E6
+                        { freq: 1046.50, duration: 120 }, // C6
+                        { freq: 783.99, duration: 120 },  // G5
+                        { freq: 659.25, duration: 120 },  // E5
+                        { freq: 523.25, duration: 120 },  // C5
+                        { freq: 392.00, duration: 120 },  // G4
+                        { freq: 329.63, duration: 120 },  // E4
+                        // 再上行
+                        { freq: 392.00, duration: 120 },  // G4
+                        { freq: 523.25, duration: 120 },  // C5
+                        { freq: 659.25, duration: 120 },  // E5
+                        { freq: 783.99, duration: 120 },  // G5
+                        { freq: 1046.50, duration: 120 }, // C6
+                        { freq: 1318.51, duration: 120 }, // E6
+                        { freq: 1567.98, duration: 120 }, // G6
+                        { freq: 1318.51, duration: 120 }, // E6
+                        { freq: 1046.50, duration: 120 }, // C6
+                        { freq: 783.99, duration: 120 },  // G5
+                        { freq: 659.25, duration: 120 },  // E5
+                        { freq: 523.25, duration: 120 },  // C5
+                        { freq: 392.00, duration: 120 },  // G4
+                        { freq: 329.63, duration: 120 },  // E4
+                        { freq: 261.63, duration: 240 },  // C4（稍长）
                     ],
                     // 致爱丽丝 - 简化版
                     '致爱丽丝': [
@@ -569,52 +554,88 @@
                 }
             }
             
-            // 播放八音盒音色（更柔和的版本）
-            playNote(freq, duration = 300) {
+            // 播放钢琴音色
+            playNote(freq, duration = 120) {
                 if (!this.audioContext) this.init();
                 if (this.audioContext.state === 'suspended') this.audioContext.resume();
                 
                 const now = this.audioContext.currentTime;
+                const durationSec = duration / 1000;
                 
-                // 主振荡器（使用 triangle 波形更柔和）
+                // 主振荡器（锯齿波，更接近钢琴的丰富泛音）
                 const osc1 = this.audioContext.createOscillator();
-                osc1.type = 'triangle';
+                osc1.type = 'sawtooth';
                 osc1.frequency.setValueAtTime(freq, now);
                 
-                // 泛音振荡器（降低音量，增加温暖感）
+                // 第二振荡器（方波，增加厚度）
                 const osc2 = this.audioContext.createOscillator();
-                osc2.type = 'sine';
-                osc2.frequency.setValueAtTime(freq * 2, now);
+                osc2.type = 'square';
+                osc2.frequency.setValueAtTime(freq, now);
                 
-                // 音量包络（更柔和的起音和衰减）
-                const gainNode = this.audioContext.createGain();
-                gainNode.gain.setValueAtTime(0, now);
-                gainNode.gain.linearRampToValueAtTime(0.15, now + 0.03);  // 更慢起音，更低音量
-                gainNode.gain.exponentialRampToValueAtTime(0.01, now + duration * 2 / 1000);  // 衰减到 2 倍
+                // 泛音振荡器（高频泛音）
+                const osc3 = this.audioContext.createOscillator();
+                osc3.type = 'sine';
+                osc3.frequency.setValueAtTime(freq * 2, now);  // 2倍频泛音
                 
-                // 泛音音量包络（更小）
-                const gainNode2 = this.audioContext.createGain();
-                gainNode2.gain.setValueAtTime(0, now);
-                gainNode2.gain.linearRampToValueAtTime(0.04, now + 0.03);  // 泛音更小
-                gainNode2.gain.exponentialRampToValueAtTime(0.01, now + duration * 1.2 / 1000);  // 泛音衰减更快
+                // 第四振荡器（低频基音）
+                const osc4 = this.audioContext.createOscillator();
+                osc4.type = 'sine';
+                osc4.frequency.setValueAtTime(freq * 0.5, now);  // 低八度
                 
-                // 低通滤波器（过滤高频刺耳部分）
+                // 主音量包络（钢琴特性：快速起音，缓慢衰减）
+                const gainMain = this.audioContext.createGain();
+                gainMain.gain.setValueAtTime(0, now);
+                gainMain.gain.linearRampToValueAtTime(0.12, now + 0.005);  // 快速起音 5ms
+                gainMain.gain.exponentialRampToValueAtTime(0.06, now + 0.1);  // 快速衰减到一半
+                gainMain.gain.exponentialRampToValueAtTime(0.01, now + durationSec * 1.5);  // 缓慢衰减
+                
+                // 方波音量（较小）
+                const gainSquare = this.audioContext.createGain();
+                gainSquare.gain.setValueAtTime(0, now);
+                gainSquare.gain.linearRampToValueAtTime(0.04, now + 0.005);
+                gainSquare.gain.exponentialRampToValueAtTime(0.005, now + durationSec);
+                
+                // 泛音音量（更小）
+                const gainHarmonic = this.audioContext.createGain();
+                gainHarmonic.gain.setValueAtTime(0, now);
+                gainHarmonic.gain.linearRampToValueAtTime(0.02, now + 0.003);
+                gainHarmonic.gain.exponentialRampToValueAtTime(0.001, now + durationSec * 0.8);
+                
+                // 低频音量
+                const gainLow = this.audioContext.createGain();
+                gainLow.gain.setValueAtTime(0, now);
+                gainLow.gain.linearRampToValueAtTime(0.03, now + 0.008);
+                gainLow.gain.exponentialRampToValueAtTime(0.001, now + durationSec * 1.2);
+                
+                // 低通滤波器（模拟钢琴共鸣）
                 const filter = this.audioContext.createBiquadFilter();
                 filter.type = 'lowpass';
-                filter.frequency.setValueAtTime(2000, now);  //  cutoff 频率 2000Hz
+                filter.frequency.setValueAtTime(4000, now);  // 起始频率
+                filter.frequency.exponentialRampToValueAtTime(800, now + durationSec);  // 衰减后降低
+                filter.Q.setValueAtTime(1, now);
                 
                 // 连接
-                osc1.connect(gainNode);
-                osc2.connect(gainNode2);
-                gainNode.connect(filter);
-                gainNode2.connect(filter);
+                osc1.connect(gainMain);
+                osc2.connect(gainSquare);
+                osc3.connect(gainHarmonic);
+                osc4.connect(gainLow);
+                
+                gainMain.connect(filter);
+                gainSquare.connect(filter);
+                gainHarmonic.connect(filter);
+                gainLow.connect(filter);
                 filter.connect(this.audioContext.destination);
                 
                 // 播放
                 osc1.start(now);
                 osc2.start(now);
-                osc1.stop(now + duration * 2 / 1000 + 0.2);
-                osc2.stop(now + duration * 1.2 / 1000 + 0.2);
+                osc3.start(now);
+                osc4.start(now);
+                
+                osc1.stop(now + durationSec * 1.5 + 0.3);
+                osc2.stop(now + durationSec + 0.2);
+                osc3.stop(now + durationSec * 0.8 + 0.2);
+                osc4.stop(now + durationSec * 1.2 + 0.2);
             }
             
             // 吃宝珠时调用
