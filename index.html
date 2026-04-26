@@ -6,7 +6,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="format-detection" content="telephone=no">
-    <title>SnakeWorm v0.21 - 吃豆人蚯蚓</title>
+    <title>SnakeWorm v0.23 - 吃豆人蚯蚓</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -465,7 +465,7 @@
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
 
-        /* ========== 八音盒音效系统 ========== */
+        /* ========== 八音盒音效系统（v2 - 真人演奏模拟） ========== */
         class MusicSystem {
             constructor() {
                 this.audioContext = null;
@@ -473,73 +473,155 @@
                 this.noteIndex = 0;
                 this.currentSong = null;
                 
+                // 延音踏板节点池
+                this.sustainNodes = [];
+                
+                // Rubato（弹性速度）参数
+                this.rubatoAmount = 0.08; // 速度变化幅度（0-1）
+                
+                // 力度变化参数
+                this.velocityRange = { min: 0.65, max: 1.0 };
+                this.currentVelocity = 0.8;
+                
+                // 情感表达参数
+                this.expression = {
+                    dolce: true,     // 甜美地
+                    legato: true,    // 连奏
+                    rubato: true,    // 弹性速度
+                    pedal: true      // 踏板
+                };
+                
+                // 卷积混响（模拟钢琴共鸣）
+                this.convolver = null;
+                this.reverbGain = null;
+                
                 // 预设歌曲（音符序列）- 水晶序曲经典琶音
+                // 每个音符: freq, duration, velocity(力度0-1), pedal(是否用踏板)
                 this.songs = {
-                    // 最终幻想水晶序曲 - C-E-G 琶音上行下行（经典模式）
+                    // 最终幻想水晶序曲 - 完整版（C-D-E-G 琶音循环 + 多调性变化）
                     '水晶序曲': [
-                        // C 大调琶音上行（3个八度）
-                        { freq: 261.63, duration: 120 },  // C4
-                        { freq: 329.63, duration: 120 },  // E4
-                        { freq: 392.00, duration: 120 },  // G4
-                        { freq: 523.25, duration: 120 },  // C5
-                        { freq: 659.25, duration: 120 },  // E5
-                        { freq: 783.99, duration: 120 },  // G5
-                        { freq: 1046.50, duration: 120 }, // C6
-                        { freq: 1318.51, duration: 120 }, // E6
-                        { freq: 1567.98, duration: 120 }, // G6
+                        // ===== 第一段：C大调琶音（4个八度）=====
+                        // 上行 - 渐强
+                        { freq: 261.63, duration: 150, velocity: 0.45, pedal: true },  // C4
+                        { freq: 293.66, duration: 150, velocity: 0.48, pedal: true },  // D4
+                        { freq: 329.63, duration: 150, velocity: 0.52, pedal: true },  // E4
+                        { freq: 392.00, duration: 150, velocity: 0.55, pedal: true },  // G4
+                        { freq: 523.25, duration: 150, velocity: 0.60, pedal: true },  // C5
+                        { freq: 587.33, duration: 150, velocity: 0.63, pedal: true },  // D5
+                        { freq: 659.25, duration: 150, velocity: 0.67, pedal: true },  // E5
+                        { freq: 783.99, duration: 150, velocity: 0.70, pedal: true },  // G5
+                        { freq: 1046.50, duration: 150, velocity: 0.75, pedal: true }, // C6
+                        { freq: 1174.66, duration: 150, velocity: 0.78, pedal: true }, // D6
+                        { freq: 1318.51, duration: 150, velocity: 0.82, pedal: true }, // E6
+                        { freq: 1567.98, duration: 150, velocity: 0.85, pedal: true }, // G6
+                        // 下行 - 渐弱
+                        { freq: 1318.51, duration: 150, velocity: 0.82, pedal: true }, // E6
+                        { freq: 1174.66, duration: 150, velocity: 0.78, pedal: true }, // D6
+                        { freq: 1046.50, duration: 150, velocity: 0.75, pedal: true }, // C6
+                        { freq: 783.99, duration: 150, velocity: 0.70, pedal: true },  // G5
+                        { freq: 659.25, duration: 150, velocity: 0.67, pedal: true },  // E5
+                        { freq: 587.33, duration: 150, velocity: 0.63, pedal: true },  // D5
+                        { freq: 523.25, duration: 150, velocity: 0.60, pedal: true },  // C5
+                        { freq: 392.00, duration: 150, velocity: 0.55, pedal: true },  // G4
+                        { freq: 329.63, duration: 150, velocity: 0.52, pedal: true },  // E4
+                        { freq: 293.66, duration: 150, velocity: 0.48, pedal: true },  // D4
+                        { freq: 261.63, duration: 200, velocity: 0.45, pedal: true },  // C4
+                        
+                        // ===== 第二段：F大调琶音（3个八度）=====
+                        // 上行
+                        { freq: 349.23, duration: 150, velocity: 0.50, pedal: true },  // F4
+                        { freq: 392.00, duration: 150, velocity: 0.53, pedal: true },  // G4
+                        { freq: 440.00, duration: 150, velocity: 0.57, pedal: true },  // A4
+                        { freq: 523.25, duration: 150, velocity: 0.60, pedal: true },  // C5
+                        { freq: 698.46, duration: 150, velocity: 0.65, pedal: true },  // F5
+                        { freq: 783.99, duration: 150, velocity: 0.68, pedal: true },  // G5
+                        { freq: 880.00, duration: 150, velocity: 0.72, pedal: true },  // A5
+                        { freq: 1046.50, duration: 150, velocity: 0.75, pedal: true }, // C6
+                        { freq: 1396.91, duration: 150, velocity: 0.80, pedal: true }, // F6
                         // 下行
-                        { freq: 1318.51, duration: 120 }, // E6
-                        { freq: 1046.50, duration: 120 }, // C6
-                        { freq: 783.99, duration: 120 },  // G5
-                        { freq: 659.25, duration: 120 },  // E5
-                        { freq: 523.25, duration: 120 },  // C5
-                        { freq: 392.00, duration: 120 },  // G4
-                        { freq: 329.63, duration: 120 },  // E4
-                        // 再上行
-                        { freq: 392.00, duration: 120 },  // G4
-                        { freq: 523.25, duration: 120 },  // C5
-                        { freq: 659.25, duration: 120 },  // E5
-                        { freq: 783.99, duration: 120 },  // G5
-                        { freq: 1046.50, duration: 120 }, // C6
-                        { freq: 1318.51, duration: 120 }, // E6
-                        { freq: 1567.98, duration: 120 }, // G6
-                        { freq: 1318.51, duration: 120 }, // E6
-                        { freq: 1046.50, duration: 120 }, // C6
-                        { freq: 783.99, duration: 120 },  // G5
-                        { freq: 659.25, duration: 120 },  // E5
-                        { freq: 523.25, duration: 120 },  // C5
-                        { freq: 392.00, duration: 120 },  // G4
-                        { freq: 329.63, duration: 120 },  // E4
-                        { freq: 261.63, duration: 240 },  // C4（稍长）
+                        { freq: 1046.50, duration: 150, velocity: 0.75, pedal: true }, // C6
+                        { freq: 880.00, duration: 150, velocity: 0.72, pedal: true },  // A5
+                        { freq: 783.99, duration: 150, velocity: 0.68, pedal: true },  // G5
+                        { freq: 698.46, duration: 150, velocity: 0.65, pedal: true },  // F5
+                        { freq: 523.25, duration: 150, velocity: 0.60, pedal: true },  // C5
+                        { freq: 440.00, duration: 150, velocity: 0.57, pedal: true },  // A4
+                        { freq: 392.00, duration: 150, velocity: 0.53, pedal: true },  // G4
+                        { freq: 349.23, duration: 200, velocity: 0.50, pedal: true },  // F4
+                        
+                        // ===== 第三段：G大调琶音（3个八度）=====
+                        // 上行
+                        { freq: 392.00, duration: 150, velocity: 0.52, pedal: true },  // G4
+                        { freq: 440.00, duration: 150, velocity: 0.55, pedal: true },  // A4
+                        { freq: 493.88, duration: 150, velocity: 0.58, pedal: true },  // B4
+                        { freq: 587.33, duration: 150, velocity: 0.62, pedal: true },  // D5
+                        { freq: 783.99, duration: 150, velocity: 0.67, pedal: true },  // G5
+                        { freq: 880.00, duration: 150, velocity: 0.70, pedal: true },  // A5
+                        { freq: 987.77, duration: 150, velocity: 0.74, pedal: true },  // B5
+                        { freq: 1174.66, duration: 150, velocity: 0.78, pedal: true }, // D6
+                        { freq: 1567.98, duration: 150, velocity: 0.82, pedal: true }, // G6
+                        // 下行
+                        { freq: 1174.66, duration: 150, velocity: 0.78, pedal: true }, // D6
+                        { freq: 987.77, duration: 150, velocity: 0.74, pedal: true },  // B5
+                        { freq: 880.00, duration: 150, velocity: 0.70, pedal: true },  // A5
+                        { freq: 783.99, duration: 150, velocity: 0.67, pedal: true },  // G5
+                        { freq: 587.33, duration: 150, velocity: 0.62, pedal: true },  // D5
+                        { freq: 493.88, duration: 150, velocity: 0.58, pedal: true },  // B4
+                        { freq: 440.00, duration: 150, velocity: 0.55, pedal: true },  // A4
+                        { freq: 392.00, duration: 200, velocity: 0.52, pedal: true },  // G4
+                        
+                        // ===== 第四段：C大调高八度琶音（3个八度）=====
+                        // 上行 - 渐强到高潮
+                        { freq: 523.25, duration: 150, velocity: 0.60, pedal: true },  // C5
+                        { freq: 587.33, duration: 150, velocity: 0.65, pedal: true },  // D5
+                        { freq: 659.25, duration: 150, velocity: 0.70, pedal: true },  // E5
+                        { freq: 783.99, duration: 150, velocity: 0.75, pedal: true },  // G5
+                        { freq: 1046.50, duration: 150, velocity: 0.80, pedal: true }, // C6
+                        { freq: 1174.66, duration: 150, velocity: 0.85, pedal: true }, // D6
+                        { freq: 1318.51, duration: 150, velocity: 0.90, pedal: true }, // E6
+                        { freq: 1567.98, duration: 150, velocity: 0.95, pedal: true }, // G6
+                        { freq: 2093.00, duration: 200, velocity: 1.0, pedal: true },  // C7（最高点）
+                        // 下行 - 渐弱收尾
+                        { freq: 1567.98, duration: 150, velocity: 0.90, pedal: true }, // G6
+                        { freq: 1318.51, duration: 150, velocity: 0.85, pedal: true }, // E6
+                        { freq: 1174.66, duration: 150, velocity: 0.80, pedal: true }, // D6
+                        { freq: 1046.50, duration: 150, velocity: 0.75, pedal: true }, // C6
+                        { freq: 783.99, duration: 150, velocity: 0.70, pedal: true },  // G5
+                        { freq: 659.25, duration: 150, velocity: 0.65, pedal: true },  // E5
+                        { freq: 587.33, duration: 150, velocity: 0.60, pedal: true },  // D5
+                        { freq: 523.25, duration: 150, velocity: 0.55, pedal: true },  // C5
+                        { freq: 392.00, duration: 150, velocity: 0.50, pedal: true },  // G4
+                        { freq: 329.63, duration: 150, velocity: 0.48, pedal: true },  // E4
+                        { freq: 293.66, duration: 150, velocity: 0.46, pedal: true },  // D4
+                        { freq: 261.63, duration: 300, velocity: 0.45, pedal: true },  // C4（最终收尾）
                     ],
                     // 致爱丽丝 - 简化版
                     '致爱丽丝': [
-                        { freq: 659.25, duration: 200 },  // E5
-                        { freq: 622.25, duration: 200 },  // D#5
-                        { freq: 659.25, duration: 200 },  // E5
-                        { freq: 622.25, duration: 200 },  // D#5
-                        { freq: 659.25, duration: 200 },  // E5
-                        { freq: 587.33, duration: 200 },  // D5
-                        { freq: 659.25, duration: 200 },  // E5
-                        { freq: 523.25, duration: 200 },  // C5
-                        { freq: 587.33, duration: 200 },  // D5
-                        { freq: 523.25, duration: 400 },  // C5
-                        { freq: 440.00, duration: 400 },  // A4
-                        { freq: 493.88, duration: 400 },  // B4
-                        { freq: 523.25, duration: 600 },  // C5
+                        { freq: 659.25, duration: 200, velocity: 0.7, pedal: true },  // E5
+                        { freq: 622.25, duration: 200, velocity: 0.65, pedal: true },  // D#5
+                        { freq: 659.25, duration: 200, velocity: 0.7, pedal: true },  // E5
+                        { freq: 622.25, duration: 200, velocity: 0.65, pedal: true },  // D#5
+                        { freq: 659.25, duration: 200, velocity: 0.7, pedal: true },  // E5
+                        { freq: 587.33, duration: 200, velocity: 0.65, pedal: true },  // D5
+                        { freq: 659.25, duration: 200, velocity: 0.7, pedal: true },  // E5
+                        { freq: 523.25, duration: 200, velocity: 0.6, pedal: true },  // C5
+                        { freq: 587.33, duration: 200, velocity: 0.65, pedal: true },  // D5
+                        { freq: 523.25, duration: 400, velocity: 0.6, pedal: true },  // C5
+                        { freq: 440.00, duration: 400, velocity: 0.55, pedal: true },  // A4
+                        { freq: 493.88, duration: 400, velocity: 0.6, pedal: true },  // B4
+                        { freq: 523.25, duration: 600, velocity: 0.65, pedal: true },  // C5
                     ],
                     // 爱的罗曼史 - 简化版
                     '爱的罗曼史': [
-                        { freq: 392.00, duration: 300 },  // G4
-                        { freq: 440.00, duration: 300 },  // A4
-                        { freq: 493.88, duration: 300 },  // B4
-                        { freq: 523.25, duration: 300 },  // C5
-                        { freq: 587.33, duration: 300 },  // D5
-                        { freq: 659.25, duration: 600 },  // E5
-                        { freq: 587.33, duration: 300 },  // D5
-                        { freq: 523.25, duration: 300 },  // C5
-                        { freq: 493.88, duration: 300 },  // B4
-                        { freq: 440.00, duration: 600 },  // A4
+                        { freq: 392.00, duration: 300, velocity: 0.6, pedal: true },  // G4
+                        { freq: 440.00, duration: 300, velocity: 0.65, pedal: true },  // A4
+                        { freq: 493.88, duration: 300, velocity: 0.7, pedal: true },  // B4
+                        { freq: 523.25, duration: 300, velocity: 0.75, pedal: true },  // C5
+                        { freq: 587.33, duration: 300, velocity: 0.8, pedal: true },  // D5
+                        { freq: 659.25, duration: 600, velocity: 0.85, pedal: true },  // E5
+                        { freq: 587.33, duration: 300, velocity: 0.8, pedal: true },  // D5
+                        { freq: 523.25, duration: 300, velocity: 0.75, pedal: true },  // C5
+                        { freq: 493.88, duration: 300, velocity: 0.7, pedal: true },  // B4
+                        { freq: 440.00, duration: 600, velocity: 0.65, pedal: true },  // A4
                     ]
                 };
                 
@@ -552,16 +634,68 @@
             init() {
                 if (!this.audioContext) {
                     this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    this._createReverb();
                 }
             }
             
-            // 播放钢琴音色
-            playNote(freq, duration = 120) {
+            // 创建卷积混响（模拟钢琴共鸣/延音踏板效果）
+            _createReverb() {
+                try {
+                    const sampleRate = this.audioContext.sampleRate;
+                    const length = sampleRate * 2; // 2秒混响尾
+                    const impulse = this.audioContext.createBuffer(2, length, sampleRate);
+                    
+                    // 左声道 - 指数衰减的噪声脉冲
+                    const leftCh = impulse.getChannelData(0);
+                    for (let i = 0; i < length; i++) {
+                        leftCh[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / length, 2.5);
+                    }
+                    // 右声道 - 略有不同
+                    const rightCh = impulse.getChannelData(1);
+                    for (let i = 0; i < length; i++) {
+                        rightCh[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / length, 2.2);
+                    }
+                    
+                    this.convolver = this.audioContext.createConvolver();
+                    this.convolver.buffer = impulse;
+                    
+                    this.reverbGain = this.audioContext.createGain();
+                    this.reverbGain.gain.setValueAtTime(0.4, this.audioContext.currentTime);
+                    
+                    this.convolver.connect(this.reverbGain);
+                    this.reverbGain.connect(this.audioContext.destination);
+                } catch(e) {
+                    console.warn('Reverb creation failed:', e);
+                }
+            }
+            
+            // 应用Rubato（弹性速度）
+            _applyRubato(baseDuration) {
+                if (!this.expression.rubato) return baseDuration;
+                const variation = (Math.random() - 0.5) * 2 * this.rubatoAmount;
+                return baseDuration * (1 + variation);
+            }
+            
+            // 更新力度（模拟真人演奏的力度微变化）
+            _updateVelocity() {
+                const range = this.velocityRange.max - this.velocityRange.min;
+                this.currentVelocity = this.velocityRange.min + Math.random() * range;
+            }
+            
+            // 播放钢琴音色（v2 - 带力度、踏板、rubato）
+            playNote(freq, duration = 120, velocity, usePedal) {
                 if (!this.audioContext) this.init();
                 if (this.audioContext.state === 'suspended') this.audioContext.resume();
                 
+                // 向后兼容：如果没有传 velocity/usePedal，使用默认值
+                if (velocity === undefined) velocity = this.currentVelocity;
+                if (usePedal === undefined) usePedal = this.expression.pedal;
+                
                 const now = this.audioContext.currentTime;
                 const durationSec = duration / 1000;
+                
+                // 力度缩放因子
+                const v = Math.max(0.3, Math.min(1.0, velocity));
                 
                 // 主振荡器（锯齿波，更接近钢琴的丰富泛音）
                 const osc1 = this.audioContext.createOscillator();
@@ -573,46 +707,46 @@
                 osc2.type = 'square';
                 osc2.frequency.setValueAtTime(freq, now);
                 
-                // 泛音振荡器（高频泛音）
+                // 泛音振荡器（2倍频泛音）
                 const osc3 = this.audioContext.createOscillator();
                 osc3.type = 'sine';
-                osc3.frequency.setValueAtTime(freq * 2, now);  // 2倍频泛音
+                osc3.frequency.setValueAtTime(freq * 2, now);
                 
-                // 第四振荡器（低频基音）
+                // 低八度基音
                 const osc4 = this.audioContext.createOscillator();
                 osc4.type = 'sine';
-                osc4.frequency.setValueAtTime(freq * 0.5, now);  // 低八度
+                osc4.frequency.setValueAtTime(freq * 0.5, now);
                 
                 // 主音量包络（钢琴特性：快速起音，缓慢衰减）
                 const gainMain = this.audioContext.createGain();
                 gainMain.gain.setValueAtTime(0, now);
-                gainMain.gain.linearRampToValueAtTime(0.12, now + 0.005);  // 快速起音 5ms
-                gainMain.gain.exponentialRampToValueAtTime(0.06, now + 0.1);  // 快速衰减到一半
-                gainMain.gain.exponentialRampToValueAtTime(0.01, now + durationSec * 1.5);  // 缓慢衰减
+                gainMain.gain.linearRampToValueAtTime(Math.min(1.0, 2.8 * v), now + 0.005);
+                gainMain.gain.exponentialRampToValueAtTime(Math.min(1.0, 1.4 * v), now + 0.1);
+                gainMain.gain.exponentialRampToValueAtTime(Math.min(1.0, 0.24 * v), now + durationSec * 1.5);
                 
-                // 方波音量（较小）
+                // 方波音量
                 const gainSquare = this.audioContext.createGain();
                 gainSquare.gain.setValueAtTime(0, now);
-                gainSquare.gain.linearRampToValueAtTime(0.04, now + 0.005);
-                gainSquare.gain.exponentialRampToValueAtTime(0.005, now + durationSec);
+                gainSquare.gain.linearRampToValueAtTime(Math.min(1.0, 1.0 * v), now + 0.005);
+                gainSquare.gain.exponentialRampToValueAtTime(Math.min(1.0, 0.12 * v), now + durationSec);
                 
-                // 泛音音量（更小）
+                // 泛音音量
                 const gainHarmonic = this.audioContext.createGain();
                 gainHarmonic.gain.setValueAtTime(0, now);
-                gainHarmonic.gain.linearRampToValueAtTime(0.02, now + 0.003);
-                gainHarmonic.gain.exponentialRampToValueAtTime(0.001, now + durationSec * 0.8);
+                gainHarmonic.gain.linearRampToValueAtTime(Math.min(1.0, 0.48 * v), now + 0.003);
+                gainHarmonic.gain.exponentialRampToValueAtTime(Math.min(1.0, 0.024 * v), now + durationSec * 0.8);
                 
                 // 低频音量
                 const gainLow = this.audioContext.createGain();
                 gainLow.gain.setValueAtTime(0, now);
-                gainLow.gain.linearRampToValueAtTime(0.03, now + 0.008);
-                gainLow.gain.exponentialRampToValueAtTime(0.001, now + durationSec * 1.2);
+                gainLow.gain.linearRampToValueAtTime(Math.min(1.0, 0.72 * v), now + 0.008);
+                gainLow.gain.exponentialRampToValueAtTime(Math.min(1.0, 0.024 * v), now + durationSec * 1.2);
                 
                 // 低通滤波器（模拟钢琴共鸣）
                 const filter = this.audioContext.createBiquadFilter();
                 filter.type = 'lowpass';
-                filter.frequency.setValueAtTime(4000, now);  // 起始频率
-                filter.frequency.exponentialRampToValueAtTime(800, now + durationSec);  // 衰减后降低
+                filter.frequency.setValueAtTime(4000, now);
+                filter.frequency.exponentialRampToValueAtTime(800, now + durationSec);
                 filter.Q.setValueAtTime(1, now);
                 
                 // 连接
@@ -625,7 +759,13 @@
                 gainSquare.connect(filter);
                 gainHarmonic.connect(filter);
                 gainLow.connect(filter);
-                filter.connect(this.audioContext.destination);
+                
+                // 踏板模式：通过卷积混响输出；非踏板：直接输出
+                if (usePedal && this.convolver) {
+                    filter.connect(this.convolver);
+                } else {
+                    filter.connect(this.audioContext.destination);
+                }
                 
                 // 播放
                 osc1.start(now);
@@ -637,24 +777,55 @@
                 osc2.stop(now + durationSec + 0.2);
                 osc3.stop(now + durationSec * 0.8 + 0.2);
                 osc4.stop(now + durationSec * 1.2 + 0.2);
+                
+                // 踏板延音：额外的微弱正弦波延续
+                if (usePedal) {
+                    this._addSustainTail(freq, durationSec, v);
+                }
+                
+                this.lastEatTime = now;
+            }
+            
+            // 添加延音踏板尾音（模拟钢琴共鸣延续）
+            _addSustainTail(freq, duration, velocity) {
+                const now = this.audioContext.currentTime;
+                const osc = this.audioContext.createOscillator();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(freq, now);
+                
+                const gain = this.audioContext.createGain();
+                gain.gain.setValueAtTime(0.02 * velocity, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + duration * 2.5);
+                
+                osc.connect(gain);
+                if (this.convolver) {
+                    gain.connect(this.convolver);
+                } else {
+                    gain.connect(this.audioContext.destination);
+                }
+                
+                osc.start(now);
+                osc.stop(now + duration * 2.5 + 0.1);
             }
             
             // 吃宝珠时调用
             onEatFood(food) {
-                const now = performance.now();
-                const timeSinceLastEat = now - this.lastEatTime;
-                
-                // 如果超过 2 秒，重置音阶
-                if (timeSinceLastEat > 2000) {
-                    this.noteIndex = 0;
-                }
+                const now = this.audioContext ? this.audioContext.currentTime : 0;
+                if (now - this.lastEatTime < 0.1) return; // 防止过于频繁
                 
                 this.lastEatTime = now;
+                
+                // 更新力度
+                this._updateVelocity();
                 
                 // 吃一个宝珠播放 1 个音符
                 if (this.currentSong && this.noteIndex < this.currentSong.length) {
                     const note = this.currentSong[this.noteIndex];
-                    this.playNote(note.freq, note.duration);
+                    
+                    // 应用Rubato到duration
+                    const adjustedDuration = this._applyRubato(note.duration);
+                    
+                    this.playNote(note.freq, adjustedDuration, note.velocity, note.pedal);
                     this.noteIndex++;
                     
                     // 如果播放完一首歌，循环播放
@@ -689,7 +860,11 @@
                     
                     const noteIndex = index % totalNotes;  // 循环使用音符
                     const note = song[noteIndex];
-                    this.playNote(note.freq, note.duration);
+                    
+                    // 应用Rubato
+                    const adjustedDuration = this._applyRubato(note.duration);
+                    
+                    this.playNote(note.freq, adjustedDuration, note.velocity, note.pedal);
                     
                     // 安排下一个音符
                     setTimeout(() => {
@@ -1035,6 +1210,11 @@
                 // 磁力效果（橙色宝珠触发）
                 this.magnetTimer = 0;  // 磁力计时器
                 this.magnetCombo = 0;  // 磁力连击数
+                
+                // 红色腹部效果（红色宝珠触发）
+                this.redSegments = 0;  // 红色段的数量
+                this.redStrengths = [];  // 每个红色段的强度数组（每个元素0-5）
+                this.bulletFiredCount = 0;  // 已发射的子弹计数
             }
 
             get head() { return this.segments[0]; }
@@ -1544,10 +1724,42 @@
                         this.drawPacmanHead(ctx, seg, radius);
                     } else {
                         // 身体段保持圆形
-                        ctx.beginPath();
-                        ctx.arc(seg.x, seg.y, radius, 0, Math.PI * 2);
                         let alpha = 0.3 + 0.5 * (1 - i / this.segments.length);
                         let color = this.color;
+                        
+                        // 红色腹部效果：头部以下的段变红，分成5个扇形
+                        if (i > 0 && i <= this.redSegments) {
+                            // 先绘制整个圆形为原色
+                            // 临时切换到正常混合模式，避免颜色叠加变白
+                            ctx.globalCompositeOperation = 'source-over';
+                            
+                            // 先绘制整个圆形为原色
+                            ctx.beginPath();
+                            ctx.arc(seg.x, seg.y, radius, 0, Math.PI * 2);
+                            ctx.fillStyle = this.hexToRgba(this.color, alpha);
+                            ctx.fill();
+                            
+                            // 绘制红色扇形（根据当前段的强度绘制相应数量的扇形）
+                            const strengthIndex = i - 1;  // redStrengths数组索引（头部是索引0，红色段从索引1开始）
+                            const segmentStrength = (strengthIndex >= 0 && strengthIndex < this.redStrengths.length) ? this.redStrengths[strengthIndex] : 0;
+                            const sliceAngle = (Math.PI * 2) / 5;  // 每个扇形角度
+                            for (let slice = 0; slice < segmentStrength; slice++) {
+                                const startAngle = slice * sliceAngle - Math.PI / 2;  // 从顶部开始
+                                const endAngle = startAngle + sliceAngle;
+                                ctx.beginPath();
+                                ctx.moveTo(seg.x, seg.y);
+                                ctx.arc(seg.x, seg.y, radius, startAngle, endAngle);
+                                ctx.closePath();
+                                ctx.fillStyle = this.hexToRgba('#ff6b6b', 0.8);
+                                ctx.fill();
+                            }
+                            
+                            // 恢复Screen混合模式
+                            ctx.globalCompositeOperation = 'screen';
+                            
+                            // 跳过后续的普通绘制
+                            continue;
+                        }
                         
                         // 黄光效果：从嘴部到尾部逐个闪光（每个段只闪一次）
                         if (this.yellowGlowTimer > 0 && i === this.yellowGlowIndex) {
@@ -1559,6 +1771,8 @@
                             ctx.shadowColor = '#ffe66d';
                         }
                         
+                        ctx.beginPath();
+                        ctx.arc(seg.x, seg.y, radius, 0, Math.PI * 2);
                         ctx.fillStyle = this.hexToRgba(color, alpha);
                         if (ctx.shadowBlur === 0) {
                             ctx.shadowBlur = 0;
@@ -2130,12 +2344,43 @@
                     const mouseX = (e.clientX - rect.left) * scaleX;
                     const mouseY = (e.clientY - rect.top) * scaleY;
                     
-                    // 子弹方向：从玩家头部指向鼠标
-                    const direction = new Vector(mouseX, mouseY).sub(player.head).normalize();
+                    // 子弹方向：嘴部开合的方向（基于头部到第二段的向量）
+                    let mouthAngle = Math.atan2(player.velocity.y, player.velocity.x);
+                    if (player.segments.length > 1) {
+                        const dir = player.head.sub(player.segments[1]);
+                        if (dir.mag() > 0) {
+                            mouthAngle = Math.atan2(dir.y, dir.x);
+                        }
+                    }
+                    const direction = new Vector(Math.cos(mouthAngle), Math.sin(mouthAngle));
                     const bulletPos = player.head.add(direction.mult(CONFIG.SEGMENT_RADIUS + 5));
                     
                     this.bullets.push(new Bullet(bulletPos.x, bulletPos.y, direction));
                     player.bulletCount--;
+                    
+                    // 每射1发子弹，减少第一个红色段的强度
+                    let strengthReduced = false;
+                    for (let i = 0; i < player.redStrengths.length; i++) {
+                        if (player.redStrengths[i] > 0) {
+                            player.redStrengths[i]--;
+                            strengthReduced = true;
+                            
+                            // 当该段强度为0时，减少红色段数
+                            if (player.redStrengths[i] === 0) {
+                                player.redSegments--;
+                                player.redStrengths.splice(i, 1);  // 从数组中移除
+                                // 更新子弹数量
+                                player.bulletCount = player.redSegments * 5;
+                            }
+                            break;  // 只减少一个段的强度
+                        }
+                    }
+                    
+                    // 如果没有红色段可用，消耗身体
+                    if (!strengthReduced && player.segments.length > 1) {
+                        player.segments.pop();
+                        player.targetLength--;
+                    }
                     
                     // 发射音效
                     if (typeof musicSystem !== 'undefined') {
@@ -2411,9 +2656,12 @@
                             worm.magnetTimer = 3.0;  // 磁力持续 3 秒（加倍）
                             worm.magnetCombo = 0;  // 重置连击数
                             worm.grow(CONFIG.GROWTH_PER_FOOD);
-                        } else if (food.type.score === 120) {  // 红色宝珠：获得子弹
-                            worm.bulletCount = (worm.bulletCount || 0) + 3;  // 获得 3 颗子弹
-                            this.floatingTexts.push(new FloatingText(foodPos.x, foodPos.y - 20, '🔫 +3', '#ff6b6b'));
+                        } else if (food.type.score === 120) {  // 红色宝珠：增加红色段（每段提供5发子弹）
+                            worm.redSegments = (worm.redSegments || 0) + 1;  // 增加1个红色段
+                            worm.redStrengths.push(5);  // 新红色段强度为5
+                            worm.bulletCount = worm.redSegments * 5;  // 子弹数量 = 红色段数 × 5
+                            worm.bulletFiredCount = 0;  // 重置已发射计数
+                            this.floatingTexts.push(new FloatingText(foodPos.x, foodPos.y - 20, '🔫 +5', '#ff6b6b'));
                             worm.grow(CONFIG.GROWTH_PER_FOOD);
                         } else {
                             worm.grow(CONFIG.GROWTH_PER_FOOD);

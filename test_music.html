@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <title>水晶序曲试听</title>
+    <title>水晶序曲 - 真人演奏模拟试听</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -15,138 +15,558 @@
             font-family: 'Microsoft YaHei', sans-serif;
             color: #eee;
         }
-        h1 { margin-bottom: 20px; color: #c77dff; }
+        h1 { margin-bottom: 10px; color: #c77dff; font-size: 24px; }
+        .subtitle { color: #888; margin-bottom: 15px; font-size: 14px; }
+        .song-selector {
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .song-selector label { color: #aaa; }
+        .song-selector select {
+            padding: 8px 15px;
+            font-size: 14px;
+            background: #2d2d3a;
+            color: #fff;
+            border: 1px solid #c77dff;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+        .song-info {
+            color: #888;
+            font-size: 12px;
+            margin-bottom: 15px;
+            font-style: italic;
+        }
         button {
             padding: 15px 40px;
-            font-size: 20px;
+            font-size: 18px;
             background: #c77dff;
             color: #1a1a2e;
             border: none;
             border-radius: 10px;
             cursor: pointer;
             font-weight: bold;
-            margin: 10px;
+            margin: 8px;
         }
         button:hover { background: #a855f7; }
+        button:disabled { background: #555; color: #888; cursor: not-allowed; }
         #status { margin-top: 20px; font-size: 16px; color: #888; }
         #now-playing { margin-top: 10px; font-size: 14px; color: #c77dff; }
+        .controls {
+            margin-top: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            align-items: center;
+        }
+        .control-row {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            font-size: 14px;
+        }
+        .control-row label { color: #aaa; min-width: 100px; text-align: right; }
+        .control-row input[type="range"] { width: 150px; }
+        .control-row .value { color: #c77dff; min-width: 40px; }
+        .features {
+            margin-top: 25px;
+            max-width: 500px;
+            text-align: left;
+            font-size: 13px;
+            color: #888;
+            line-height: 1.8;
+        }
+        .features span { color: #c77dff; }
     </style>
 </head>
 <body>
-    <h1>🎵 最终幻想水晶序曲 - 试听</h1>
-    <button id="playBtn" onclick="playSong()">播放水晶序曲</button>
+    <h1>🎵 钢琴曲谱试听</h1>
+    <div class="subtitle">v2 真人演奏模拟 - 力度变化 + 延音踏板 + 弹性速度</div>
+    
+    <div class="song-selector">
+        <label>选择曲谱：</label>
+        <select id="songSelect" onchange="changeSong(this.value)">
+            <option value="水晶序曲">水晶序曲 (Final Fantasy Prelude)</option>
+            <option value="canon">🎻 卡农 (Canon in D - MIDI)</option>
+            <option value="fur_elise">🎹 致爱丽丝 (Für Elise - MIDI)</option>
+            <option value="carmen">🎺 卡门 - 哈巴涅拉 (MIDI)</option>
+            <option value="爱的罗曼史">爱的罗曼史 (Romance Anónimo)</option>
+            <option value="小星星">小星星 (Twinkle Twinkle)</option>
+            <option value="欢乐颂">欢乐颂 (Ode to Joy)</option>
+            <option value="midi">📂 加载其他 MIDI 文件...</option>
+        </select>
+    </div>
+    <div id="songInfo" class="song-info">植松伸夫 - 《最终幻想》系列标志性旋律</div>
+    
+    <!-- MIDI 文件上传（隐藏，通过选择触发） -->
+    <input type="file" id="midiFileInput" accept=".mid,.midi" style="display:none" onchange="loadMidiFile(this)">
+    <button id="playBtn" onclick="playSong()">播放</button>
     <button id="stopBtn" onclick="stopSong()" disabled>停止</button>
     <div id="status">点击按钮播放</div>
     <div id="now-playing"></div>
 
+    <div class="controls">
+        <div class="control-row">
+            <label>Rubato:</label>
+            <input type="range" id="rubatoSlider" min="0" max="100" value="8" oninput="updateRubato(this.value)">
+            <span class="value" id="rubatoValue">8%</span>
+        </div>
+        <div class="control-row">
+            <label>力度范围:</label>
+            <input type="range" id="velocityMinSlider" min="30" max="100" value="65" oninput="updateVelocity()">
+            <span class="value" id="velocityMinValue">0.65</span>
+            <span style="color:#555">~</span>
+            <input type="range" id="velocityMaxSlider" min="30" max="100" value="100" oninput="updateVelocity()">
+            <span class="value" id="velocityMaxValue">1.00</span>
+        </div>
+        <div class="control-row">
+            <label>踏板效果:</label>
+            <button onclick="togglePedal()" id="pedalBtn" style="padding:8px 20px;font-size:14px;">开启</button>
+        </div>
+        <div class="control-row">
+            <label>循环播放:</label>
+            <input type="checkbox" id="loopCheckbox" onchange="toggleLoop()">
+            <span class="value" id="loopStatus">关闭</span>
+        </div>
+        <div class="control-row">
+            <label>🔊 音量:</label>
+            <input type="range" id="volumeSlider" min="0" max="100" value="70" oninput="updateVolume(this.value)">
+            <span class="value" id="volumeValue">70%</span>
+            <span style="color:#555;font-size:12px;">（最高600%）</span>
+        </div>
+    </div>
+
+    <div class="features">
+        <div>✨ <span>力度变化（Velocity）</span>：每个音符有独立力度，渐强渐弱</div>
+        <div>🎹 <span>延音踏板（Pedal）</span>：卷积混响模拟钢琴共鸣，音符间自然延续</div>
+        <div>🎼 <span>弹性速度（Rubato）</span>：微妙的速度变化，避免机械感</div>
+        <div>💕 <span>情感表达（Dolce）</span>：甜美地演奏，力度+踏板+速度的组合</div>
+    </div>
+
+    <script src="songs.js"></script>
+    <script src="midi-player.js"></script>
     <script>
         let audioContext = null;
         let isPlaying = false;
-        let currentNotes = [];
+        let currentTimeout = null;
+        let isLooping = false;
+        let masterVolume = 4.2;  // 主音量 (默认70% * 6 = 4.2)
+        let masterGain = null;   // 主音量增益节点
 
-        const song = {
-            name: '水晶序曲',
-            notes: [
-                { freq: 392.00, duration: 400, note: 'G4' },
-                { freq: 440.00, duration: 400, note: 'A4' },
-                { freq: 523.25, duration: 400, note: 'C5' },
-                { freq: 587.33, duration: 400, note: 'D5' },
-                { freq: 659.25, duration: 800, note: 'E5' },
-                { freq: 587.33, duration: 400, note: 'D5' },
-                { freq: 523.25, duration: 400, note: 'C5' },
-                { freq: 440.00, duration: 400, note: 'A4' },
-                { freq: 392.00, duration: 800, note: 'G4' },
-                { freq: 440.00, duration: 400, note: 'A4' },
-                { freq: 523.25, duration: 400, note: 'C5' },
-                { freq: 659.25, duration: 800, note: 'E5' },
-                { freq: 523.25, duration: 400, note: 'C5' },
-                { freq: 440.00, duration: 400, note: 'A4' },
-                { freq: 392.00, duration: 400, note: 'G4' },
-                { freq: 330.00, duration: 400, note: 'E4' },
-                { freq: 294.00, duration: 800, note: 'D4' },
-            ]
+        // === 改进的音乐系统 ===
+        const music = {
+            audioContext: null,
+            convolver: null,
+            reverbGain: null,
+            rubatoAmount: 0.08,
+            velocityRange: { min: 0.65, max: 1.0 },
+            currentVelocity: 0.8,
+            pedalEnabled: true,
+
+            init() {
+                if (!this.audioContext) {
+                    this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    // 创建主音量增益节点（支持0-3倍音量）
+                    masterGain = this.audioContext.createGain();
+                    masterGain.gain.setValueAtTime(masterVolume, this.audioContext.currentTime);
+                    masterGain.connect(this.audioContext.destination);
+                    this._createReverb();
+                }
+            },
+
+            _createReverb() {
+                try {
+                    const sr = this.audioContext.sampleRate;
+                    const len = sr * 2;
+                    const imp = this.audioContext.createBuffer(2, len, sr);
+                    const l = imp.getChannelData(0);
+                    const r = imp.getChannelData(1);
+                    for (let i = 0; i < len; i++) {
+                        l[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2.5);
+                        r[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2.2);
+                    }
+                    this.convolver = this.audioContext.createConvolver();
+                    this.convolver.buffer = imp;
+                    this.reverbGain = this.audioContext.createGain();
+                    this.reverbGain.gain.setValueAtTime(0.4, this.audioContext.currentTime);
+                    this.convolver.connect(this.reverbGain);
+                    this.reverbGain.connect(masterGain);  // 连接到主音量
+                } catch(e) { console.warn('Reverb failed:', e); }
+            },
+
+            _applyRubato(dur) {
+                const v = (Math.random() - 0.5) * 2 * this.rubatoAmount;
+                return dur * (1 + v);
+            },
+
+            _updateVelocity() {
+                const range = this.velocityRange.max - this.velocityRange.min;
+                this.currentVelocity = this.velocityRange.min + Math.random() * range;
+            },
+
+            playNote(freq, duration = 120, velocity, usePedal) {
+                if (!this.audioContext) this.init();
+                if (this.audioContext.state === 'suspended') this.audioContext.resume();
+                
+                // 确保主音量节点存在
+                if (!masterGain) {
+                    masterGain = this.audioContext.createGain();
+                    masterGain.gain.setValueAtTime(masterVolume, this.audioContext.currentTime);
+                    masterGain.connect(this.audioContext.destination);
+                }
+
+                if (velocity === undefined) velocity = this.currentVelocity;
+                if (usePedal === undefined) usePedal = this.pedalEnabled;
+
+                const now = this.audioContext.currentTime;
+                const dur = duration / 1000;
+                const v = Math.max(0.3, Math.min(1.0, velocity));
+
+                // 钢琴音色合成 - 更接近真实钢琴
+                // 基频（正弦波为主，更纯净）
+                const osc1 = this.audioContext.createOscillator();
+                osc1.type = 'sine';
+                osc1.frequency.setValueAtTime(freq, now);
+
+                // 2倍频泛音（三角波，柔和）
+                const osc2 = this.audioContext.createOscillator();
+                osc2.type = 'triangle';
+                osc2.frequency.setValueAtTime(freq * 2, now);
+
+                // 3倍频泛音（正弦波，微弱）
+                const osc3 = this.audioContext.createOscillator();
+                osc3.type = 'sine';
+                osc3.frequency.setValueAtTime(freq * 3, now);
+
+                // 4倍频泛音（正弦波，更微弱）
+                const osc4 = this.audioContext.createOscillator();
+                osc4.type = 'sine';
+                osc4.frequency.setValueAtTime(freq * 4, now);
+
+                // 击弦噪音 - 极微弱，仅增加一点质感
+                const noiseBuffer = this.audioContext.createBuffer(1, this.audioContext.sampleRate * 0.01, this.audioContext.sampleRate);
+                const noiseData = noiseBuffer.getChannelData(0);
+                for (let i = 0; i < noiseData.length; i++) {
+                    noiseData[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / noiseData.length, 5);
+                }
+                const noiseSource = this.audioContext.createBufferSource();
+                noiseSource.buffer = noiseBuffer;
+                const noiseGain = this.audioContext.createGain();
+                noiseGain.gain.setValueAtTime(0.008 * v, now);  // 非常微弱
+                noiseGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.01);
+                noiseSource.connect(noiseGain);
+                noiseGain.connect(masterGain);  // 连接到主音量
+
+                // 基频 - 钢琴包络：快速起音，自然衰减
+                const g1 = this.audioContext.createGain();
+                g1.gain.setValueAtTime(0, now);
+                g1.gain.linearRampToValueAtTime(0.5 * v, now + 0.003);  // 快速起音 3ms
+                g1.gain.exponentialRampToValueAtTime(0.15 * v, now + 0.15); // 快速衰减
+                g1.gain.exponentialRampToValueAtTime(0.02 * v, now + dur * 2); // 缓慢衰减
+
+                // 2倍频泛音 - 衰减更快
+                const g2 = this.audioContext.createGain();
+                g2.gain.setValueAtTime(0, now);
+                g2.gain.linearRampToValueAtTime(0.2 * v, now + 0.002);
+                g2.gain.exponentialRampToValueAtTime(0.02 * v, now + dur * 1.2);
+
+                // 3倍频泛音 - 更快衰减
+                const g3 = this.audioContext.createGain();
+                g3.gain.setValueAtTime(0, now);
+                g3.gain.linearRampToValueAtTime(0.08 * v, now + 0.001);
+                g3.gain.exponentialRampToValueAtTime(0.005 * v, now + dur * 0.8);
+
+                // 4倍频泛音 - 最快衰减
+                const g4 = this.audioContext.createGain();
+                g4.gain.setValueAtTime(0, now);
+                g4.gain.linearRampToValueAtTime(0.04 * v, now + 0.001);
+                g4.gain.exponentialRampToValueAtTime(0.002 * v, now + dur * 0.5);
+
+                // 模拟钢琴共鸣板的滤波特性
+                const f = this.audioContext.createBiquadFilter();
+                f.type = 'lowpass';
+                f.frequency.setValueAtTime(6000, now);  // 起始频率更高
+                f.frequency.exponentialRampToValueAtTime(1200, now + dur * 1.5); // 衰减更慢
+                f.Q.setValueAtTime(0.7, now);  // Q值更低，更自然
+
+                // 添加一个低频共鸣滤波器（模拟钢琴共鸣板）
+                const f2 = this.audioContext.createBiquadFilter();
+                f2.type = 'peaking';
+                f2.frequency.setValueAtTime(200, now);
+                f2.Q.setValueAtTime(1, now);
+                f2.gain.setValueAtTime(6, now);  // 低频提升6dB
+
+                osc1.connect(g1); osc2.connect(g2); osc3.connect(g3); osc4.connect(g4);
+                g1.connect(f); g2.connect(f); g3.connect(f); g4.connect(f);
+                f.connect(f2);  // 经过低频共鸣滤波器
+
+                if (usePedal && this.convolver) {
+                    f2.connect(this.convolver);
+                } else {
+                    f2.connect(masterGain);  // 连接到主音量
+                }
+
+                // 播放击弦噪音
+                noiseSource.start(now);
+
+                osc1.start(now); osc2.start(now); osc3.start(now); osc4.start(now);
+                osc1.stop(now + dur * 2 + 0.5);  // 基频持续最久
+                osc2.stop(now + dur * 1.2 + 0.3);
+                osc3.stop(now + dur * 0.8 + 0.2);
+                osc4.stop(now + dur * 0.5 + 0.2);
+
+                // 延音尾音
+                if (usePedal) {
+                    const so = this.audioContext.createOscillator();
+                    so.type = 'sine';
+                    so.frequency.setValueAtTime(freq, now);
+                    const sg = this.audioContext.createGain();
+                    sg.gain.setValueAtTime(0.02 * v, now);
+                    sg.gain.exponentialRampToValueAtTime(0.001, now + dur * 2.5);
+                    so.connect(sg);
+                    if (this.convolver) sg.connect(this.convolver);
+                    else sg.connect(masterGain);  // 连接到主音量
+                    so.start(now);
+                    so.stop(now + dur * 2.5 + 0.1);
+                }
+            }
         };
 
-        function playNote(freq, duration, startTime) {
-            const osc1 = audioContext.createOscillator();
-            osc1.type = 'sine';
-            osc1.frequency.setValueAtTime(freq, startTime);
-
-            const osc2 = audioContext.createOscillator();
-            osc2.type = 'sine';
-            osc2.frequency.setValueAtTime(freq * 2, startTime);
-
-            const gainNode = audioContext.createGain();
-            gainNode.gain.setValueAtTime(0, startTime);
-            gainNode.gain.linearRampToValueAtTime(0.25, startTime + 0.02);
-            gainNode.gain.exponentialRampToValueAtTime(0.01, startTime + duration * 2.5 / 1000);
-
-            const gainNode2 = audioContext.createGain();
-            gainNode2.gain.setValueAtTime(0, startTime);
-            gainNode2.gain.linearRampToValueAtTime(0.08, startTime + 0.02);
-            gainNode2.gain.exponentialRampToValueAtTime(0.01, startTime + duration * 1.5 / 1000);
-
-            osc1.connect(gainNode);
-            osc2.connect(gainNode2);
-            gainNode.connect(audioContext.destination);
-            gainNode2.connect(audioContext.destination);
-
-            osc1.start(startTime);
-            osc2.start(startTime);
-            osc1.stop(startTime + duration * 2.5 / 1000 + 0.2);
-            osc2.stop(startTime + duration * 1.5 / 1000 + 0.2);
-
-            currentNotes.push({ osc1, osc2, startTime, duration });
-        }
+        // 当前选中的曲谱
+        let currentSongName = '水晶序曲';
+        let song = SONGS[currentSongName].notes;
 
         function playSong() {
-            if (!audioContext) {
-                audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            }
-            
+            music.init();
+            audioContext = music.audioContext;  // 同步audioContext
             isPlaying = true;
-            currentNotes = [];
             document.getElementById('playBtn').disabled = true;
+            document.getElementById('playBtn').textContent = '播放中...';
             document.getElementById('stopBtn').disabled = false;
-            document.getElementById('status').textContent = '正在播放...';
+            document.getElementById('status').textContent = isLooping ? '循环播放中...' : '正在播放...';
 
-            let currentTime = audioContext.currentTime + 0.1;
-            const gap = 0.05;  // 音符间隔 50ms
+            let idx = 0;
+            const gap = 0.05;
 
-            song.notes.forEach((item, index) => {
-                playNote(item.freq, item.duration, currentTime);
-                document.getElementById('now-playing').textContent = `正在播放: ${item.note}`;
-                
-                setTimeout(() => {
-                    if (isPlaying) {
-                        document.getElementById('now-playing').textContent = `正在播放: ${item.note}`;
-                    }
-                }, (currentTime - audioContext.currentTime) * 1000);
-
-                currentTime += item.duration / 1000 + gap;
-            });
-
-            setTimeout(() => {
-                if (isPlaying) {
-                    isPlaying = false;
-                    document.getElementById('playBtn').disabled = false;
-                    document.getElementById('stopBtn').disabled = true;
-                    document.getElementById('status').textContent = '播放完成';
-                    document.getElementById('now-playing').textContent = '';
+            const playNext = () => {
+                if (!isPlaying) {
+                    return;
                 }
-            }, currentTime * 1000);
+                
+                // 播放完成
+                if (idx >= song.length) {
+                    if (isLooping) {
+                        // 循环播放：重置索引继续播放
+                        idx = 0;
+                        document.getElementById('status').textContent = '循环播放中...';
+                    } else {
+                        // 播放完成
+                        isPlaying = false;
+                        document.getElementById('playBtn').disabled = false;
+                        document.getElementById('playBtn').textContent = '播放';
+                        document.getElementById('stopBtn').disabled = true;
+                        document.getElementById('status').textContent = '播放完成';
+                        document.getElementById('now-playing').textContent = '';
+                        return;
+                    }
+                }
+
+                const note = song[idx];
+                const adjustedDur = music._applyRubato(note.duration);
+                music.playNote(note.freq, adjustedDur, note.velocity, note.pedal);
+                
+                document.getElementById('now-playing').textContent = 
+                    `♪ ${note.freq.toFixed(1)}Hz | v=${note.velocity.toFixed(2)} | dur=${adjustedDur.toFixed(0)}ms`;
+
+                idx++;
+                currentTimeout = setTimeout(playNext, adjustedDur + gap * 1000);
+            };
+
+            playNext();
         }
 
         function stopSong() {
             isPlaying = false;
-            currentNotes.forEach(({ osc1, osc2 }) => {
-                try { osc1.stop(); osc2.stop(); } catch(e) {}
-            });
-            currentNotes = [];
+            if (currentTimeout) clearTimeout(currentTimeout);
             document.getElementById('playBtn').disabled = false;
+            document.getElementById('playBtn').textContent = '播放';
             document.getElementById('stopBtn').disabled = true;
             document.getElementById('status').textContent = '已停止';
             document.getElementById('now-playing').textContent = '';
+        }
+
+        function updateRubato(val) {
+            music.rubatoAmount = val / 100;
+            document.getElementById('rubatoValue').textContent = val + '%';
+        }
+
+        function updateVelocity() {
+            const min = document.getElementById('velocityMinSlider').value / 100;
+            const max = document.getElementById('velocityMaxSlider').value / 100;
+            music.velocityRange.min = Math.min(min, max);
+            music.velocityRange.max = Math.max(min, max);
+            document.getElementById('velocityMinValue').textContent = music.velocityRange.min.toFixed(2);
+            document.getElementById('velocityMaxValue').textContent = music.velocityRange.max.toFixed(2);
+        }
+
+        function togglePedal() {
+            music.pedalEnabled = !music.pedalEnabled;
+            document.getElementById('pedalBtn').textContent = music.pedalEnabled ? '开启' : '关闭';
+            document.getElementById('pedalBtn').style.background = music.pedalEnabled ? '#c77dff' : '#555';
+        }
+
+        function toggleLoop() {
+            isLooping = document.getElementById('loopCheckbox').checked;
+            document.getElementById('loopStatus').textContent = isLooping ? '开启' : '关闭';
+            if (isLooping && !isPlaying) {
+                // 如果开启循环且当前未播放，自动开始播放
+                playSong();
+            }
+        }
+
+        function changeSong(songName) {
+            if (songName === 'midi') {
+                // 触发文件选择
+                document.getElementById('midiFileInput').click();
+                return;
+            }
+            
+            if (songName === 'carmen') {
+                // 加载内置的卡门 MIDI 文件
+                loadMidiFromUrl('carmen_habanera.mid');
+                return;
+            }
+            
+            if (songName === 'canon') {
+                // 加载内置的卡农 MIDI 文件
+                loadMidiFromUrl('pachelbel_canon.mid');
+                return;
+            }
+            
+            if (songName === 'fur_elise') {
+                // 加载内置的致爱丽丝 MIDI 文件
+                loadMidiFromUrl('fur_elise.mid');
+                return;
+            }
+            
+            if (SONGS[songName]) {
+                currentSongName = songName;
+                song = SONGS[songName].notes;
+                document.getElementById('songInfo').textContent = 
+                    `${SONGS[songName].composer} - ${SONGS[songName].description}`;
+                // 如果正在播放，停止并重置
+                if (isPlaying) {
+                    stopSong();
+                }
+            }
+        }
+
+        async function loadMidiFromUrl(url) {
+            try {
+                console.log('开始加载 MIDI:', url);
+                const response = await fetch(url);
+                console.log('fetch 响应状态:', response.status, response.ok);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                
+                const buffer = await response.arrayBuffer();
+                console.log('文件大小:', buffer.byteLength, '字节');
+                
+                const midiData = MidiPlayer.parse(buffer);
+                console.log('MIDI 格式:', midiData.format, '音轨数:', midiData.tracks.length, 'division:', midiData.division);
+                
+                // 显示每个音轨的事件数
+                midiData.tracks.forEach((track, i) => {
+                    const noteOnCount = track.events.filter(e => e.type === 'noteOn').length;
+                    const noteOffCount = track.events.filter(e => e.type === 'noteOff').length;
+                    console.log(`音轨 ${i}: ${track.events.length} 事件, ${noteOnCount} noteOn, ${noteOffCount} noteOff`);
+                });
+                
+                const notes = MidiPlayer.toNotes(midiData);
+                console.log('解析出音符数:', notes.length);
+                
+                if (notes.length === 0) {
+                    alert('MIDI 文件中没有找到音符，检查控制台获取详情');
+                    return;
+                }
+                
+                // 根据文件名显示不同信息
+                const songInfoMap = {
+                    'carmen_habanera.mid': '比才 - 卡门哈巴涅拉',
+                    'pachelbel_canon.mid': '帕赫贝尔 - 卡农 (D大调)',
+                    'fur_elise.mid': '贝多芬 - 致爱丽丝'
+                };
+                
+                currentSongName = url.replace('.mid', '');
+                song = notes;
+                const songName = songInfoMap[url] || url;
+                document.getElementById('songInfo').textContent = 
+                    `${songName} (${notes.length} 个音符)`;
+                
+                if (isPlaying) {
+                    stopSong();
+                }
+                
+                console.log('MIDI 加载成功:', songName, notes.length, '个音符');
+                console.log('前5个音符:', notes.slice(0, 5).map(n => `${n.freq.toFixed(1)}Hz ${n.duration}ms v=${n.velocity.toFixed(2)}`));
+            } catch (e) {
+                console.error('MIDI 加载失败:', e);
+                alert('MIDI 加载失败: ' + e.message);
+            }
+        }
+
+        async function loadMidiFile(input) {
+            try {
+                const buffer = await MidiPlayer.loadFromFile(input);
+                const midiData = MidiPlayer.parse(buffer);
+                const notes = MidiPlayer.toNotes(midiData);
+                
+                if (notes.length === 0) {
+                    alert('MIDI 文件中没有找到音符');
+                    return;
+                }
+                
+                // 更新当前曲谱
+                currentSongName = 'midi';
+                song = notes;
+                
+                // 更新显示
+                const fileName = input.files[0].name;
+                document.getElementById('songInfo').textContent = 
+                    `MIDI: ${fileName} (${notes.length} 个音符)`;
+                
+                // 重置选择框显示
+                document.getElementById('songSelect').value = '';
+                
+                // 如果正在播放，停止并重置
+                if (isPlaying) {
+                    stopSong();
+                }
+                
+                console.log('MIDI 加载成功:', notes.length, '个音符');
+            } catch (e) {
+                console.error('MIDI 加载失败:', e);
+                alert('MIDI 加载失败: ' + e.message);
+            }
+        }
+
+        function updateVolume(val) {
+            // 音量范围 0 ~ 6倍 (0-600%)
+            masterVolume = (val / 100) * 6;
+            document.getElementById('volumeValue').textContent = val + '%';
+            
+            // 确保audioContext存在
+            if (!audioContext && music.audioContext) {
+                audioContext = music.audioContext;
+            }
+            
+            if (masterGain && audioContext) {
+                masterGain.gain.setValueAtTime(masterVolume, audioContext.currentTime);
+            }
         }
     </script>
 </body>
