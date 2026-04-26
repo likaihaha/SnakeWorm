@@ -186,59 +186,76 @@
         
         /* 移动端响应式优化 */
         @media (max-width: 768px) {
+            /* 标题缩小 */
             h1 {
-                font-size: 18px !important;
-                margin-bottom: 5px !important;
+                font-size: 16px !important;
+                margin-bottom: 3px !important;
             }
             
+            /* 隐藏实验标签 */
+            .experiment-badge {
+                display: none !important;
+            }
+            
+            /* 隐藏侧边图例 */
             .legend {
-                display: none !important;  // 隐藏侧边图例
+                display: none !important;
             }
             
+            /* 隐藏底部说明文字 */
             #controls {
-                display: none !important;  // 隐藏底部说明文字
+                display: none !important;
             }
             
+            /* Canvas 边框变细 */
+            #gameCanvas {
+                border-width: 1px !important;
+            }
+            
+            /* UI 文字大小 */
             #ui {
-                font-size: 12px !important;
-                gap: 10px !important;
+                font-size: 11px !important;
+                gap: 8px !important;
+                margin-top: 5px !important;
             }
             
+            /* 摇杆位置和大小 */
             #joystick {
-                bottom: 80px !important;  // 摇杆上移，避开浏览器控件
-                left: 30px !important;
-                width: 100px !important;
-                height: 100px !important;
+                bottom: 90px !important;  // 摇杆上移，避开浏览器控件
+                left: 20px !important;
+                width: 90px !important;
+                height: 90px !important;
             }
             
             #joystickKnob {
-                width: 40px !important;
-                height: 40px !important;
+                width: 36px !important;
+                height: 36px !important;
             }
             
-            #startScreen, #pauseScreen {
-                padding: 20px 30px !important;
-                width: 90% !important;
-                max-width: 350px !important;
+            /* 弹窗优化 */
+            #startScreen, #pauseScreen, #gameOver {
+                padding: 15px 20px !important;
+                width: 85% !important;
+                max-width: 320px !important;
             }
             
-            #startScreen h2, #pauseScreen h2 {
-                font-size: 22px !important;
-                margin-bottom: 15px !important;
+            #startScreen h2, #pauseScreen h2, #gameOver h2 {
+                font-size: 20px !important;
+                margin-bottom: 10px !important;
             }
             
-            #startScreen button, #pauseScreen button {
-                padding: 10px 30px !important;
-                font-size: 16px !important;
+            #startScreen button, #pauseScreen button, #gameOver button {
+                padding: 8px 25px !important;
+                font-size: 15px !important;
+            }
+            
+            #gameOver p {
+                font-size: 14px !important;
+                margin: 5px 0 !important;
             }
             
             body {
-                padding: 5px !important;
-            }
-            
-            .experiment-badge {
-                font-size: 10px !important;
-                padding: 3px 10px !important;
+                padding: 3px !important;
             }
         }
     </style>
