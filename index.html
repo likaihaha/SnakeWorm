@@ -1363,6 +1363,10 @@
                 this.redSegments = 0;  // 红色段的数量
                 this.redStrengths = [];  // 每个红色段的强度数组（每个元素0-5）
                 this.bulletFiredCount = 0;  // 已发射的子弹计数
+                
+                // AI射击相关
+                this.aiShootTimer = 0;  // AI射击冷却计时器
+                this.aiShootInterval = 2.0 + Math.random() * 2;  // AI射击间隔（2-4秒随机）
             }
 
             get head() { return this.segments[0]; }
@@ -2951,6 +2955,17 @@
                             worm.segments[0].x = Math.max(margin, Math.min(CONFIG.CANVAS_WIDTH - margin, worm.segments[0].x));
                             worm.segments[0].y = Math.max(margin, Math.min(CONFIG.CANVAS_HEIGHT - margin, worm.segments[0].y));
                         }
+                        
+                        // AI蚯蚓随机射击（有红色段时）
+                        if (worm.redSegments > 0 && worm.bulletCount > 0) {
+                            worm.aiShootTimer -= dt;
+                            if (worm.aiShootTimer <= 0) {
+                                // 随机射击
+                                this.aiFireBullet(worm);
+                                worm.aiShootTimer = worm.aiShootInterval;  // 重置射击间隔
+                                worm.aiShootInterval = 2.0 + Math.random() * 2;  // 新的随机间隔（2-4秒）
+                            }
+                        }
                     }
                 }
                 
@@ -3396,6 +3411,46 @@
                 // 发射音效
                 if (typeof musicSystem !== 'undefined') {
                     musicSystem.playNote(800, 50);
+                }
+            }
+            
+            /**
+             * AI蚯蚓发射子弹（随机方向）
+             */
+            aiFireBullet(worm) {
+                if (!worm || !worm.isAlive || worm.segments.length < 2) return;
+                if (!worm.bulletCount || worm.bulletCount <= 0) return;
+                
+                // 计算射击方向（基于头部到第二段的方向，加随机偏移）
+                const head = worm.segments[0];
+                const next = worm.segments[1];
+                let angle = Math.atan2(head.y - next.y, head.x - next.x);
+                angle += (Math.random() - 0.5) * 0.5;  // 随机偏移±0.25弧度
+                
+                const direction = new Vector(Math.cos(angle), Math.sin(angle));
+                const bulletPos = head.add(direction.mult(CONFIG.SEGMENT_RADIUS + 5));
+                
+                this.bullets.push(new Bullet(bulletPos.x, bulletPos.y, direction));
+                worm.bulletCount--;
+                
+                // 每射1发子弹，减少第一个红色段的强度
+                for (let i = 0; i < worm.redStrengths.length; i++) {
+                    if (worm.redStrengths[i] > 0) {
+                        worm.redStrengths[i]--;
+                        if (worm.redStrengths[i] === 0) {
+                            // 红色段用完，移除
+                            worm.redSegments--;
+                            worm.redStrengths.splice(i, 1);
+                            worm.bulletCount = worm.redSegments * 5;
+                            // 移除该节身体
+                            if (worm.segments.length > 3) {
+                                worm.segments.pop();
+                                worm.targetLength = worm.segments.length;
+                            }
+                            break;
+                        }
+                        break;
+                    }
                 }
             }
             
