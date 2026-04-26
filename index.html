@@ -651,26 +651,20 @@
                 }
             }
             
-            // 播放黄色宝珠的琶音（最终幻想水晶序曲的分解和弦）
-            playYellowBeadArpeggio() {
-                // 水晶序曲的分解和弦琶音序列
-                const arpeggio = [
-                    { freq: 392.00, duration: 100 },  // G4
-                    { freq: 493.88, duration: 100 },  // B4
-                    { freq: 659.25, duration: 100 },  // E5
-                    { freq: 783.99, duration: 100 },  // G5
-                    { freq: 987.77, duration: 100 },  // B5
-                    { freq: 1174.66, duration: 100 }, // D6
-                    { freq: 1318.51, duration: 100 }, // E6
-                    { freq: 1567.98, duration: 150 }, // G6
-                ];
+            // 播放黄色宝珠的琶音（水晶序曲音符，数量等于段数）
+            playYellowBeadArpeggio(segmentCount) {
+                // 使用与普通宝珠相同的水晶序曲音符序列
+                const song = this.songs['水晶序曲'];
+                if (!song) return;
                 
-                // 播放琶音序列
-                arpeggio.forEach((note, index) => {
+                // 播放 segmentCount 个音符（循环使用音符序列）
+                for (let i = 0; i < segmentCount; i++) {
+                    const noteIndex = i % song.length;  // 循环使用音符
+                    const note = song[noteIndex];
                     setTimeout(() => {
                         this.playNote(note.freq, note.duration);
-                    }, index * 80);  // 每个音符间隔 80ms
-                });
+                    }, i * 80);  // 每个音符间隔 80ms
+                }
             }
         }
 
@@ -2096,9 +2090,9 @@
                         
                         // 触发音效
                         if (worm.isPlayer) {
-                            // 黄色宝珠：播放最终幻想水晶序曲琶音
+                            // 黄色宝珠：播放水晶序曲音符，数量等于蚯蚓段数
                             if (food.type.score === 30) {
-                                musicSystem.playYellowBeadArpeggio();
+                                musicSystem.playYellowBeadArpeggio(worm.segments.length);
                             } else {
                                 musicSystem.onEatFood(food);
                             }
