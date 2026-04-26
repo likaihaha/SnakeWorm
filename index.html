@@ -540,7 +540,7 @@
         <div id="rhythmHint" style="color:#ffd700; font-size:10px; margin-top:3px;"></div>
     </div>
     <div id="controls">
-        🖱️ 鼠标移动控制方向 | 🔮 <b>宝珠渐进解锁：🟢绿→🟡黄(30s)→🟠橙(60s)→🔴红(身长15)</b><br>
+        🖱️ 鼠标移动控制方向 | 🔮 <b>宝珠渐进解锁：🟢绿→🟡黄(30s)→🔴红(60s+身长20)→🟠橙(90s)</b><br>
         🔴 <b>咬尾巴 → 断尾分裂</b> | ⚠️ <b>头碰身体中段 → 自己分裂</b><br>
         🎵 <b>吃黄宝珠后等待旋律播完再出现下一颗</b> | 🎨 <b>Screen 混合模式</b>
     </div>
@@ -1035,8 +1035,9 @@
             // 游戏节奏配置
             RHYTHM: {
                 YELLOW_UNLOCK_TIME: 30,      // 30秒后解锁黄色宝珠
-                RED_UNLOCK_LENGTH: 15,       // 身体15节后解锁红色宝珠
-                ORANGE_UNLOCK_TIME: 60,      // 1分钟后解锁橙色宝珠
+                RED_UNLOCK_TIME: 60,         // 60秒后解锁红色宝珠
+                RED_UNLOCK_LENGTH: 20,       // 身体20节后解锁红色宝珠
+                ORANGE_UNLOCK_TIME: 90,      // 90秒后解锁橙色宝珠
                 YELLOW_COOLDOWN: 5.0,        // 吃黄宝珠后冷却5秒（旋律3秒+等待2秒）
             }
         };
@@ -2437,6 +2438,8 @@
                 this.bullets = [];  // 子弹
                 this.slowedFoods = new Map();  // 减速的宝珠 {food: slowTimer}
                 this.initialGreenSpawned = 0;  // 初始绿宝珠已生成数量
+                this.showCrosshairHint = false;  // 是否显示瞄准镜提示
+                this.crosshairHintTimer = 0;  // 瞄准镜提示计时器
                 this.slowedWorms = new Map();  // 减速的蚯蚓 {worm: slowTimer}
                 this.mousePos = new Vector(CONFIG.CANVAS_WIDTH / 2, CONFIG.CANVAS_HEIGHT / 2);
                 this.score = 0;
@@ -2779,6 +2782,8 @@
                 this.yellowCooldown = 0;
                 this.gameTime = 0;
                 this.rhythmNotified = {};  // 重置节奏通知
+                this.showCrosshairHint = false;  // 重置瞄准镜提示
+                this.crosshairHintTimer = 0;
                 this.isRunning = true;
                 this.isPaused = false;
                 this.isGameOver = false;
@@ -2846,12 +2851,12 @@
                             hints.push('🟡');
                         }
                     }
-                    // 橙色：1分钟后
+                    // 橙色：90秒后
                     if (this.gameTime >= CONFIG.RHYTHM.ORANGE_UNLOCK_TIME) {
                         hints.push('🟠');
                     }
-                    // 红色：身体15节后
-                    if (player.length >= CONFIG.RHYTHM.RED_UNLOCK_LENGTH) {
+                    // 红色：60秒后 + 身体20节后
+                    if (this.gameTime >= CONFIG.RHYTHM.RED_UNLOCK_TIME && player.length >= CONFIG.RHYTHM.RED_UNLOCK_LENGTH) {
                         hints.push('🔴');
                     }
                     rhythmHint.textContent = hints.join(' ');
@@ -2886,6 +2891,14 @@
                     this.yellowCooldown -= dt;
                 }
 
+                // 更新瞄准镜提示计时器
+                if (this.crosshairHintTimer > 0) {
+                    this.crosshairHintTimer -= dt;
+                    if (this.crosshairHintTimer <= 0) {
+                        this.showCrosshairHint = false;
+                    }
+                }
+
                 // 节奏解锁通知
                 if (!this.rhythmNotified.yellow && this.gameTime >= CONFIG.RHYTHM.YELLOW_UNLOCK_TIME) {
                     this.rhythmNotified.yellow = true;
@@ -2895,9 +2908,9 @@
                     this.rhythmNotified.orange = true;
                     this.floatingTexts.push(new FloatingText(CONFIG.CANVAS_WIDTH / 2, CONFIG.CANVAS_HEIGHT / 2 - 50, '🟠 橙色宝珠已解锁！', '#ff8c42'));
                 }
-                if (!this.rhythmNotified.red && player.length >= CONFIG.RHYTHM.RED_UNLOCK_LENGTH) {
+                if (!this.rhythmNotified.red && this.gameTime >= CONFIG.RHYTHM.RED_UNLOCK_TIME && player.length >= CONFIG.RHYTHM.RED_UNLOCK_LENGTH) {
                     this.rhythmNotified.red = true;
-                    this.floatingTexts.push(new FloatingText(CONFIG.CANVAS_WIDTH / 2, CONFIG.CANVAS_HEIGHT / 2 - 50, '🔴 红色宝珠已解锁！', '#ff6b6b'));
+                    this.floatingTexts.push(new FloatingText(CONFIG.CANVAS_WIDTH / 2, CONFIG.CANVAS_HEIGHT / 2 - 50, '🔴 红色宝珠已解锁！可以发射子弹！', '#ff6b6b'));
                 }
 
                 // 更新宝珠刷新计时器
@@ -2987,6 +3000,12 @@
                             worm.bulletFiredCount = 0;  // 重置已发射计数
                             this.floatingTexts.push(new FloatingText(foodPos.x, foodPos.y - 20, '🔫 +5', '#ff6b6b'));
                             worm.grow(CONFIG.GROWTH_PER_FOOD);
+                            // 第一次吃到红宝珠：显示瞄准镜提示
+                            if (!this.rhythmNotified.redAim) {
+                                this.rhythmNotified.redAim = true;
+                                this.showCrosshairHint = true;  // 显示瞄准镜提示
+                                this.crosshairHintTimer = 3.0;  // 提示持续3秒
+                            }
                         } else if (food.type.score === 300) {  // 紫色宝珠：无敌状态
                             worm.invincibleTimer = 10.0;  // 10秒无敌
                             worm.headEnlarged = true;  // 头部变大一倍
@@ -3262,11 +3281,12 @@
                             canSpawn = this.gameTime >= CONFIG.RHYTHM.YELLOW_UNLOCK_TIME 
                                 && this.yellowCooldown <= 0;
                             break;
-                        case 60:  // 橙色：1分钟后
+                        case 60:  // 橙色：90秒后
                             canSpawn = this.gameTime >= CONFIG.RHYTHM.ORANGE_UNLOCK_TIME;
                             break;
-                        case 120: // 红色：身体15节后
-                            canSpawn = playerLength >= CONFIG.RHYTHM.RED_UNLOCK_LENGTH;
+                        case 120: // 红色：60秒后 + 身体20节后
+                            canSpawn = this.gameTime >= CONFIG.RHYTHM.RED_UNLOCK_TIME 
+                                && playerLength >= CONFIG.RHYTHM.RED_UNLOCK_LENGTH;
                             break;
                         case 300: // 紫色：暂时禁用
                             canSpawn = false;
@@ -3615,7 +3635,7 @@
             }
 
             /**
-             * 绘制自定义鼠标光标：18px 圆环（触摸设备不绘制）
+             * 绘制自定义鼠标光标：有红色宝珠时显示瞄准镜，否则显示圆环
              */
             drawCustomCursor() {
                 if (!this.mouseInCanvas) return;
@@ -3623,14 +3643,64 @@
                 
                 const cursorX = this.mousePos.x;
                 const cursorY = this.mousePos.y;
-                const radius = 18;  // 36px 直径 = 18px 半径
-                const lineWidth = 2;
+                const player = this.worms[0];
+                const hasRedSegments = player && player.redSegments > 0;
                 
-                ctx.beginPath();
-                ctx.arc(cursorX, cursorY, radius, 0, Math.PI * 2);
-                ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
-                ctx.lineWidth = lineWidth;
-                ctx.stroke();
+                if (hasRedSegments) {
+                    // 瞄准镜图样（红色）
+                    const radius = 20;
+                    const lineWidth = 2;
+                    
+                    // 外圈
+                    ctx.beginPath();
+                    ctx.arc(cursorX, cursorY, radius, 0, Math.PI * 2);
+                    ctx.strokeStyle = 'rgba(255, 107, 107, 0.8)';
+                    ctx.lineWidth = lineWidth;
+                    ctx.stroke();
+                    
+                    // 十字线
+                    const crossSize = radius + 8;
+                    ctx.beginPath();
+                    ctx.moveTo(cursorX - crossSize, cursorY);
+                    ctx.lineTo(cursorX - radius - 3, cursorY);
+                    ctx.moveTo(cursorX + radius + 3, cursorY);
+                    ctx.lineTo(cursorX + crossSize, cursorY);
+                    ctx.moveTo(cursorX, cursorY - crossSize);
+                    ctx.lineTo(cursorX, cursorY - radius - 3);
+                    ctx.moveTo(cursorX, cursorY + radius + 3);
+                    ctx.lineTo(cursorX, cursorY + crossSize);
+                    ctx.strokeStyle = 'rgba(255, 107, 107, 0.6)';
+                    ctx.lineWidth = 1;
+                    ctx.stroke();
+                    
+                    // 中心点
+                    ctx.beginPath();
+                    ctx.arc(cursorX, cursorY, 2, 0, Math.PI * 2);
+                    ctx.fillStyle = 'rgba(255, 107, 107, 0.9)';
+                    ctx.fill();
+                } else {
+                    // 普通圆环（白色）
+                    const radius = 18;
+                    const lineWidth = 2;
+                    
+                    ctx.beginPath();
+                    ctx.arc(cursorX, cursorY, radius, 0, Math.PI * 2);
+                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+                    ctx.lineWidth = lineWidth;
+                    ctx.stroke();
+                }
+                
+                // 瞄准镜提示（第一次吃到红宝珠时）
+                if (this.showCrosshairHint && this.crosshairHintTimer > 0) {
+                    const alpha = Math.min(1, this.crosshairHintTimer / 0.5);  // 最后0.5秒淡出
+                    ctx.save();
+                    ctx.globalAlpha = alpha;
+                    ctx.fillStyle = '#ff6b6b';
+                    ctx.font = 'bold 16px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('🎯 点击鼠标发射子弹！', cursorX, cursorY - 40);
+                    ctx.restore();
+                }
             }
 
             gameOver() {
