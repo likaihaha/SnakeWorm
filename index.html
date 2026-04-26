@@ -1245,6 +1245,7 @@
                 this.trail = [];  // 拖尾
                 this.bounces = 0;  // 弹跳次数
                 this.maxBounces = type.wobble > 0 ? 2 : 1;  // 有摆动的宝珠可以弹跳 2 次
+                this.inactiveTimer = 0;  // 初生冷却计时器（尸体转化的宝珠需要散布后才能被互动）
             }
             
             static weightedRandom() {
@@ -1273,6 +1274,11 @@
             }
             
             update(dt) {
+                // 初生冷却倒计时
+                if (this.inactiveTimer > 0) {
+                    this.inactiveTimer -= dt;
+                }
+                
                 this.pulsePhase += dt * 3;
                 this.movePhase += dt * 2;
                 
@@ -1340,7 +1346,10 @@
                 ctx.shadowColor = this.type.color;
                 ctx.beginPath();
                 ctx.arc(this.pos.x, this.pos.y, r, 0, Math.PI * 2);
-                ctx.fillStyle = this.type.color;
+                // 初生冷却中的宝珠半透明，提示玩家还不能互动
+                ctx.fillStyle = this.inactiveTimer > 0
+                    ? this.type.color.replace(')', ', 0.5)').replace('rgb', 'rgba')
+                    : this.type.color;
                 ctx.fill();
                 
                 // 高光
@@ -1811,6 +1820,7 @@
                 const head = this.segments[0];
                 for (let i = 0; i < foods.length; i++) {
                     const food = foods[i];
+                    if (food.inactiveTimer > 0) continue;  // 初生冷却中的宝珠不能被吃
                     const eatDist = CONFIG.SEGMENT_RADIUS + food.type.radius;
                     if (head.dist(food.pos) < eatDist) return i;
                 }
@@ -3422,6 +3432,7 @@
                         food.velocity.y = -(3.0 + Math.random() * 3.0);  // 向上速度
                         // 水平散射：随机左右偏移，确保宝珠分散不挤在一起
                         food.velocity.x = (Math.random() - 0.5) * 8.0;   // 左右偏移范围-4~+4
+                        food.inactiveTimer = 2.0;  // 初生冷却2秒，期间不能被吃、不能被磁力吸引
                         this.foods.push(food);
                         
                         // 添加粒子特效（尸体段变宝珠的转化效果）
@@ -3447,6 +3458,7 @@
                     const playerHead = player.head;
                     
                     for (const food of this.foods) {
+                        if (food.inactiveTimer > 0) continue;  // 初生冷却中的宝珠不能被磁力吸引
                         const dist = playerHead.dist(food.pos);
                         if (dist > magnetRange) continue;  // 超出范围
                         
