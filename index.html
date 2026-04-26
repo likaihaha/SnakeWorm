@@ -3537,14 +3537,17 @@
                 const deathMargin = CONFIG.WALL_MARGIN * 2 + CONFIG.SEGMENT_RADIUS * 2;
                 for (let i = this.foods.length - 1; i >= 0; i--) {
                     const food = this.foods[i];
-                    // 宝珠掉到底部死亡线时，播放消散特效
-                    if (food.pos.y > CONFIG.CANVAS_HEIGHT - deathMargin) {
+                    // 宝珠掉到底部死亡线时，播放消散特效（只处理向下掉的，底部发射向上飞的不删除）
+                    if (food.pos.y > CONFIG.CANVAS_HEIGHT - deathMargin && food.velocity.y >= 0) {
                         // 创建消散粒子特效（使用宝珠颜色）
                         for (let j = 0; j < 8; j++) {
                             this.particles.push(new Particle(food.pos.x, food.pos.y, food.type.color));
                         }
                         this.foods.splice(i, 1);
                         this.foodRespawnTimers[food.type.score] = food.type.respawnTime;
+                    } else if (food.pos.y < -50) {
+                        // 清理飞出顶部的宝珠
+                        this.foods.splice(i, 1);
                     }
                 }
                 
