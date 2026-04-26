@@ -6,7 +6,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="format-detection" content="telephone=no">
-    <title>SnakeWorm v0.23 - 吃豆人蚯蚓</title>
+    <title>SnakeWorm v0.24 - 吃豆人蚯蚓</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -952,6 +952,7 @@
             SEGMENT_RADIUS: 8, SEGMENT_SPACING: 14,
             BASE_SPEED: 5, MIN_SPEED: 2, SPEED_DECAY: 0.02,
             WORM_INITIAL_LENGTH: 3, GROWTH_PER_FOOD: 1,
+            MAX_SEGMENT_LENGTH: 80,  // 最大身体长度（防止出框）
             WALL_MARGIN: 10,
             // 分裂配置
             SPLIT_COLOR_DURATION: 3.0,
@@ -1237,6 +1238,13 @@
                 this.speed = isPlayer ? CONFIG.BASE_SPEED : CONFIG.AI_BASE_SPEED;
                 this.invincibleTimer = 0;
                 this.activationTimer = 0;
+                this.headEnlarged = false;  // 头部是否变大
+                this.headEnlargedTimer = 0;  // 头部变大计时器
+                this.headScale = 1.0;  // 头部缩放比例（1.0正常，2.0变大）
+                this.headScaleTarget = 1.0;  // 头部缩放目标值
+                this.purpleParticleTimer = 0;  // 紫色粒子特效计时器
+                this.tailYellowDash = true;  // 尾部黄色虚线是否显示
+                this.tailYellowDashTimer = 0;  // 尾部虚线消失计时器
                 
                 // 出场动画相关
                 this.isEntering = isPlayer;  // 玩家蚯蚓需要出场动画
@@ -1294,8 +1302,16 @@
             }
 
             grow(amount) {
+                // 检查是否达到最大长度
+                if (this.segments.length >= CONFIG.MAX_SEGMENT_LENGTH) {
+                    return;  // 已达到最大长度，不再生长
+                }
+                
+                // 限制生长数量，不超过最大长度
+                const canGrow = Math.min(amount, CONFIG.MAX_SEGMENT_LENGTH - this.segments.length);
+                
                 // 添加生长动画，而不是直接增加长度
-                for (let i = 0; i < amount; i++) {
+                for (let i = 0; i < canGrow; i++) {
                     // 计算尾部方向（根据最后两节）
                     let direction = new Vector(0, 0);
                     if (this.segments.length >= 2) {
@@ -1348,11 +1364,35 @@
             }
 
     update(targetPos, dt, allFoods = [], allWorms = []) {
+                // 空指针保护：如果segments为空，直接返回
+                if (this.segments.length === 0) return;
                 if (this.invincibleTimer > 0) this.invincibleTimer -= dt;
                 if (this.activationTimer > 0) this.activationTimer -= dt;
                 if (this.mouthCloseTimer > 0) this.mouthCloseTimer -= dt;
                 if (this.warningFlashTimer > 0) this.warningFlashTimer -= dt;
                 if (this.magnetTimer > 0) this.magnetTimer -= dt;
+                if (this.purpleParticleTimer > 0) this.purpleParticleTimer -= dt;
+                if (this.headEnlargedTimer > 0) {
+                    this.headEnlargedTimer -= dt;
+                    if (this.headEnlargedTimer <= 0) {
+                        this.headEnlarged = false;  // 头部变大时间结束
+                        this.headScaleTarget = 1.0;  // 头部缩放目标值恢复
+                    }
+                }
+                if (this.tailYellowDashTimer > 0) {
+                    this.tailYellowDashTimer -= dt;
+                    if (this.tailYellowDashTimer <= 0) {
+                        this.tailYellowDash = true;  // 尾部虚线恢复显示
+                    }
+                }
+                
+                // 头部缩放平滑过渡
+                const scaleSpeed = 5.0;  // 缩放速度
+                if (Math.abs(this.headScale - this.headScaleTarget) > 0.01) {
+                    this.headScale += (this.headScaleTarget - this.headScale) * scaleSpeed * dt;
+                } else {
+                    this.headScale = this.headScaleTarget;
+                }
                 
                 // 更新黄光效果：从嘴部到尾部逐个闪光
                 if (this.yellowGlowTimer > 0) {
@@ -1375,42 +1415,48 @@
                 if (this.pendingGrowCount > 0 && this.grownCount < this.pendingGrowCount) {
                     this.growStepTimer -= dt;
                     if (this.growStepTimer <= 0) {
-                        // 直接添加生长动画（不通过 grow，避免 startPos 固定）
-                        let direction = new Vector(0, 0);
-                        if (this.segments.length >= 2) {
-                            const tail = this.segments[this.segments.length - 1];
-                            const beforeTail = this.segments[this.segments.length - 2];
-                            direction = tail.sub(beforeTail).normalize();
-                        } else if (this.segments.length === 1) {
-                            direction = this.velocity.clone();
-                        }
-                        
-                        // 添加到生长队列（startPos 为 null，会在更新时动态获取）
-                        this.growingSegments.push({
-                            targetPos: new Vector(0, 0),  // 会在更新时重新计算
-                            progress: 0,
-                            direction: direction,
-                            startPos: null,  // 动态获取当前位置
-                            basePos: null
-                        });
-                        
-                        this.targetLength++;
-                        this.grownCount++;
-                        this.growStepTimer = 0.4;  // 下一节间隔 0.4 秒
-                        
-                        // 播放一个音符（水晶序曲）
-                        if (typeof musicSystem !== 'undefined') {
-                            const song = musicSystem.songs['水晶序曲'];
-                            if (song) {
-                                const noteIndex = (this.grownCount - 1) % song.length;
-                                musicSystem.playNote(song[noteIndex].freq, song[noteIndex].duration);
-                            }
-                        }
-                        
-                        // 所有节都长完了，重置
-                        if (this.grownCount >= this.pendingGrowCount) {
+                        // 检查是否达到最大长度
+                        if (this.segments.length >= CONFIG.MAX_SEGMENT_LENGTH) {
                             this.pendingGrowCount = 0;
                             this.grownCount = 0;
+                        } else {
+                            // 直接添加生长动画（不通过 grow，避免 startPos 固定）
+                            let direction = new Vector(0, 0);
+                            if (this.segments.length >= 2) {
+                                const tail = this.segments[this.segments.length - 1];
+                                const beforeTail = this.segments[this.segments.length - 2];
+                                direction = tail.sub(beforeTail).normalize();
+                            } else if (this.segments.length === 1) {
+                                direction = this.velocity.clone();
+                            }
+                            
+                            // 添加到生长队列（startPos 为 null，会在更新时动态获取）
+                            this.growingSegments.push({
+                                targetPos: new Vector(0, 0),  // 会在更新时重新计算
+                                progress: 0,
+                                direction: direction,
+                                startPos: null,  // 动态获取当前位置
+                                basePos: null
+                            });
+                            
+                            this.targetLength++;
+                            this.grownCount++;
+                            this.growStepTimer = 0.4;  // 下一节间隔 0.4 秒
+                            
+                            // 播放一个音符（水晶序曲）
+                            if (typeof musicSystem !== 'undefined') {
+                                const song = musicSystem.songs['水晶序曲'];
+                                if (song) {
+                                    const noteIndex = (this.grownCount - 1) % song.length;
+                                    musicSystem.playNote(song[noteIndex].freq, song[noteIndex].duration);
+                                }
+                            }
+                            
+                            // 所有节都长完了，重置
+                            if (this.grownCount >= this.pendingGrowCount) {
+                                this.pendingGrowCount = 0;
+                                this.grownCount = 0;
+                            }
                         }
                     }
                 }
@@ -1621,6 +1667,9 @@
             }
 
             aiThink(foods, allWorms, dt) {
+                // 空指针保护：如果segments为空，直接返回
+                if (!this.head) return null;
+
                 this.aiWanderTimer -= dt;
                 if (this.aiWanderTimer <= 0) {
                     this.aiWanderTimer = CONFIG.AI_WANDER_CHANGE + Math.random() * 2;
@@ -1630,6 +1679,7 @@
                 let nearestFood = null;
                 let minDist = Infinity;
                 for (const food of foods) {
+                    if (!food || !food.pos) continue;  // 跳过无效食物
                     const d = this.head.dist(food.pos);
                     if (d < minDist) {
                         minDist = d;
@@ -1646,6 +1696,7 @@
 
             // 死亡线检测（外框，最外面）
             checkWallCollision() {
+                if (this.segments.length === 0) return false;
                 const head = this.segments[0];
                 const margin = CONFIG.WALL_MARGIN * 2 + CONFIG.SEGMENT_RADIUS * 2;  // 死亡线：最外框
                 return head.x < margin || head.x > CONFIG.CANVAS_WIDTH - margin ||
@@ -1654,6 +1705,7 @@
             
             // 预警线检测（内框，最里面）
             checkWarningLine() {
+                if (this.segments.length === 0) return false;
                 const head = this.segments[0];
                 const margin = CONFIG.WALL_MARGIN;  // 预警线：最内框
                 return head.x < margin || head.x > CONFIG.CANVAS_WIDTH - margin ||
@@ -1661,6 +1713,7 @@
             }
 
             checkFoodCollision(foods) {
+                if (this.segments.length === 0) return -1;
                 const head = this.segments[0];
                 for (let i = 0; i < foods.length; i++) {
                     const food = foods[i];
@@ -1671,6 +1724,7 @@
             }
 
    checkSelfCollision() {
+                if (this.segments.length < 11) return -1;  // 至少需要11段才可能自噬
                 const head = this.segments[0];
                 const collisionDist = CONFIG.SEGMENT_RADIUS * 1.5;
 
@@ -1688,6 +1742,7 @@
              * 注意：返回所有咬尾段，由调用方判断无敌状态
              */
             checkSelfTailBite() {
+                if (this.segments.length === 0) return -1;
                 const head = this.segments[0];
                 const collisionDist = CONFIG.SEGMENT_RADIUS * 1.2;
 
@@ -1705,6 +1760,7 @@
              * 返回: { worm: 被咬的蚯蚓，segmentIndex: 被咬的段索引 } 或 null
              */
             checkTailBite(otherWorms) {
+                if (this.segments.length === 0) return null;
                 const head = this.segments[0];
                 const collisionDist = CONFIG.SEGMENT_RADIUS * 1.2;
 
@@ -1730,6 +1786,7 @@
              * 跳过无敌状态的蚯蚓
              */
             checkOtherWormCollision(otherWorms) {
+                if (this.segments.length === 0) return null;
                 const head = this.segments[0];
                 const collisionDist = CONFIG.SEGMENT_RADIUS * 1.2;
 
@@ -1768,7 +1825,7 @@
             }
 
             draw(ctx) {
-                if (!this.isAlive && this.segments.length === 0) return;
+                if (!this.isAlive || this.segments.length === 0) return;
 
                 // 获取尾巴和头部段索引集合 (用于视觉标识)
                 const tailIndices = new Set(this.tailSegmentIndices);
@@ -1784,7 +1841,10 @@
                     const isTail = i > 0 && tailIndices.has(i);
                     const isHeadRegion = headIndices.has(i);
                     const sizeRatio = isHead ? 1.0 : (0.7 + 0.3 * (1 - i / this.segments.length));
-                    const radius = CONFIG.SEGMENT_RADIUS * sizeRatio;
+                    let radius = CONFIG.SEGMENT_RADIUS * sizeRatio;
+                    if (isHead) {
+                        radius *= this.headScale;  // 头部缩放比例
+                    }
 
                     if (isHead) {
                         // 头部段优先使用吃豆人形状绘制
@@ -1944,6 +2004,9 @@
              * @param {boolean} isPlayer - 是否为玩家蚯蚓 (玩家用黄色，AI 用红色)
              */
             drawTailIndicator(ctx, seg, radius, isPlayer) {
+                // 如果尾部黄色虚线被禁用，直接返回
+                if (!this.tailYellowDash && isPlayer) return;
+                
                 const borderColor = isPlayer ? 'rgba(255, 230, 109, 0.9)' : 'rgba(255, 100, 100, 0.8)';
                 const fillColor = isPlayer ? 'rgba(255, 230, 109, 0.2)' : 'rgba(255, 80, 80, 0.15)';
 
@@ -2640,7 +2703,7 @@
 
                 // 1. 更新所有蚯蚓
                 for (const worm of this.worms) {
-                    if (!worm.isAlive) continue;
+                    if (!worm.isAlive || worm.segments.length === 0) continue;
 
                     if (worm.isPlayer) {
                         if (this.mouseInCanvas) {
@@ -2706,6 +2769,16 @@
                             worm.bulletCount = worm.redSegments * 5;  // 子弹数量 = 红色段数 × 5
                             worm.bulletFiredCount = 0;  // 重置已发射计数
                             this.floatingTexts.push(new FloatingText(foodPos.x, foodPos.y - 20, '🔫 +5', '#ff6b6b'));
+                            worm.grow(CONFIG.GROWTH_PER_FOOD);
+                        } else if (food.type.score === 300) {  // 紫色宝珠：无敌状态
+                            worm.invincibleTimer = 10.0;  // 10秒无敌
+                            worm.headEnlarged = true;  // 头部变大一倍
+                            worm.headEnlargedTimer = 10.0;  // 头部变大持续时间
+                            worm.headScaleTarget = 2.0;  // 头部缩放目标值
+                            worm.purpleParticleTimer = 10.0;  // 紫色粒子特效持续时间（与无敌状态同步）
+                            worm.tailYellowDash = false;  // 尾部黄色虚线消失
+                            worm.tailYellowDashTimer = 10.0;  // 尾部虚线消失持续时间
+                            this.floatingTexts.push(new FloatingText(foodPos.x, foodPos.y - 20, '⭐ 无敌', '#c77dff'));
                             worm.grow(CONFIG.GROWTH_PER_FOOD);
                         } else {
                             worm.grow(CONFIG.GROWTH_PER_FOOD);
@@ -2789,11 +2862,41 @@
                     }
                 }
 
-                // 6. 玩家被其他蚯蚓吞噬
+                // 6. 玩家被其他蚯蚓吞噬，或者玩家在无敌状态下咬死其他蚯蚓
                 const otherCollision = player.checkOtherWormCollision(activeWorms);
                 if (otherCollision) {
-                    this.gameOver();
-                    return;
+                    if (player.invincibleTimer > 0) {
+                        // 玩家处于无敌状态，咬死其他蚯蚓
+                        this.handleTailBiteSplit(otherCollision.worm, otherCollision.segmentIndex);
+                        this.splitCooldown = 2.0;
+                    } else {
+                        // 玩家被吞噬
+                        this.gameOver();
+                        return;
+                    }
+                }
+
+                // 6.5 AI蚯蚓头部互撞：短的被咬死，等长则都死
+                for (const worm of this.worms) {
+                    if (!worm.isAlive || worm.isPlayer || worm.isEntering) continue;
+                    if (worm.segments.length === 0) continue;
+                    
+                    const aiCollision = worm.checkOtherWormCollision(activeWorms);
+                    if (aiCollision && aiCollision.segmentIndex === 0) {
+                        // 头部互撞
+                        const other = aiCollision.worm;
+                        if (worm.segments.length <= other.segments.length) {
+                            // worm较短或等长，worm死亡
+                            console.log(`[头部互撞] AI头部互撞！worm(${worm.segments.length}) vs other(${other.segments.length})，worm死亡`);
+                            worm.isAlive = false;
+                            worm.segments = [];
+                        } else {
+                            // other较短，other死亡
+                            console.log(`[头部互撞] AI头部互撞！worm(${worm.segments.length}) vs other(${other.segments.length})，other死亡`);
+                            other.isAlive = false;
+                            other.segments = [];
+                        }
+                    }
                 }
 
                 // 7. 更新断尾
@@ -2883,7 +2986,7 @@
                     // 检测子弹击中蚯蚓
                     if (this.bullets[i]) {
                         for (const worm of this.worms) {
-                            if (!worm.isAlive || worm.isPlayer) continue;
+                            if (!worm.isAlive || worm.isPlayer || worm.segments.length === 0) continue;
                             if (bullet.checkWormHit(worm)) {
                                 // 蚯蚓减速
                                 this.slowedWorms.set(worm, 3.0);  // 减速 3 秒
@@ -2939,6 +3042,19 @@
                     }
                 });
 
+                // 9.5 紫色粒子特效（当玩家有purpleParticleTimer时）
+                if (player.purpleParticleTimer > 0) {
+                    // 在玩家头部位置创建紫色粒子
+                    const headPos = player.head;
+                    for (let i = 0; i < 2; i++) {
+                        this.particles.push(new Particle(
+                            headPos.x + (Math.random() - 0.5) * 20,
+                            headPos.y + (Math.random() - 0.5) * 20,
+                            'rgb(199, 125, 255)'  // 紫色
+                        ));
+                    }
+                }
+
                 // 10. 更新粒子效果
                 for (let i = this.particles.length - 1; i >= 0; i--) {
                     if (!this.particles[i].update(dt)) {
@@ -2967,7 +3083,7 @@
                 if (!this.isRunning || this.isPaused || this.isGameOver) return;
                 
                 const player = this.worms[0];
-                if (!player || !player.isAlive) return;
+                if (!player || !player.isAlive || player.segments.length === 0) return;
                 if (!player.bulletCount || player.bulletCount <= 0) return;
                 
                 // 子弹方向：嘴部开合的方向（基于头部到第二段的向量）
@@ -2991,8 +3107,21 @@
                         player.redStrengths[i]--;
                         strengthReduced = true;
                         
-                        // 当该段强度为0时，减少红色段数
+                        // 当该段强度为0时，减少红色段数并创建消失动画，同时移除该节身体
                         if (player.redStrengths[i] === 0) {
+                            // 创建消失动画（粒子效果）
+                            const segmentIndex = i + 1;  // 对应的身体段索引
+                            if (segmentIndex < player.segments.length) {
+                                const segmentPos = player.segments[segmentIndex];
+                                // 创建红色粒子爆炸效果
+                                for (let j = 0; j < 8; j++) {
+                                    this.particles.push(new Particle(segmentPos.x, segmentPos.y, 'rgb(255, 107, 107)'));
+                                }
+                                // 移除该节身体
+                                player.segments.splice(segmentIndex, 1);
+                                player.targetLength--;
+                            }
+                            
                             player.redSegments--;
                             player.redStrengths.splice(i, 1);  // 从数组中移除
                             // 更新子弹数量
@@ -3073,8 +3202,8 @@
              * 总控AI：检测AI蚯蚓是否聚集，如果聚集就让它们分散
              */
             updateAIDispersal() {
-                // 获取所有存活的AI蚯蚓
-                const aiWorms = this.worms.filter(w => w.isAlive && !w.isPlayer);
+                // 获取所有存活的AI蚯蚓（排除segments为空的）
+                const aiWorms = this.worms.filter(w => w.isAlive && !w.isPlayer && w.segments.length > 0);
                 if (aiWorms.length < 2) return;  // 少于2条AI不检测
                 
                 // 计算所有AI蚯蚓的中心点
@@ -3142,6 +3271,14 @@
                 // 被咬的蚯蚓：删除尾巴段（从 biteIndex 开始）
                 worm.segments = worm.segments.slice(0, biteIndex);
                 worm.targetLength = worm.segments.length;
+
+                // 如果剩余段太少（< 3），蚯蚓死亡
+                if (worm.segments.length < 3) {
+                    console.log(`[实验调试] 蚯蚓被咬死后剩余长度=${worm.segments.length}，标记死亡`);
+                    worm.isAlive = false;
+                    worm.segments = [];
+                    return;
+                }
 
                 // 创建断尾
                 const brokenTail = new BrokenTail(tailSegments, worm.color);
