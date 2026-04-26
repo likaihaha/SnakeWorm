@@ -2862,42 +2862,19 @@
                     }
                 }
 
-                // 6. 玩家被其他蚯蚓吞噬，或者玩家在无敌状态下咬死其他蚯蚓
+                // 6. 玩家碰到其他蚯蚓身体（只有咬到尾部才能咬断，其他地方不咬断）
                 const otherCollision = player.checkOtherWormCollision(activeWorms);
                 if (otherCollision) {
                     if (player.invincibleTimer > 0) {
-                        // 玩家处于无敌状态，咬死其他蚯蚓
-                        this.handleTailBiteSplit(otherCollision.worm, otherCollision.segmentIndex);
-                        this.splitCooldown = 2.0;
+                        // 玩家处于无敌状态，不被吞噬也不咬断对方
                     } else {
-                        // 玩家被吞噬
+                        // 玩家碰到其他蚯蚓身体，被吞噬
                         this.gameOver();
                         return;
                     }
                 }
 
-                // 6.5 AI蚯蚓头部互撞：短的被咬死，等长则都死
-                for (const worm of this.worms) {
-                    if (!worm.isAlive || worm.isPlayer || worm.isEntering) continue;
-                    if (worm.segments.length === 0) continue;
-                    
-                    const aiCollision = worm.checkOtherWormCollision(activeWorms);
-                    if (aiCollision && aiCollision.segmentIndex === 0) {
-                        // 头部互撞
-                        const other = aiCollision.worm;
-                        if (worm.segments.length <= other.segments.length) {
-                            // worm较短或等长，worm死亡
-                            console.log(`[头部互撞] AI头部互撞！worm(${worm.segments.length}) vs other(${other.segments.length})，worm死亡`);
-                            worm.isAlive = false;
-                            worm.segments = [];
-                        } else {
-                            // other较短，other死亡
-                            console.log(`[头部互撞] AI头部互撞！worm(${worm.segments.length}) vs other(${other.segments.length})，other死亡`);
-                            other.isAlive = false;
-                            other.segments = [];
-                        }
-                    }
-                }
+                // 6.5 AI蚯蚓头部互撞：不咬断，只是碰撞
 
                 // 7. 更新断尾
                 for (let i = this.brokenTails.length - 1; i >= 0; i--) {
