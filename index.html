@@ -1312,9 +1312,31 @@
                 
                 // 添加生长动画，而不是直接增加长度
                 for (let i = 0; i < canGrow; i++) {
-                    // 计算尾部方向（根据最后两节）
+                    // 计算尾部方向（参考旧身体曲率）
                     let direction = new Vector(0, 0);
-                    if (this.segments.length >= 2) {
+                    if (this.segments.length >= 3) {
+                        // 用最后3节计算曲率：当前方向 + 曲率偏移
+                        const tail = this.segments[this.segments.length - 1];
+                        const beforeTail = this.segments[this.segments.length - 2];
+                        const beforeBeforeTail = this.segments[this.segments.length - 3];
+                        
+                        // 当前方向：从倒数第二节到倒数第一节
+                        const currentDir = tail.sub(beforeTail).normalize();
+                        // 之前方向：从倒数第三节到倒数第二节
+                        const prevDir = beforeTail.sub(beforeBeforeTail).normalize();
+                        
+                        // 计算曲率角度（当前方向相对于之前方向的偏转）
+                        const currentAngle = Math.atan2(currentDir.y, currentDir.x);
+                        const prevAngle = Math.atan2(prevDir.y, prevDir.x);
+                        let curvature = currentAngle - prevAngle;
+                        
+                        // 限制曲率范围，避免过度弯曲
+                        curvature = Math.max(-0.5, Math.min(0.5, curvature));
+                        
+                        // 应用曲率到新方向
+                        const newAngle = currentAngle + curvature;
+                        direction = new Vector(Math.cos(newAngle), Math.sin(newAngle));
+                    } else if (this.segments.length === 2) {
                         const tail = this.segments[this.segments.length - 1];
                         const beforeTail = this.segments[this.segments.length - 2];
                         direction = tail.sub(beforeTail).normalize();
@@ -1679,12 +1701,30 @@
                         
                         growing.startPos = new Vector(currentTailPos.x, currentTailPos.y);
                         
-                        // 重新计算目标位置（基于当前尾部位置）
+                        // 重新计算目标位置（基于当前尾部位置和曲率）
                         let direction = growing.direction;
-                        if (direction.mag() === 0 && this.segments.length >= 2) {
-                            const tail = this.segments[this.segments.length - 1];
-                            const beforeTail = this.segments[this.segments.length - 2];
-                            direction = tail.sub(beforeTail).normalize();
+                        if (direction.mag() === 0) {
+                            // 方向为空时，根据旧身体曲率重新计算
+                            if (this.segments.length >= 3) {
+                                const tail = this.segments[this.segments.length - 1];
+                                const beforeTail = this.segments[this.segments.length - 2];
+                                const beforeBeforeTail = this.segments[this.segments.length - 3];
+                                
+                                const currentDir = tail.sub(beforeTail).normalize();
+                                const prevDir = beforeTail.sub(beforeBeforeTail).normalize();
+                                
+                                const currentAngle = Math.atan2(currentDir.y, currentDir.x);
+                                const prevAngle = Math.atan2(prevDir.y, prevDir.x);
+                                let curvature = currentAngle - prevAngle;
+                                curvature = Math.max(-0.5, Math.min(0.5, curvature));
+                                
+                                const newAngle = currentAngle + curvature;
+                                direction = new Vector(Math.cos(newAngle), Math.sin(newAngle));
+                            } else if (this.segments.length >= 2) {
+                                const tail = this.segments[this.segments.length - 1];
+                                const beforeTail = this.segments[this.segments.length - 2];
+                                direction = tail.sub(beforeTail).normalize();
+                            }
                         }
                         growing.targetPos = currentTailPos.add(direction.mult(CONFIG.SEGMENT_SPACING));
                     }
