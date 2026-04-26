@@ -1095,7 +1095,7 @@
                 { color: '#4ecca3', score: 10, radius: 8, gravity: 0.01, wobble: 0, weight: 60, maxCount: 5, respawnTime: 0.5 },  // 绿色：超慢速直落
                 { color: '#ffe66d', score: 30, radius: 8, gravity: 0.02, wobble: 0.5, weight: 25, maxCount: 1, respawnTime: 1.0 },  // 黄色：慢速 + 大幅摇摆
                 { color: '#ff8c42', score: 60, radius: 8, gravity: 0.03, wobble: 0.6, weight: 10, maxCount: 2, respawnTime: 1.5 },  // 橙色：中速 + 大幅摆动
-                { color: '#ff6b6b', score: 120, radius: 8, gravity: 0.04, wobble: 0, weight: 4, maxCount: 1, respawnTime: 2.0 },  // 红色：中速直落
+                { color: '#ff6b6b', score: 120, radius: 8, gravity: 0.04, wobble: 0, weight: 4, maxCount: 2, respawnTime: 1.0 },  // 红色：中速直落（maxCount翻倍，respawnTime减半）
                 { color: '#c77dff', score: 300, radius: 8, gravity: 0.05, wobble: 0.7, weight: 1, maxCount: 0, respawnTime: 2.5 }  // 紫色：稍快 + 大幅摆动（暂时禁用）
             ],
             // 游戏节奏配置
@@ -2611,11 +2611,18 @@
                     
                     // 碰底检测：该段尸体转化为宝珠向上发射
                     if (seg.y >= canvasHeight - CONFIG.WALL_MARGIN) {
-                        // 随机选择宝珠类型（优先显眼类型）
-                        const preferredTypes = CONFIG.FOOD_TYPES.filter(t => t.score >= 30 && t.score !== 300);
-                        const type = preferredTypes.length > 0
-                            ? preferredTypes[Math.floor(Math.random() * preferredTypes.length)]
-                            : CONFIG.FOOD_TYPES[0];
+                        // 尸体爆宝珠概率：70%绿、15%红、10%黄、5%橙
+                        const roll = Math.random();
+                        let type;
+                        if (roll < 0.70) {
+                            type = CONFIG.FOOD_TYPES[0]; // 绿色
+                        } else if (roll < 0.85) {
+                            type = CONFIG.FOOD_TYPES[3]; // 红色
+                        } else if (roll < 0.95) {
+                            type = CONFIG.FOOD_TYPES[1]; // 黄色
+                        } else {
+                            type = CONFIG.FOOD_TYPES[2]; // 橙色
+                        }
                         
                         // 根据段在尸体中的位置计算水平偏移：尾部段更靠左，头部段更靠右
                         const spreadX = (i / (this.segments.length + 1) - 0.5) * 60;  // 左右展开60像素
