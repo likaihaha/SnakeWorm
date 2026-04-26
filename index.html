@@ -1204,7 +1204,8 @@
             }
             
             static random(type = null) {
-                const margin = CONFIG.WALL_MARGIN + 10;
+                // 使用死亡线边距，确保宝珠不会在死亡区内生成
+                const margin = CONFIG.WALL_MARGIN * 2 + CONFIG.SEGMENT_RADIUS * 2;
                 const foodType = type || Food.weightedRandom();
                 // 随机位置：x随机，y从画布上方不同高度开始（避免排成直线）
                 const startY = -20 - Math.random() * 100;  // y在-20到-120之间随机
@@ -1228,8 +1229,8 @@
                     this.pos.x += Math.sin(this.movePhase) * this.type.wobble * dt * 60;
                 }
                 
-                // 左右边界碰撞（反弹）
-                const margin = CONFIG.WALL_MARGIN;
+                // 四边界碰撞（反弹）— 使用死亡线边距，防止宝珠落入死亡区
+                const margin = CONFIG.WALL_MARGIN * 2 + CONFIG.SEGMENT_RADIUS * 2;
                 if (this.pos.x < margin) {
                     this.pos.x = margin;
                     this.velocity.x = Math.abs(this.velocity.x) * 0.5;
@@ -1238,9 +1239,16 @@
                     this.pos.x = CONFIG.CANVAS_WIDTH - margin;
                     this.velocity.x = -Math.abs(this.velocity.x) * 0.5;
                 }
-                
-                // 底部不碰撞，直接穿出去
-                // 当宝珠掉出画布太远时，由 Game 类负责清理和重新生成
+                // 顶部边界反弹
+                if (this.pos.y < margin) {
+                    this.pos.y = margin;
+                    this.velocity.y = Math.abs(this.velocity.y) * 0.3;
+                }
+                // 底部边界反弹（防止落入死亡区）
+                if (this.pos.y > CONFIG.CANVAS_HEIGHT - margin) {
+                    this.pos.y = CONFIG.CANVAS_HEIGHT - margin;
+                    this.velocity.y = -Math.abs(this.velocity.y) * 0.5;
+                }
             }
             
             draw(ctx) {
