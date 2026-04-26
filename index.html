@@ -3449,7 +3449,7 @@
                 }
 
                 // 11. 磁力吸引效果（橙色宝珠触发）
-                if (player.magnetTimer > 0) {
+                if (player && player.magnetTimer > 0) {
                     const magnetRange = 150;  // 磁力范围（减半）
                     const playerHead = player.head;
                     
