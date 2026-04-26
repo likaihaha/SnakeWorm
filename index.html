@@ -185,7 +185,7 @@
             position: static;
         }
         
-        /* 移动端响应式优化 */
+     /* 移动端响应式优化 */
         @media (max-width: 768px) {
             /* 标题缩小 */
             h1 {
@@ -220,7 +220,7 @@
                 margin-top: 5px !important;
             }
             
-           /* 摇杆位置和大小 - 增大摇杆 */
+            /* 摇杆位置和大小 - 增大摇杆 */
             #joystick {
                 bottom: 70px !important;  // 摇杆下移
                 left: 30px !important;
@@ -257,6 +257,71 @@
             
             body {
                 padding: 3px !important;
+            }
+        }
+        
+        /* 横屏模式适配 */
+        @media (max-height: 500px) and (orientation: landscape) {
+            /* 横屏时调整布局 */
+            body {
+                flex-direction: row !important;
+                align-items: flex-start !important;
+                justify-content: flex-start !important;
+                padding: 5px !important;
+                overflow: auto !important;
+            }
+            
+            /* 标题缩小 */
+            h1 {
+                font-size: 14px !important;
+                margin-bottom: 2px !important;
+            }
+            
+            /* Canvas 占满宽度 */
+            #gameCanvas {
+                max-width: calc(100vw - 20px) !important;
+                max-height: calc(100vh - 60px) !important;
+                margin-top: 0 !important;
+                margin-bottom: 5px !important;
+            }
+            
+            /* UI 和摇杆在 Canvas 下方 */
+            #ui {
+                font-size: 10px !important;
+                gap: 5px !important;
+                margin-top: 3px !important;
+                margin-bottom: 5px !important;
+            }
+            
+            /* 摇杆移到右下角 */
+            #joystick {
+                bottom: 10px !important;
+                left: auto !important;
+                right: 10px !important;
+                width: 100px !important;  // 横屏摇杆小一点
+                height: 100px !important;
+            }
+            
+            #joystickKnob {
+                width: 40px !important;
+                height: 40px !important;
+            }
+            
+            /* 弹窗适配横屏 */
+            #startScreen, #pauseScreen, #gameOver {
+                width: 90% !important;
+                max-width: 400px !important;
+                padding: 12px 15px !important;
+            }
+            
+            #startScreen h2, #pauseScreen h2, #gameOver h2 {
+                font-size: 18px !important;
+                margin-bottom: 8px !important;
+            }
+            
+            #startScreen button, #pauseScreen button, #gameOver button {
+                padding: 6px 20px !important;
+                font-size: 14px !important;
             }
         }
     </style>
