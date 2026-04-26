@@ -1350,15 +1350,48 @@
             }
 
             /**
-             * 获取尾巴段索引范围（最后 1/3 段）
-             * 注意：索引 0 是头部，所以尾巴应该从 length * 0.67 开始
-             * 排除索引 0（嘴部），避免与头部区域重叠
+             * 获取头部段索引（仅第0节 = 嘴部）
+             */
+            get headSegmentIndices() {
+                return [0];
+            }
+
+            /**
+             * 获取颈部段索引范围（第1节到身体1/3）
+             */
+            get neckSegmentIndices() {
+                const len = this.segments.length;
+                const neckEnd = Math.max(1, Math.floor(len / 3));
+                const indices = [];
+                for (let i = 1; i <= neckEnd && i < len; i++) {
+                    indices.push(i);
+                }
+                return indices;
+            }
+
+            /**
+             * 获取腹部段索引范围（身体1/3到2/3）
+             */
+            get abdomenSegmentIndices() {
+                const len = this.segments.length;
+                const abdStart = Math.max(1, Math.floor(len / 3));
+                const abdEnd = Math.floor(len * 2 / 3);
+                const indices = [];
+                for (let i = abdStart; i <= abdEnd && i < len; i++) {
+                    indices.push(i);
+                }
+                return indices;
+            }
+
+            /**
+             * 获取尾巴段索引范围（最后 1/3 段，从2/3到末尾）
              */
             get tailSegmentIndices() {
-                const tailStart = Math.floor(this.segments.length * (1 - CONFIG.TAIL_RATIO));
+                const len = this.segments.length;
+                const tailStart = Math.floor(len * 2 / 3);
                 const indices = [];
-                for (let i = tailStart; i < this.segments.length; i++) {
-                    if (i > 0) indices.push(i);  // 排除头部段
+                for (let i = tailStart; i < len; i++) {
+                    indices.push(i);
                 }
                 return indices;
             }
@@ -1809,27 +1842,14 @@
                 return null;
             }
 
-            /**
-             * 获取头部段索引范围（前 1/3 段）
-             * 注意：索引 0 是头部，所以头部从 0 开始到 length * 0.33
-             * 至少包含索引 0（嘴部），即使长度很短
-             * 使用四舍五入确保精度
-             */
-            get headSegmentIndices() {
-                const headEnd = Math.max(1, Math.round(this.segments.length * CONFIG.TAIL_RATIO));
-                const indices = [];
-                for (let i = 0; i < headEnd; i++) {
-                    indices.push(i);
-                }
-                return indices;
-            }
-
             draw(ctx) {
                 if (!this.isAlive || this.segments.length === 0) return;
 
-                // 获取尾巴和头部段索引集合 (用于视觉标识)
+                // 获取各区域段索引集合 (用于视觉标识)
                 const tailIndices = new Set(this.tailSegmentIndices);
                 const headIndices = new Set(this.headSegmentIndices);
+                const neckIndices = new Set(this.neckSegmentIndices);
+                const abdomenIndices = new Set(this.abdomenSegmentIndices);
 
                 // 启用 Screen 混合模式：颜色叠加变亮，红 + 绿 + 蓝 = 白
                 ctx.globalCompositeOperation = 'screen';
