@@ -183,6 +183,64 @@
         .experiment-badge-outside {
             position: static;
         }
+        
+        /* 移动端响应式优化 */
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 18px !important;
+                margin-bottom: 5px !important;
+            }
+            
+            .legend {
+                display: none !important;  // 隐藏侧边图例
+            }
+            
+            #controls {
+                display: none !important;  // 隐藏底部说明文字
+            }
+            
+            #ui {
+                font-size: 12px !important;
+                gap: 10px !important;
+            }
+            
+            #joystick {
+                bottom: 80px !important;  // 摇杆上移，避开浏览器控件
+                left: 30px !important;
+                width: 100px !important;
+                height: 100px !important;
+            }
+            
+            #joystickKnob {
+                width: 40px !important;
+                height: 40px !important;
+            }
+            
+            #startScreen, #pauseScreen {
+                padding: 20px 30px !important;
+                width: 90% !important;
+                max-width: 350px !important;
+            }
+            
+            #startScreen h2, #pauseScreen h2 {
+                font-size: 22px !important;
+                margin-bottom: 15px !important;
+            }
+            
+            #startScreen button, #pauseScreen button {
+                padding: 10px 30px !important;
+                font-size: 16px !important;
+            }
+            
+            body {
+                padding: 5px !important;
+            }
+            
+            .experiment-badge {
+                font-size: 10px !important;
+                padding: 3px 10px !important;
+            }
+        }
     </style>
 </head>
 <body>
