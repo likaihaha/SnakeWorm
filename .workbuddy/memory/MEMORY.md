@@ -8,5 +8,6 @@
 - Git Credential Manager 已配置，推送自动认证
 
 ## 当前版本
+- v0.14: 移动端适配 - 触摸支持 + 响应式 Canvas + 隐藏光标
 - v0.13: 重命名为 index.html 以支持 GitHub Pages
 - v0.12: 吃豆人嘴型 + 单只头顶眼睛 + 嘴巴张合动画 + 鼠标圆环 + 速度限制

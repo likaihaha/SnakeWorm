@@ -46,6 +46,31 @@
             line-height: 1.6;
             padding: 0 10px;
         }
+        /* 虚拟摇杆样式 */
+        #joystick {
+            position: fixed;
+            bottom: 50px;
+            left: 50px;
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            display: none;  // 默认隐藏，触摸设备显示
+            touch-action: none;
+            z-index: 1000;
+        }
+        #joystickKnob {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: rgba(255, 107, 107, 0.6);
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+        }
         #gameOver {
             position: absolute;
             top: 50%; left: 50%;
@@ -161,6 +186,11 @@
     </style>
 </head>
 <body>
+    <!-- 虚拟摇杆 -->
+    <div id="joystick">
+        <div id="joystickKnob"></div>
+    </div>
+    
     <div style="display: flex; align-items: center; justify-content: center; gap: 12px; margin-bottom: 10px;">
         <h1 style="margin: 0;">🐍 SnakeWorm v0.7-实验 - 重力宝珠</h1>
         <div class="experiment-badge experiment-badge-outside">🧪 分支实验</div>
@@ -1372,6 +1402,7 @@
                 this.splitCount = 0;
                 this.splitCooldown = 0;
                 this.foodRespawnTimers = {};  // 宝珠刷新计时器
+                this.joystickDirection = new Vector(0, 0);  // 摇杆方向
                 // 初始化每种宝珠的计时器
                 CONFIG.FOOD_TYPES.forEach(type => {
                     this.foodRespawnTimers[type.score] = 0;
@@ -1383,6 +1414,94 @@
                 window.addEventListener('resize', () => {
                     this.resizeCanvas();
                 });
+                
+                // 初始化虚拟摇杆
+                this.initJoystick();
+            }
+            
+            /**
+             * 初始化虚拟摇杆
+             */
+            initJoystick() {
+                if (!this.isTouchDevice) return;  // 非触摸设备不初始化
+                
+                const joystick = document.getElementById('joystick');
+                const knob = document.getElementById('joystickKnob');
+                
+                if (!joystick || !knob) return;
+                
+                joystick.style.display = 'block';  // 显示摇杆
+                
+                const joystickRect = joystick.getBoundingClientRect();
+                const joystickCenterX = joystickRect.left + joystickRect.width / 2;
+                const joystickCenterY = joystickRect.top + joystickRect.height / 2;
+                const maxRadius = joystickRect.width / 2 - 25;  // 摇杆最大半径
+                
+                let isDragging = false;
+                
+                // 触摸开始
+                joystick.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    isDragging = true;
+                    this.handleJoystickMove(e.touches[0], joystickCenterX, joystickCenterY, maxRadius, knob);
+                }, { passive: false });
+                
+                // 触摸移动
+                joystick.addEventListener('touchmove', (e) => {
+                    e.preventDefault();
+                    if (isDragging) {
+                        this.handleJoystickMove(e.touches[0], joystickCenterX, joystickCenterY, maxRadius, knob);
+                    }
+                }, { passive: false });
+                
+                // 触摸结束
+                joystick.addEventListener('touchend', (e) => {
+                    e.preventDefault();
+                    isDragging = false;
+                    // 摇杆归位
+                    knob.style.transform = 'translate(-50%, -50%)';
+                    this.joystickDirection = new Vector(0, 0);
+                }, { passive: false });
+            }
+            
+            /**
+             * 处理摇杆移动
+             */
+            handleJoystickMove(touch, centerX, centerY, maxRadius, knob) {
+                const touchX = touch.clientX;
+                const touchY = touch.clientY;
+                
+                // 计算触摸点相对于摇杆中心的偏移
+                let dx = touchX - centerX;
+                let dy = touchY - centerY;
+                
+                // 计算距离
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                
+                // 如果超出最大半径，限制在半径内
+                if (distance > maxRadius) {
+                    dx = (dx / distance) * maxRadius;
+                    dy = (dy / distance) * maxRadius;
+                }
+                
+                // 移动摇杆 knob
+                knob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+                
+                // 计算方向向量（归一化）
+                const direction = new Vector(dx, dy);
+                const normalizedDir = direction.normalize();
+                
+                // 将摇杆方向转换为游戏坐标
+                // 摇杆：上=-y, 下=+y, 左=-x, 右=+x
+                // 游戏：上=-y, 下=+y, 左=-x, 右=+x
+                this.joystickDirection = normalizedDir;
+                
+                // 更新鼠标位置（在摇杆方向上）
+                const head = this.worms[0] ? this.worms[0].head : new Vector(CONFIG.CANVAS_WIDTH / 2, CONFIG.CANVAS_HEIGHT / 2);
+                const targetX = head.x + normalizedDir.x * 100;
+                const targetY = head.y + normalizedDir.y * 100;
+                this.mousePos = new Vector(targetX, targetY);
+                this.mouseInCanvas = true;
             }
 
             setupInput() {
@@ -1410,21 +1529,33 @@
                     }
                 });
                 
-                // 触摸事件（移动端）
+                // 触摸事件（移动端）- 在 Canvas 上触摸也控制方向
                 canvas.addEventListener('touchstart', (e) => {
                     e.preventDefault();
                     this.isTouchDevice = true;
+                    // 如果摇杆存在，使用摇杆；否则使用触摸点
+                    if (this.joystickDirection.mag() > 0) {
+                        // 摇杆正在使用，忽略 Canvas 触摸
+                        return;
+                    }
                     this.handleTouch(e);
                 }, { passive: false });
                 
                 canvas.addEventListener('touchmove', (e) => {
                     e.preventDefault();
+                    // 如果摇杆正在使用，忽略 Canvas 触摸
+                    if (this.joystickDirection.mag() > 0) {
+                        return;
+                    }
                     this.handleTouch(e);
                 }, { passive: false });
                 
                 canvas.addEventListener('touchend', (e) => {
                     e.preventDefault();
-                    this.mouseInCanvas = false;
+                    // 如果摇杆正在使用，不关闭 mouseInCanvas
+                    if (this.joystickDirection.mag() <= 0) {
+                        this.mouseInCanvas = false;
+                    }
                 }, { passive: false });
                 
                 // 键盘事件
