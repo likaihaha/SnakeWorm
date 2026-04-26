@@ -2568,28 +2568,28 @@
             constructor(segments, originalColor) {
                 this.segments = segments.map(s => new Vector(s.x, s.y));
                 this.originalColor = originalColor;
-                // 每段独立的速度，避免共用velocity导致异常累积
-                this.velocities = segments.map(() => new Vector(0, 0));
+                // 每段独立的速度，给初始向下速度确保能下沉
+                this.velocities = segments.map(() => new Vector(0, 30 + Math.random() * 30));
                 this.isFinished = false;
             }
 
             update(dt, canvasHeight) {
                 const emitted = [];  // 记录本次碰底需要发射的宝珠
 
-                // 柔软无力地下沉：缓慢向下移动 + 轻微摆动
+                // 柔软无力地下沉：缓慢向下移动 + 左右摆动
                 for (let i = this.segments.length - 1; i >= 0; i--) {
                     const seg = this.segments[i];
                     const vel = this.velocities[i];
                     
-                    // 向下重力
-                    vel.y += 50 * dt;  // 重力加速度
+                    // 向下重力（增大加速度让下沉速度合理）
+                    vel.y += 120 * dt;
                     
-                    // 轻微左右摆动（柔软无力）
-                    vel.x += Math.sin(performance.now() / 500 + i * 0.5) * 20 * dt;
+                    // 左右摆动（柔软无力）
+                    vel.x += Math.sin(performance.now() / 400 + i * 0.6) * 30 * dt;
                     
                     // 阻尼
-                    vel.x *= 0.98;
-                    vel.y *= 0.98;
+                    vel.x *= 0.97;
+                    vel.y *= 0.99;
                     
                     seg.x += vel.x * dt;
                     seg.y += vel.y * dt;
