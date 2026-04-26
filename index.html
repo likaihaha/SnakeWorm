@@ -2313,7 +2313,7 @@
                             worm.grownCount = 0;
                             worm.growStepTimer = 0;
                         } else if (food.type.score === 60) {  // 橙色宝珠：触发磁力效果
-                            worm.magnetTimer = 1.5;  // 磁力持续 1.5 秒
+                            worm.magnetTimer = 3.0;  // 磁力持续 3 秒（加倍）
                             worm.magnetCombo = 0;  // 重置连击数
                             worm.grow(CONFIG.GROWTH_PER_FOOD);
                         } else {
@@ -2423,7 +2423,7 @@
 
                 // 7.5 磁力吸引效果（橙色宝珠触发）
                 if (player.magnetTimer > 0) {
-                    const magnetRange = 150;  // 磁力范围
+                    const magnetRange = 300;  // 磁力范围（加倍）
                     const playerHead = player.head;
                     
                     for (const food of this.foods) {
