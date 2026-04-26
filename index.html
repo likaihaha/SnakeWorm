@@ -6,7 +6,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="format-detection" content="telephone=no">
-    <title>Melody Worm v0.43 - 旋律虫虫</title>
+    <title>Melody Worm v0.58 - 旋律虫虫</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -611,7 +611,7 @@
 
     <script>
         /**
-         * Melody Worm v0.43 - 旋律虫虫
+         * Melody Worm v0.58 - 旋律虫虫
          * 
          * 实验机制:
          * - 任何蚯蚓的头部咬到任何其他蚯蚓的尾巴（最后 1/3 段）→ 被咬者断尾分裂
@@ -1091,11 +1091,12 @@
             ],
             // 游戏节奏配置
             RHYTHM: {
-                YELLOW_UNLOCK_TIME: 35,      // 35秒后解锁黄色宝珠（推迟5秒）
+                YELLOW_UNLOCK_TIME: 25,      // 25秒后解锁黄色宝珠（提前）
+                YELLOW_UNLOCK_LENGTH: 10,    // 身体10节后也可解锁黄色宝珠
                 RED_UNLOCK_TIME: 30,         // 30秒后解锁红色宝珠（加快2倍）
                 RED_UNLOCK_LENGTH: 15,       // 身体15节后解锁红色宝珠（降低门槛配合加快节奏）
                 ORANGE_UNLOCK_TIME: 90,      // 90秒后解锁橙色宝珠
-                YELLOW_COOLDOWN: 5.0,        // 吃黄宝珠后冷却5秒（旋律3秒+等待2秒）
+                YELLOW_COOLDOWN: 15.0,       // 吃黄宝珠后冷却15秒（旋律播完后等待）
             }
         };
 
@@ -3102,8 +3103,10 @@
                     const hints = [];
                     // 绿色始终可用
                     hints.push('🟢');
-                    // 黄色：10秒后
-                    if (this.gameTime >= CONFIG.RHYTHM.YELLOW_UNLOCK_TIME) {
+                    // 黄色：25秒后或10节后解锁
+                    const isYellowUnlocked = this.gameTime >= CONFIG.RHYTHM.YELLOW_UNLOCK_TIME
+                        || player.length >= CONFIG.RHYTHM.YELLOW_UNLOCK_LENGTH;
+                    if (isYellowUnlocked) {
                         if (this.yellowCooldown > 0) {
                             hints.push('🟡⏳' + this.yellowCooldown.toFixed(1) + 's');
                         } else {
@@ -3176,7 +3179,7 @@
                 }
 
                 // 节奏解锁通知
-                if (!this.rhythmNotified.yellow && this.gameTime >= CONFIG.RHYTHM.YELLOW_UNLOCK_TIME) {
+                if (!this.rhythmNotified.yellow && (this.gameTime >= CONFIG.RHYTHM.YELLOW_UNLOCK_TIME || player.length >= CONFIG.RHYTHM.YELLOW_UNLOCK_LENGTH)) {
                     this.rhythmNotified.yellow = true;
                     this.floatingTexts.push(new FloatingText(CONFIG.CANVAS_WIDTH / 2, CONFIG.CANVAS_HEIGHT / 2 - 50, '🟡 黄色宝珠已解锁！', '#ffd700'));
                 }
@@ -3609,10 +3612,12 @@
                                 canSpawn = Math.random() < 0.3;
                             }
                             break;
-                        case 30:  // 黄色：30秒后 + 冷却结束
-                            canSpawn = this.gameTime >= CONFIG.RHYTHM.YELLOW_UNLOCK_TIME 
-                                && this.yellowCooldown <= 0;
+                        case 30: { // 黄色：25秒后或10节后 + 冷却结束
+                            const isYellowUnlocked = this.gameTime >= CONFIG.RHYTHM.YELLOW_UNLOCK_TIME
+                                || playerLength >= CONFIG.RHYTHM.YELLOW_UNLOCK_LENGTH;
+                            canSpawn = isYellowUnlocked && this.yellowCooldown <= 0;
                             break;
+                        }
                         case 60:  // 橙色：90秒后
                             canSpawn = this.gameTime >= CONFIG.RHYTHM.ORANGE_UNLOCK_TIME;
                             break;
