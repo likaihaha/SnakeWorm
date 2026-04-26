@@ -2975,10 +2975,9 @@
                 // 等待玩家控制阶段：执行出场动画，暂停其他游戏逻辑
                 if (this.waitingForPlayer) {
                     // 确保出场动画启动
-                    if (player && !player.isEntering) {
-                        player.isEntering = true;
-                        player.enterPhase = 0;
-                        player.enterTime = 0;
+                    if (player && player.isEntering && player.enterPhase === 0) {
+                        player.enterPhase = 1;  // 立即切换到phase 1
+                        player.enterStartTime = performance.now() / 1000;
                     }
                     // 更新蚯蚓出场动画
                     if (player && player.isEntering) {
@@ -3746,8 +3745,8 @@
                 for (const worm of this.worms) {
                     if (!worm.isAlive) continue;
                     
-                    // 出场动画期间，如果头部还在框外，不绘制蚯蚓
-                    if (worm.isEntering && worm.segments[0].x < -CONFIG.SEGMENT_RADIUS) {
+                    // 出场动画期间，如果头部进入动画后才开始绘制
+                    if (worm.isEntering && worm.enterPhase < 1) {
                         continue;
                     }
                     
