@@ -1019,7 +1019,7 @@
             SPLIT_GROW_HEAD_TIME: 2.0,
             SPLIT_INVINCIBLE_TIME: 9.0,
             SPLIT_COLORS: ['#ff6b6b', '#4ecdc4', '#ffe66d', '#a8e6cf', '#ff8b94', '#c7ceea'],
-            MAX_WORMS: 20,
+            MAX_WORMS: 12,  // 最大蚯蚓数量（包括玩家）
             AI_BASE_SPEED: 3.5,
             AI_WANDER_CHANGE: 2.0,
             // 实验配置：尾巴定义为最后 1/3 段
@@ -3535,20 +3535,20 @@
                 }
                 const avgDist = totalDist / aiWorms.length;
                 
-                // 如果平均距离小于阈值（聚集），让部分蚯蚓分散
-                const dispersalThreshold = 100;  // 聚集阈值
+                // 如果平均距离小于阈值（聚集），让大部分蚯蚓分散
+                const dispersalThreshold = 80;  // 聚集阈值（降低到80，更容易触发）
                 if (avgDist < dispersalThreshold) {
-                    // 随机选择一半的AI蚯蚓让它们分散
+                    // 让大部分AI蚯蚓分散（60%概率）
                     for (const worm of aiWorms) {
-                        if (Math.random() < 0.4) {  // 40% 的概率触发分散
+                        if (Math.random() < 0.6) {  // 60% 的概率触发分散（提高）
                             // 计算远离中心的方向
                             const awayX = worm.head.x - centerX;
                             const awayY = worm.head.y - centerY;
                             const dist = Math.sqrt(awayX * awayX + awayY * awayY);
                             
                             if (dist > 0) {
-                                // 设置远离中心的随机方向
-                                const randomAngle = (Math.random() - 0.5) * Math.PI;  // ±90度随机偏移
+                                // 设置远离中心的随机方向（更大角度偏移）
+                                const randomAngle = (Math.random() - 0.5) * Math.PI * 1.5;  // ±135度随机偏移
                                 const cos = Math.cos(randomAngle);
                                 const sin = Math.sin(randomAngle);
                                 worm.aiWanderDir = new Vector(
