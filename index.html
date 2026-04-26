@@ -2593,7 +2593,9 @@
                             ? preferredTypes[Math.floor(Math.random() * preferredTypes.length)]
                             : CONFIG.FOOD_TYPES[0];
                         
-                        emitted.push({ x: seg.x, y: seg.y, type });
+                        // 根据段在尸体中的位置计算水平偏移：尾部段更靠左，头部段更靠右
+                        const spreadX = (i / (this.segments.length + 1) - 0.5) * 60;  // 左右展开60像素
+                        emitted.push({ x: seg.x + spreadX, y: seg.y, type });
                         
                         // 从尸体中移除该段（变成宝珠飞走了）
                         this.segments.splice(i, 1);
@@ -3418,7 +3420,8 @@
                     for (const emit of emitted) {
                         const food = new Food(emit.x, emit.y, emit.type);
                         food.velocity.y = -(3.0 + Math.random() * 3.0);  // 向上速度
-                        food.velocity.x = (Math.random() - 0.5) * 4.0;   // 随机左右偏移
+                        // 水平散射：随机左右偏移，确保宝珠分散不挤在一起
+                        food.velocity.x = (Math.random() - 0.5) * 8.0;   // 左右偏移范围-4~+4
                         this.foods.push(food);
                         
                         // 添加粒子特效（尸体段变宝珠的转化效果）
