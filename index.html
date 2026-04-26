@@ -960,6 +960,7 @@
                 this.yellowGlowTimer = 0;  // 黄光计时器
                 this.yellowGlowIndex = 0;  // 当前闪光的段索引（从嘴部开始）
                 this.yellowGlowStepTimer = 0;  // 步进计时器（控制每个段闪光的间隔）
+                this.pendingGrow = 0;  // 等待黄光结束后生长的节数
                 
                 // 尾部生长动画
                 this.growingSegments = [];  // 正在生长的新节 [{targetPos, progress, direction}]
@@ -1041,6 +1042,12 @@
                     if (this.yellowGlowStepTimer <= 0) {
                         this.yellowGlowIndex++;
                         this.yellowGlowStepTimer = 0.1;  // 间隔 0.1 秒
+                    }
+                    
+                    // 黄光结束后，触发等待的生长
+                    if (this.yellowGlowTimer <= 0 && this.pendingGrow > 0) {
+                        this.grow(this.pendingGrow);
+                        this.pendingGrow = 0;
                     }
                 }
 
@@ -2159,13 +2166,13 @@
                         const foodPos = food.pos;
                         this.foods.splice(eatenIndex, 1);
                         
-                        // 黄色宝珠特殊处理：长2格
+                        // 黄色宝珠特殊处理：先闪光，闪完再长2格
                         if (food.type.score === 30) {  // 黄色宝珠
-                            worm.grow(2);
                             // 触发黄光效果：从嘴部到尾部逐个闪光
-                            worm.yellowGlowTimer = worm.segments.length * 0.1;  // 根据段数计算总时间
+                            worm.yellowGlowTimer = worm.segments.length * 0.1 + 0.2;  // 根据段数计算总时间 + 余量
                             worm.yellowGlowIndex = 0;  // 从第 0 段（嘴部）开始
                             worm.yellowGlowStepTimer = 0;
+                            worm.pendingGrow = 2;  // 等黄光结束后长2格
                         } else {
                             worm.grow(CONFIG.GROWTH_PER_FOOD);
                         }
