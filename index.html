@@ -22,7 +22,7 @@
         }
         h1 { margin-bottom: 10px; font-size: 24px; color: #ff6b6b; }
         #gameCanvas {
-            border: 2px solid #ff6b6b;
+            border: 1px solid rgba(255, 107, 107, 0.2);
             background: #2d2d3a;
             cursor: none;  // 隐藏默认鼠标，使用自定义圆环
             max-width: 100%;
@@ -1330,18 +1330,18 @@
                 return this.head.add(this.aiWanderDir.mult(100));
             }
 
-            // 死亡线检测（外框，加宽一倍）
+            // 死亡线检测（外框，最外面）
             checkWallCollision() {
                 const head = this.segments[0];
-                const margin = (CONFIG.WALL_MARGIN + CONFIG.SEGMENT_RADIUS) * 2;  // 死亡线：加宽一倍
+                const margin = CONFIG.WALL_MARGIN * 2 + CONFIG.SEGMENT_RADIUS * 2;  // 死亡线：最外框
                 return head.x < margin || head.x > CONFIG.CANVAS_WIDTH - margin ||
                        head.y < margin || head.y > CONFIG.CANVAS_HEIGHT - margin;
             }
             
-            // 预警线检测（内框，原始宽度）
+            // 预警线检测（内框，最里面）
             checkWarningLine() {
                 const head = this.segments[0];
-                const margin = CONFIG.WALL_MARGIN + CONFIG.SEGMENT_RADIUS;  // 预警线：原始宽度
+                const margin = CONFIG.WALL_MARGIN;  // 预警线：最内框
                 return head.x < margin || head.x > CONFIG.CANVAS_WIDTH - margin ||
                        head.y < margin || head.y > CONFIG.CANVAS_HEIGHT - margin;
             }
@@ -2584,17 +2584,21 @@
             }
 
             drawWalls() {
-                // 预警线（内框）- 半透明红色
-                ctx.strokeStyle = 'rgba(255, 107, 107, 0.3)';
+                // 预警线（内框）- 半透明红色，进入后显示预警
+                ctx.strokeStyle = 'rgba(255, 107, 107, 0.4)';
                 ctx.lineWidth = 2;
-                const m1 = CONFIG.WALL_MARGIN + CONFIG.SEGMENT_RADIUS;
-                ctx.strokeRect(m1, m1, CONFIG.CANVAS_WIDTH - m1 * 2, CONFIG.CANVAS_HEIGHT - m1 * 2);
+                const warningMargin = CONFIG.WALL_MARGIN;
+                ctx.strokeRect(warningMargin, warningMargin, 
+                    CONFIG.CANVAS_WIDTH - warningMargin * 2, 
+                    CONFIG.CANVAS_HEIGHT - warningMargin * 2);
                 
-                // 死亡线（外框）- 更明显的红色
-                ctx.strokeStyle = 'rgba(255, 60, 60, 0.5)';
+                // 死亡线（外框）- 更明显的红色，碰到就死
+                ctx.strokeStyle = 'rgba(255, 60, 60, 0.6)';
                 ctx.lineWidth = 3;
-                const m2 = (CONFIG.WALL_MARGIN + CONFIG.SEGMENT_RADIUS) * 2;
-                ctx.strokeRect(m2, m2, CONFIG.CANVAS_WIDTH - m2 * 2, CONFIG.CANVAS_HEIGHT - m2 * 2);
+                const deathMargin = CONFIG.WALL_MARGIN * 2 + CONFIG.SEGMENT_RADIUS * 2;
+                ctx.strokeRect(deathMargin, deathMargin, 
+                    CONFIG.CANVAS_WIDTH - deathMargin * 2, 
+                    CONFIG.CANVAS_HEIGHT - deathMargin * 2);
             }
 
             /**
