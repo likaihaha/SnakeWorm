@@ -2664,6 +2664,8 @@
                 // 鼠标事件（桌面端）
                 canvas.addEventListener('mousemove', (e) => {
                     if (this.isTouchDevice) return;  // 触摸设备不处理鼠标事件
+                    // 出场动画期间忽略鼠标位置更新
+                    if (this.isRunning && this.worms[0] && this.worms[0].isEntering) return;
                     const rect = canvas.getBoundingClientRect();
                     const scaleX = CONFIG.CANVAS_WIDTH / rect.width;
                     const scaleY = CONFIG.CANVAS_HEIGHT / rect.height;
@@ -2731,6 +2733,8 @@
              * 处理触摸事件
              */
             handleTouch(e) {
+                // 出场动画期间忽略触摸位置更新
+                if (this.isRunning && this.worms[0] && this.worms[0].isEntering) return;
                 const touch = e.touches[0];
                 const rect = canvas.getBoundingClientRect();
                 const scaleX = CONFIG.CANVAS_WIDTH / rect.width;
