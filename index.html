@@ -1336,21 +1336,12 @@
                 }
                 
                 // 主球体
-                const baseBlur = this.type.score >= 120 ? 15 : 10;
-                ctx.shadowBlur = this.fromBottom ? baseBlur + 10 : baseBlur;  // 底部发射的宝珠更亮
+                ctx.shadowBlur = this.type.score >= 120 ? 15 : 10;
                 ctx.shadowColor = this.type.color;
                 ctx.beginPath();
                 ctx.arc(this.pos.x, this.pos.y, r, 0, Math.PI * 2);
                 ctx.fillStyle = this.type.color;
                 ctx.fill();
-                
-                // 底部发射的宝珠添加向上箭头提示
-                if (this.fromBottom) {
-                    ctx.fillStyle = 'rgba(255,255,255,0.8)';
-                    ctx.font = 'bold 10px sans-serif';
-                    ctx.textAlign = 'center';
-                    ctx.fillText('▲', this.pos.x, this.pos.y + 3);
-                }
                 
                 // 高光
                 ctx.shadowBlur = 0;
@@ -3428,7 +3419,6 @@
                         const food = new Food(emit.x, emit.y, emit.type);
                         food.velocity.y = -(3.0 + Math.random() * 3.0);  // 向上速度
                         food.velocity.x = (Math.random() - 0.5) * 4.0;   // 随机左右偏移
-                        food.fromBottom = true;
                         this.foods.push(food);
                         
                         // 添加粒子特效（尸体段变宝珠的转化效果）
