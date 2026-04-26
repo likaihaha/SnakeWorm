@@ -960,7 +960,9 @@
                 this.yellowGlowTimer = 0;  // 黄光计时器
                 this.yellowGlowIndex = 0;  // 当前闪光的段索引（从嘴部开始）
                 this.yellowGlowStepTimer = 0;  // 步进计时器（控制每个段闪光的间隔）
-                this.pendingGrow = 0;  // 等待黄光结束后生长的节数
+                this.pendingGrowCount = 0;  // 等待黄光结束后生长的节数
+                this.growStepTimer = 0;  // 逐节生长的计时器
+                this.grownCount = 0;  // 已生长的节数
                 
                 // 尾部生长动画
                 this.growingSegments = [];  // 正在生长的新节 [{targetPos, progress, direction}]
@@ -1044,10 +1046,34 @@
                         this.yellowGlowStepTimer = 0.1;  // 间隔 0.1 秒
                     }
                     
-                    // 黄光结束后，触发等待的生长
-                    if (this.yellowGlowTimer <= 0 && this.pendingGrow > 0) {
-                        this.grow(this.pendingGrow);
-                        this.pendingGrow = 0;
+                    // 黄光结束后，开始逐节生长
+                    if (this.yellowGlowTimer <= 0 && this.pendingGrowCount > 0) {
+                        this.growStepTimer = 0;  // 立即开始第一节
+                    }
+                }
+                
+                // 逐节生长逻辑：每隔 0.4 秒长一节
+                if (this.pendingGrowCount > 0 && this.grownCount < this.pendingGrowCount) {
+                    this.growStepTimer -= dt;
+                    if (this.growStepTimer <= 0) {
+                        this.grow(1);  // 长一节
+                        this.grownCount++;
+                        this.growStepTimer = 0.4;  // 下一节间隔 0.4 秒
+                        
+                        // 播放一个音符（水晶序曲）
+                        if (typeof musicSystem !== 'undefined') {
+                            const song = musicSystem.songs['水晶序曲'];
+                            if (song) {
+                                const noteIndex = (this.grownCount - 1) % song.length;
+                                musicSystem.playNote(song[noteIndex].freq, song[noteIndex].duration);
+                            }
+                        }
+                        
+                        // 所有节都长完了，重置
+                        if (this.grownCount >= this.pendingGrowCount) {
+                            this.pendingGrowCount = 0;
+                            this.grownCount = 0;
+                        }
                     }
                 }
 
@@ -2166,13 +2192,15 @@
                         const foodPos = food.pos;
                         this.foods.splice(eatenIndex, 1);
                         
-                        // 黄色宝珠特殊处理：先闪光，闪完再长2格
+                        // 黄色宝珠特殊处理：先闪光，闪完后逐节长2格
                         if (food.type.score === 30) {  // 黄色宝珠
                             // 触发黄光效果：从嘴部到尾部逐个闪光
                             worm.yellowGlowTimer = worm.segments.length * 0.1 + 0.2;  // 根据段数计算总时间 + 余量
                             worm.yellowGlowIndex = 0;  // 从第 0 段（嘴部）开始
                             worm.yellowGlowStepTimer = 0;
-                            worm.pendingGrow = 2;  // 等黄光结束后长2格
+                            worm.pendingGrowCount = 2;  // 等黄光结束后逐节长2格
+                            worm.grownCount = 0;
+                            worm.growStepTimer = 0;
                         } else {
                             worm.grow(CONFIG.GROWTH_PER_FOOD);
                         }
