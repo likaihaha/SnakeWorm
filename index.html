@@ -1229,7 +1229,7 @@
                     this.pos.x += Math.sin(this.movePhase) * this.type.wobble * dt * 60;
                 }
                 
-                // 四边界碰撞（反弹）— 使用死亡线边距，防止宝珠落入死亡区
+                // 左右边界碰撞（反弹）— 防止宝珠进入左右死亡区
                 const margin = CONFIG.WALL_MARGIN * 2 + CONFIG.SEGMENT_RADIUS * 2;
                 if (this.pos.x < margin) {
                     this.pos.x = margin;
@@ -1244,11 +1244,7 @@
                     this.pos.y = margin;
                     this.velocity.y = Math.abs(this.velocity.y) * 0.3;
                 }
-                // 底部边界反弹（防止落入死亡区）
-                if (this.pos.y > CONFIG.CANVAS_HEIGHT - margin) {
-                    this.pos.y = CONFIG.CANVAS_HEIGHT - margin;
-                    this.velocity.y = -Math.abs(this.velocity.y) * 0.5;
-                }
+                // 底部：不反弹，让宝珠自然掉落（由Game类处理消散特效）
             }
             
             draw(ctx) {
@@ -3223,11 +3219,16 @@
                 // 8. 更新食物动画
                 this.foods.forEach(food => food.update(dt));
 
-                // 9. 按类型刷新宝珠 + 清理出画布的宝珠
+                // 9. 按类型刷新宝珠 + 清理出画布的宝珠（底部消散特效）
+                const deathMargin = CONFIG.WALL_MARGIN * 2 + CONFIG.SEGMENT_RADIUS * 2;
                 for (let i = this.foods.length - 1; i >= 0; i--) {
                     const food = this.foods[i];
-                    // 清理掉出画布太远的宝珠
-                    if (food.pos.y > CONFIG.CANVAS_HEIGHT + 50) {
+                    // 宝珠掉到底部死亡线时，播放消散特效
+                    if (food.pos.y > CONFIG.CANVAS_HEIGHT - deathMargin) {
+                        // 创建消散粒子特效（使用宝珠颜色）
+                        for (let j = 0; j < 8; j++) {
+                            this.particles.push(new Particle(food.pos.x, food.pos.y, food.type.color));
+                        }
                         this.foods.splice(i, 1);
                         this.foodRespawnTimers[food.type.score] = food.type.respawnTime;
                     }
