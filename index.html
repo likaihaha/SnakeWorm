@@ -540,7 +540,7 @@
         <div id="rhythmHint" style="color:#ffd700; font-size:10px; margin-top:3px;"></div>
     </div>
     <div id="controls">
-        🖱️ 鼠标移动控制方向 | 🔮 <b>宝珠渐进解锁：🟢绿→🟡黄(10s)→🟠橙(60s)→🔴红(身长15)</b><br>
+        🖱️ 鼠标移动控制方向 | 🔮 <b>宝珠渐进解锁：🟢绿→🟡黄(30s)→🟠橙(60s)→🔴红(身长15)</b><br>
         🔴 <b>咬尾巴 → 断尾分裂</b> | ⚠️ <b>头碰身体中段 → 自己分裂</b><br>
         🎵 <b>吃黄宝珠后等待旋律播完再出现下一颗</b> | 🎨 <b>Screen 混合模式</b>
     </div>
@@ -1034,7 +1034,7 @@
             ],
             // 游戏节奏配置
             RHYTHM: {
-                YELLOW_UNLOCK_TIME: 10,      // 10秒后解锁黄色宝珠
+                YELLOW_UNLOCK_TIME: 30,      // 30秒后解锁黄色宝珠
                 RED_UNLOCK_LENGTH: 15,       // 身体15节后解锁红色宝珠
                 ORANGE_UNLOCK_TIME: 60,      // 1分钟后解锁橙色宝珠
                 YELLOW_COOLDOWN: 5.0,        // 吃黄宝珠后冷却5秒（旋律3秒+等待2秒）
@@ -1206,10 +1206,11 @@
             static random(type = null) {
                 const margin = CONFIG.WALL_MARGIN + 10;
                 const foodType = type || Food.weightedRandom();
-                // 从顶部随机位置生成
+                // 随机位置：x随机，y从画布上方不同高度开始（避免排成直线）
+                const startY = -20 - Math.random() * 100;  // y在-20到-120之间随机
                 return new Food(
                     margin + Math.random() * (CONFIG.CANVAS_WIDTH - margin * 2),
-                    -20,  // 从画布上方外开始
+                    startY,
                     foodType
                 );
             }
@@ -2797,7 +2798,7 @@
                 this.worms.push(player);
                 
                 // 显示节奏提示
-                this.floatingTexts.push(new FloatingText(CONFIG.CANVAS_WIDTH / 2, 60, '🟢 绿宝珠 → 🟡 黄宝珠(10s) → 🟠 橙宝珠(60s) → 🔴 红宝珠(身长15)', '#ffd700'));
+                this.floatingTexts.push(new FloatingText(CONFIG.CANVAS_WIDTH / 2, 60, '🟢 绿宝珠 → 🟡 黄宝珠(30s) → 🟠 橙宝珠(60s) → 🔴 红宝珠(身长15)', '#ffd700'));
 
                 // 初始化宝珠：开局只生成绿色宝珠，其他颜色由节奏系统解锁后生成
                 const greenType = CONFIG.FOOD_TYPES.find(t => t.score === 10);
@@ -3257,7 +3258,10 @@
                     }
 
                     if (canSpawn) {
-                        this.foods.push(Food.random(type));
+                        // 添加随机延迟，避免宝珠同时生成排成直线
+                        if (Math.random() < 0.3) {  // 30%概率生成，增加随机性
+                            this.foods.push(Food.random(type));
+                        }
                     }
                 });
 
