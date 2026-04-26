@@ -15,20 +15,25 @@
             min-height: 100vh;
             font-family: 'Microsoft YaHei', 'PingFang SC', sans-serif;
             color: #eee;
+            padding: 10px;
         }
         h1 { margin-bottom: 10px; font-size: 24px; color: #ff6b6b; }
         #gameCanvas {
             border: 2px solid #ff6b6b;
             background: #2d2d3a;
             cursor: none;  // 隐藏默认鼠标，使用自定义圆环
+            max-width: 100%;
+            max-height: 70vh;
+            touch-action: none;  // 禁止默认触摸行为
         }
         #ui {
             margin-top: 10px;
             display: flex;
-            gap: 25px;
+            gap: 15px;
             font-size: 14px;
             flex-wrap: wrap;
             justify-content: center;
+            padding: 5px;
         }
         #ui span { color: #ff6b6b; }
         #ui .value { color: #fff; font-weight: bold; }
@@ -39,6 +44,7 @@
             text-align: center;
             max-width: 800px;
             line-height: 1.6;
+            padding: 0 10px;
         }
         #gameOver {
             position: absolute;
@@ -1372,14 +1378,28 @@
                 });
 
                 this.setupInput();
+                
+                // 窗口大小改变时重新调整 Canvas
+                window.addEventListener('resize', () => {
+                    this.resizeCanvas();
+                });
             }
 
             setupInput() {
                 this.mouseInCanvas = false;
+                this.isTouchDevice = false;  // 标记是否为触摸设备
+                
+                // 检测触摸设备
+                this.isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+                
+                // 鼠标事件（桌面端）
                 canvas.addEventListener('mousemove', (e) => {
+                    if (this.isTouchDevice) return;  // 触摸设备不处理鼠标事件
                     const rect = canvas.getBoundingClientRect();
-                    const x = e.clientX - rect.left;
-                    const y = e.clientY - rect.top;
+                    const scaleX = CONFIG.CANVAS_WIDTH / rect.width;
+                    const scaleY = CONFIG.CANVAS_HEIGHT / rect.height;
+                    const x = (e.clientX - rect.left) * scaleX;
+                    const y = (e.clientY - rect.top) * scaleY;
                     
                     // 检查鼠标是否真的在 Canvas 区域内
                     if (x >= 0 && x <= CONFIG.CANVAS_WIDTH && y >= 0 && y <= CONFIG.CANVAS_HEIGHT) {
@@ -1389,16 +1409,25 @@
                         this.mouseInCanvas = false;
                     }
                 });
+                
+                // 触摸事件（移动端）
+                canvas.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    this.isTouchDevice = true;
+                    this.handleTouch(e);
+                }, { passive: false });
+                
                 canvas.addEventListener('touchmove', (e) => {
                     e.preventDefault();
-                    const rect = canvas.getBoundingClientRect();
-                    const touch = e.touches[0];
-                    this.mousePos = new Vector(touch.clientX - rect.left, touch.clientY - rect.top);
-                    this.mouseInCanvas = true;
-                });
-                canvas.addEventListener('touchend', () => {
+                    this.handleTouch(e);
+                }, { passive: false });
+                
+                canvas.addEventListener('touchend', (e) => {
+                    e.preventDefault();
                     this.mouseInCanvas = false;
-                });
+                }, { passive: false });
+                
+                // 键盘事件
                 document.addEventListener('keydown', (e) => {
                     if (e.key === 'Escape') {
                         if (this.isRunning && !this.isGameOver) {
@@ -1409,12 +1438,45 @@
                     }
                 });
             }
+            
+            /**
+             * 处理触摸事件
+             */
+            handleTouch(e) {
+                const touch = e.touches[0];
+                const rect = canvas.getBoundingClientRect();
+                const scaleX = CONFIG.CANVAS_WIDTH / rect.width;
+                const scaleY = CONFIG.CANVAS_HEIGHT / rect.height;
+                const x = (touch.clientX - rect.left) * scaleX;
+                const y = (touch.clientY - rect.top) * scaleY;
+                
+                // 检查触摸是否在 Canvas 区域内
+                if (x >= 0 && x <= CONFIG.CANVAS_WIDTH && y >= 0 && y <= CONFIG.CANVAS_HEIGHT) {
+                    this.mousePos = new Vector(x, y);
+                    this.mouseInCanvas = true;
+                } else {
+                    this.mouseInCanvas = false;
+                }
+            }
 
             startGame() {
                 document.getElementById('startScreen').style.display = 'none';
+                this.resizeCanvas();  // 调整 Canvas 大小
                 this.restart();
                 this.lastTime = performance.now();  // 重置时间
                 this.loop(this.lastTime);
+            }
+            
+            /**
+             * 响应式调整 Canvas 大小
+             */
+            resizeCanvas() {
+                const maxWidth = Math.min(window.innerWidth - 20, 800);
+                const maxHeight = Math.min(window.innerHeight * 0.7, 600);
+                const scale = Math.min(maxWidth / CONFIG.CANVAS_WIDTH, maxHeight / CONFIG.CANVAS_HEIGHT);
+                
+                canvas.style.width = (CONFIG.CANVAS_WIDTH * scale) + 'px';
+                canvas.style.height = (CONFIG.CANVAS_HEIGHT * scale) + 'px';
             }
 
             pauseGame() {
@@ -1789,10 +1851,11 @@
             }
 
             /**
-             * 绘制自定义鼠标光标：18px 圆环
+             * 绘制自定义鼠标光标：18px 圆环（触摸设备不绘制）
              */
             drawCustomCursor() {
                 if (!this.mouseInCanvas) return;
+                if (this.isTouchDevice) return;  // 触摸设备不显示光标
                 
                 const cursorX = this.mousePos.x;
                 const cursorY = this.mousePos.y;
