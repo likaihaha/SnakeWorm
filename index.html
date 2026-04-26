@@ -4013,16 +4013,32 @@
                     min-width: 300px;
                 `;
                 
-                dialog.innerHTML = `
-                    <h2 style="color: #ff6b6b; margin-bottom: 20px;">💀 你被咬死了！</h2>
-                    <p style="color: #fff; margin-bottom: 10px;">最终长度: <span id="deathLength">${this.worms[0]?.segments?.length || 0}</span></p>
-                    <p style="color: #fff; margin-bottom: 10px;">最终分数: <span id="deathScore">${this.score}</span></p>
-                    <p style="color: #fff; margin-bottom: 20px;">分裂次数: <span id="deathSplits">${this.splitCount}</span></p>
-                    <button onclick="document.getElementById('playerDeathDialog').remove(); location.reload();" 
-                            style="background: #ff6b6b; color: #fff; border: none; padding: 10px 30px; font-size: 16px; border-radius: 5px; cursor: pointer;">
-                        重新开始
-                    </button>
-                `;
+                // 安全创建DOM元素，避免innerHTML注入风险
+                const h2 = document.createElement('h2');
+                h2.style.cssText = 'color: #ff6b6b; margin-bottom: 20px;';
+                h2.textContent = '💀 你被咬死了！';
+                dialog.appendChild(h2);
+                
+                const p1 = document.createElement('p');
+                p1.style.cssText = 'color: #fff; margin-bottom: 10px;';
+                p1.textContent = '最终长度: ' + (this.worms[0]?.segments?.length || 0);
+                dialog.appendChild(p1);
+                
+                const p2 = document.createElement('p');
+                p2.style.cssText = 'color: #fff; margin-bottom: 10px;';
+                p2.textContent = '最终分数: ' + this.score;
+                dialog.appendChild(p2);
+                
+                const p3 = document.createElement('p');
+                p3.style.cssText = 'color: #fff; margin-bottom: 20px;';
+                p3.textContent = '分裂次数: ' + this.splitCount;
+                dialog.appendChild(p3);
+                
+                const btn = document.createElement('button');
+                btn.textContent = '重新开始';
+                btn.style.cssText = 'background: #ff6b6b; color: #fff; border: none; padding: 10px 30px; font-size: 16px; border-radius: 5px; cursor: pointer;';
+                btn.onclick = function() { document.getElementById('playerDeathDialog').remove(); location.reload(); };
+                dialog.appendChild(btn);
                 
                 document.body.appendChild(dialog);
             }
