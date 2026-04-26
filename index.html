@@ -2716,12 +2716,11 @@
                 // 显示节奏提示
                 this.floatingTexts.push(new FloatingText(CONFIG.CANVAS_WIDTH / 2, 60, '🟢 绿宝珠 → 🟡 黄宝珠(10s) → 🟠 橙宝珠(60s) → 🔴 红宝珠(身长15)', '#ffd700'));
 
-                // 初始化多色宝珠：每种类型按配置生成
-                CONFIG.FOOD_TYPES.forEach(type => {
-                    for (let i = 0; i < type.maxCount; i++) {
-                        this.foods.push(Food.random(type));
-                    }
-                });
+                // 初始化宝珠：开局只生成绿色宝珠，其他颜色由节奏系统解锁后生成
+                const greenType = CONFIG.FOOD_TYPES.find(t => t.score === 10);
+                for (let i = 0; i < greenType.maxCount; i++) {
+                    this.foods.push(Food.random(greenType));
+                }
 
                 document.getElementById('gameOver').style.display = 'none';
                 this.updateUI();
