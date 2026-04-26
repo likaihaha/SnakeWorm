@@ -2796,9 +2796,6 @@
                 // 给玩家添加无敌时间，出场动画期间不会被吞噬
                 player.invincibleTimer = 3.5;  // 3.5 秒无敌（2 秒动画 + 1.5 秒游向鼠标）
                 this.worms.push(player);
-                
-                // 显示节奏提示
-                this.floatingTexts.push(new FloatingText(CONFIG.CANVAS_WIDTH / 2, 60, '🟢 绿宝珠 → 🟡 黄宝珠(30s) → 🟠 橙宝珠(60s) → 🔴 红宝珠(身长15)', '#ffd700'));
 
                 // 初始化宝珠：开局只生成绿色宝珠，其他颜色由节奏系统解锁后生成
                 const greenType = CONFIG.FOOD_TYPES.find(t => t.score === 10);
