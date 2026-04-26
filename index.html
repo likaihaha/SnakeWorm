@@ -1207,8 +1207,8 @@
                 // 使用死亡线边距，确保宝珠不会在死亡区内生成
                 const margin = CONFIG.WALL_MARGIN * 2 + CONFIG.SEGMENT_RADIUS * 2;
                 const foodType = type || Food.weightedRandom();
-                // 随机位置：x随机，y从画布上方不同高度开始（避免排成直线）
-                const startY = -20 - Math.random() * 100;  // y在-20到-120之间随机
+                // 随机位置：x随机分散，y从画布上方不同高度开始（避免排成直线）
+                const startY = -30 - Math.random() * 200;  // y在-30到-230之间随机，范围更大
                 return new Food(
                     margin + Math.random() * (CONFIG.CANVAS_WIDTH - margin * 2),
                     startY,
@@ -3247,8 +3247,9 @@
                     switch (type.score) {
                         case 10:  // 绿色：开局分批生成，之后持续补充
                             if (this.initialGreenSpawned < type.maxCount) {
-                                // 开局分批生成：每隔0.8秒生成1个，错落有致
-                                if (this.gameTime > this.initialGreenSpawned * 0.8) {
+                                // 开局分批生成：每隔1.5-2.5秒生成1个，错落有致
+                                const spawnInterval = 1.5 + Math.random();  // 1.5~2.5秒随机间隔
+                                if (this.gameTime > this.initialGreenSpawned * spawnInterval) {
                                     canSpawn = true;
                                     this.initialGreenSpawned++;
                                 }
