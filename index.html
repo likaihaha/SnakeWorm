@@ -424,6 +424,7 @@
         <div>玩家长度: <span class="value" id="lengthDisplay">3</span></div>
         <div>分数: <span class="value" id="scoreDisplay">0</span></div>
         <div>速度: <span class="value" id="speedDisplay">5</span></div>
+        <div>子弹: <span class="value" id="bulletDisplay">0</span></div>
         <div>分裂体: <span class="value" id="splitCount">0</span></div>
         <div>总蚯蚓数: <span class="value" id="wormCount">1</span></div>
     </div>
@@ -774,6 +775,67 @@
                 ctx.arc(this.pos.x, this.pos.y, this.size * alpha, 0, Math.PI * 2);
                 ctx.fill();
                 ctx.globalCompositeOperation = 'source-over';
+            }
+        }
+
+        /* ========== 子弹类 ========== */
+        class Bullet {
+            constructor(x, y, direction) {
+                this.pos = new Vector(x, y);
+                this.velocity = direction.normalize().mult(12);  // 子弹速度
+                this.radius = 5;
+                this.life = 2.0;  // 子弹存活 2 秒
+                this.hitTargets = [];  // 已击中的目标（避免重复击中）
+            }
+            
+            update(dt) {
+                this.pos = this.pos.add(this.velocity.mult(dt * 60));
+                this.life -= dt;
+                
+                // 超出边界或时间到则消失
+                if (this.life <= 0 || 
+                    this.pos.x < 0 || this.pos.x > CONFIG.CANVAS_WIDTH ||
+                    this.pos.y < 0 || this.pos.y > CONFIG.CANVAS_HEIGHT) {
+                    return false;
+                }
+                return true;
+            }
+            
+            draw(ctx) {
+                // 子弹外观：红色发光球
+                ctx.globalCompositeOperation = 'screen';
+                ctx.beginPath();
+                ctx.arc(this.pos.x, this.pos.y, this.radius, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(255, 80, 80, 0.9)';
+                ctx.shadowBlur = 15;
+                ctx.shadowColor = '#ff4444';
+                ctx.fill();
+                
+                // 内核高光
+                ctx.beginPath();
+                ctx.arc(this.pos.x, this.pos.y, this.radius * 0.4, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+                ctx.fill();
+                
+                ctx.shadowBlur = 0;
+                ctx.globalCompositeOperation = 'source-over';
+            }
+            
+            // 检测是否击中宝珠
+            checkFoodHit(food) {
+                const dist = this.pos.dist(food.pos);
+                return dist < this.radius + food.type.radius;
+            }
+            
+            // 检测是否击中蚯蚓
+            checkWormHit(worm) {
+                for (let i = 0; i < worm.segments.length; i++) {
+                    const dist = this.pos.dist(worm.segments[i]);
+                    if (dist < this.radius + CONFIG.SEGMENT_RADIUS) {
+                        return true;
+                    }
+                }
+                return false;
             }
         }
 
@@ -1896,6 +1958,9 @@
                 this.foods = [];
                 this.particles = [];  // 粒子效果
                 this.floatingTexts = [];  // 浮动文字
+                this.bullets = [];  // 子弹
+                this.slowedFoods = new Map();  // 减速的宝珠 {food: slowTimer}
+                this.slowedWorms = new Map();  // 减速的蚯蚓 {worm: slowTimer}
                 this.mousePos = new Vector(CONFIG.CANVAS_WIDTH / 2, CONFIG.CANVAS_HEIGHT / 2);
                 this.score = 0;
                 this.isRunning = false;
@@ -2046,6 +2111,35 @@
                         this.mouseInCanvas = true;
                     } else {
                         this.mouseInCanvas = false;
+                    }
+                });
+                
+                // 鼠标点击发射子弹
+                canvas.addEventListener('mousedown', (e) => {
+                    if (this.isTouchDevice) return;
+                    if (!this.isRunning || this.isPaused || this.isGameOver) return;
+                    
+                    const player = this.worms[0];
+                    if (!player || !player.isAlive) return;
+                    if (!player.bulletCount || player.bulletCount <= 0) return;
+                    
+                    // 发射子弹
+                    const rect = canvas.getBoundingClientRect();
+                    const scaleX = CONFIG.CANVAS_WIDTH / rect.width;
+                    const scaleY = CONFIG.CANVAS_HEIGHT / rect.height;
+                    const mouseX = (e.clientX - rect.left) * scaleX;
+                    const mouseY = (e.clientY - rect.top) * scaleY;
+                    
+                    // 子弹方向：从玩家头部指向鼠标
+                    const direction = new Vector(mouseX, mouseY).sub(player.head).normalize();
+                    const bulletPos = player.head.add(direction.mult(CONFIG.SEGMENT_RADIUS + 5));
+                    
+                    this.bullets.push(new Bullet(bulletPos.x, bulletPos.y, direction));
+                    player.bulletCount--;
+                    
+                    // 发射音效
+                    if (typeof musicSystem !== 'undefined') {
+                        musicSystem.playNote(800, 50);
                     }
                 });
                 
@@ -2215,6 +2309,7 @@
                 document.getElementById('lengthDisplay').textContent = player.length;
                 document.getElementById('scoreDisplay').textContent = this.score;
                 document.getElementById('speedDisplay').textContent = player.speed.toFixed(1);
+                document.getElementById('bulletDisplay').textContent = player.bulletCount || 0;
                 document.getElementById('splitCount').textContent = this.splitCount;
                 document.getElementById('wormCount').textContent = this.worms.filter(w => w.isAlive).length;
             }
@@ -2315,6 +2410,10 @@
                         } else if (food.type.score === 60) {  // 橙色宝珠：触发磁力效果
                             worm.magnetTimer = 3.0;  // 磁力持续 3 秒（加倍）
                             worm.magnetCombo = 0;  // 重置连击数
+                            worm.grow(CONFIG.GROWTH_PER_FOOD);
+                        } else if (food.type.score === 120) {  // 红色宝珠：获得子弹
+                            worm.bulletCount = (worm.bulletCount || 0) + 3;  // 获得 3 颗子弹
+                            this.floatingTexts.push(new FloatingText(foodPos.x, foodPos.y - 20, '🔫 +3', '#ff6b6b'));
                             worm.grow(CONFIG.GROWTH_PER_FOOD);
                         } else {
                             worm.grow(CONFIG.GROWTH_PER_FOOD);
@@ -2460,6 +2559,72 @@
                         }, i * 100);
                     }
                     player.magnetCombo = 0;  // 重置连击
+                }
+                
+                // 7.6 更新子弹和碰撞检测
+                for (let i = this.bullets.length - 1; i >= 0; i--) {
+                    const bullet = this.bullets[i];
+                    if (!bullet.update(dt)) {
+                        this.bullets.splice(i, 1);
+                        continue;
+                    }
+                    
+                    // 检测子弹击中宝珠
+                    for (let j = this.foods.length - 1; j >= 0; j--) {
+                        const food = this.foods[j];
+                        if (bullet.checkFoodHit(food)) {
+                            // 宝珠减速
+                            this.slowedFoods.set(food, 3.0);  // 减速 3 秒
+                            food.velocity = food.velocity.mult(0.2);  // 速度降为 20%
+                            
+                            // 击中特效
+                            for (let k = 0; k < 4; k++) {
+                                this.particles.push(new Particle(food.pos.x, food.pos.y, '#ff6b6b'));
+                            }
+                            this.floatingTexts.push(new FloatingText(food.pos.x, food.pos.y - 15, 'SLOW', '#ff6b6b'));
+                            
+                            this.bullets.splice(i, 1);
+                            break;
+                        }
+                    }
+                    
+                    // 检测子弹击中蚯蚓
+                    if (this.bullets[i]) {
+                        for (const worm of this.worms) {
+                            if (!worm.isAlive || worm.isPlayer) continue;
+                            if (bullet.checkWormHit(worm)) {
+                                // 蚯蚓减速
+                                this.slowedWorms.set(worm, 3.0);  // 减速 3 秒
+                                worm.speed *= 0.3;  // 速度降为 30%
+                                
+                                // 击中特效
+                                for (let k = 0; k < 6; k++) {
+                                    this.particles.push(new Particle(worm.head.x, worm.head.y, '#ff6b6b'));
+                                }
+                                this.floatingTexts.push(new FloatingText(worm.head.x, worm.head.y - 20, 'SLOW!', '#ff6b6b'));
+                                
+                                this.bullets.splice(i, 1);
+                                break;
+                            }
+                        }
+                    }
+                }
+                
+                // 更新减速计时器
+                for (const [food, timer] of this.slowedFoods) {
+                    if (timer <= dt) {
+                        this.slowedFoods.delete(food);
+                    } else {
+                        this.slowedFoods.set(food, timer - dt);
+                    }
+                }
+                for (const [worm, timer] of this.slowedWorms) {
+                    if (timer <= dt) {
+                        this.slowedWorms.delete(worm);
+                        worm.updateSpeed();  // 恢复速度
+                    } else {
+                        this.slowedWorms.set(worm, timer - dt);
+                    }
                 }
 
                 // 8. 更新食物动画
@@ -2617,6 +2782,9 @@
 
                 // 绘制粒子效果
                 this.particles.forEach(p => p.draw(ctx));
+
+                // 绘制子弹
+                this.bullets.forEach(b => b.draw(ctx));
 
                 // 绘制蚯蚓
                 for (const worm of this.worms) {
