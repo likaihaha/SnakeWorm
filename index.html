@@ -2436,6 +2436,7 @@
                 this.floatingTexts = [];  // 浮动文字
                 this.bullets = [];  // 子弹
                 this.slowedFoods = new Map();  // 减速的宝珠 {food: slowTimer}
+                this.initialGreenSpawned = 0;  // 初始绿宝珠已生成数量
                 this.slowedWorms = new Map();  // 减速的蚯蚓 {worm: slowTimer}
                 this.mousePos = new Vector(CONFIG.CANVAS_WIDTH / 2, CONFIG.CANVAS_HEIGHT / 2);
                 this.score = 0;
@@ -2801,11 +2802,10 @@
                 player.invincibleTimer = 3.5;  // 3.5 秒无敌（2 秒动画 + 1.5 秒游向鼠标）
                 this.worms.push(player);
 
-                // 初始化宝珠：开局只生成绿色宝珠，其他颜色由节奏系统解锁后生成
+                // 初始化宝珠：开局只生成1个绿色宝珠，其他由节奏系统逐步生成
                 const greenType = CONFIG.FOOD_TYPES.find(t => t.score === 10);
-                for (let i = 0; i < greenType.maxCount; i++) {
-                    this.foods.push(Food.random(greenType));
-                }
+                this.foods.push(Food.random(greenType));
+                this.initialGreenSpawned = 1;  // 记录已生成的初始绿宝珠数量
 
                 document.getElementById('gameOver').style.display = 'none';
                 this.updateUI();
@@ -3245,10 +3245,19 @@
                     // 根据节奏配置决定是否生成
                     let canSpawn = false;
                     switch (type.score) {
-                        case 10:  // 绿色：始终生成
-                            canSpawn = true;
+                        case 10:  // 绿色：开局分批生成，之后持续补充
+                            if (this.initialGreenSpawned < type.maxCount) {
+                                // 开局分批生成：每隔0.8秒生成1个，错落有致
+                                if (this.gameTime > this.initialGreenSpawned * 0.8) {
+                                    canSpawn = true;
+                                    this.initialGreenSpawned++;
+                                }
+                            } else {
+                                // 之后持续补充（30%概率）
+                                canSpawn = Math.random() < 0.3;
+                            }
                             break;
-                        case 30:  // 黄色：10秒后 + 冷却结束
+                        case 30:  // 黄色：30秒后 + 冷却结束
                             canSpawn = this.gameTime >= CONFIG.RHYTHM.YELLOW_UNLOCK_TIME 
                                 && this.yellowCooldown <= 0;
                             break;
@@ -3264,10 +3273,7 @@
                     }
 
                     if (canSpawn) {
-                        // 添加随机延迟，避免宝珠同时生成排成直线
-                        if (Math.random() < 0.3) {  // 30%概率生成，增加随机性
-                            this.foods.push(Food.random(type));
-                        }
+                        this.foods.push(Food.random(type));
                     }
                 });
 
