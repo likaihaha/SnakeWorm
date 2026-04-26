@@ -2226,6 +2226,9 @@
                         }
                     }
                 }
+                
+                // 总控AI：检测AI蚯蚓是否聚集，如果聚集就让它们分散
+                this.updateAIDispersal();
 
  // 2. 玩家撞墙（出场动画期间不检测）
                 if (this.mouseInCanvas && !player.isEntering && player.checkWallCollision()) {
@@ -2392,6 +2395,62 @@
 
                 // 12. 更新 UI
                 this.updateUI();
+            }
+            
+            /**
+             * 总控AI：检测AI蚯蚓是否聚集，如果聚集就让它们分散
+             */
+            updateAIDispersal() {
+                // 获取所有存活的AI蚯蚓
+                const aiWorms = this.worms.filter(w => w.isAlive && !w.isPlayer);
+                if (aiWorms.length < 2) return;  // 少于2条AI不检测
+                
+                // 计算所有AI蚯蚓的中心点
+                let centerX = 0, centerY = 0;
+                for (const worm of aiWorms) {
+                    centerX += worm.head.x;
+                    centerY += worm.head.y;
+                }
+                centerX /= aiWorms.length;
+                centerY /= aiWorms.length;
+                
+                // 计算平均距离（与中心点的距离）
+                let totalDist = 0;
+                for (const worm of aiWorms) {
+                    const dx = worm.head.x - centerX;
+                    const dy = worm.head.y - centerY;
+                    totalDist += Math.sqrt(dx * dx + dy * dy);
+                }
+                const avgDist = totalDist / aiWorms.length;
+                
+                // 如果平均距离小于阈值（聚集），让部分蚯蚓分散
+                const dispersalThreshold = 100;  // 聚集阈值
+                if (avgDist < dispersalThreshold) {
+                    // 随机选择一半的AI蚯蚓让它们分散
+                    for (const worm of aiWorms) {
+                        if (Math.random() < 0.4) {  // 40% 的概率触发分散
+                            // 计算远离中心的方向
+                            const awayX = worm.head.x - centerX;
+                            const awayY = worm.head.y - centerY;
+                            const dist = Math.sqrt(awayX * awayX + awayY * awayY);
+                            
+                            if (dist > 0) {
+                                // 设置远离中心的随机方向
+                                const randomAngle = (Math.random() - 0.5) * Math.PI;  // ±90度随机偏移
+                                const cos = Math.cos(randomAngle);
+                                const sin = Math.sin(randomAngle);
+                                worm.aiWanderDir = new Vector(
+                                    (awayX * cos - awayY * sin) / dist,
+                                    (awayX * sin + awayY * cos) / dist
+                                );
+                            } else {
+                                worm.aiWanderDir = Vector.randomDir();
+                            }
+                            
+                            worm.aiWanderTimer = 3 + Math.random() * 2;  // 保持分散方向 3-5 秒
+                        }
+                    }
+                }
             }
 
             /**
