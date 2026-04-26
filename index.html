@@ -75,6 +75,64 @@
             transform: translate(-50%, -50%);
             pointer-events: none;
         }
+        /* 移动端射击按钮 */
+        #fireBtn {
+            position: fixed;
+            bottom: 60px;
+            right: 40px;
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: rgba(255, 107, 107, 0.7);
+            border: 3px solid rgba(255, 107, 107, 0.9);
+            color: white;
+            font-size: 16px;
+            font-weight: bold;
+            display: none;  // 默认隐藏，触摸设备显示
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            touch-action: none;
+            user-select: none;
+        }
+        #fireBtn:active {
+            background: rgba(255, 107, 107, 1);
+            transform: scale(0.95);
+        }
+        /* 移动端弹仓显示 */
+        #ammoDisplay {
+            position: fixed;
+            bottom: 150px;
+            right: 40px;
+            background: rgba(0, 0, 0, 0.8);
+            border: 2px solid #ff6b6b;
+            border-radius: 10px;
+            padding: 10px 15px;
+            color: white;
+            font-size: 14px;
+            display: none;  // 默认隐藏，触摸设备显示
+            z-index: 1000;
+            text-align: center;
+        }
+        #ammoDisplay .count {
+            font-size: 24px;
+            font-weight: bold;
+            color: #ff6b6b;
+        }
+        /* 移动端小指针 */
+        #mouseIndicator {
+            position: fixed;
+            width: 12px;
+            height: 12px;
+            background: rgba(255, 255, 255, 0.8);
+            border: 2px solid rgba(255, 255, 255, 0.9);
+            border-radius: 50%;
+            pointer-events: none;
+            display: none;  // 默认隐藏，触摸设备显示
+            z-index: 999;
+            transform: translate(-50%, -50%);
+            transition: opacity 0.2s;
+        }
         #gameOver {
             position: absolute;
             top: 50%; left: 50%;
@@ -386,6 +444,15 @@
     <div id="joystick">
         <div id="joystickKnob"></div>
     </div>
+    <!-- 移动端射击按钮 -->
+    <div id="fireBtn">🔥</div>
+    <!-- 移动端弹仓显示 -->
+    <div id="ammoDisplay">
+        <div>弹药</div>
+        <div class="count" id="ammoCount">0</div>
+    </div>
+    <!-- 移动端小指针 -->
+    <div id="mouseIndicator"></div>
     
     <div style="display: flex; align-items: center; justify-content: center; gap: 12px; margin-bottom: 10px;">
         <h1 style="margin: 0;">🐍 SnakeWorm - 吃豆人蚯蚓</h1>
@@ -2310,6 +2377,30 @@
                 // 检测触摸设备
                 this.isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
                 
+                // 触摸设备显示移动端UI
+                if (this.isTouchDevice) {
+                    const joystick = document.getElementById('joystick');
+                    const fireBtn = document.getElementById('fireBtn');
+                    const ammoDisplay = document.getElementById('ammoDisplay');
+                    const mouseIndicator = document.getElementById('mouseIndicator');
+                    if (joystick) joystick.style.display = 'block';
+                    if (fireBtn) fireBtn.style.display = 'flex';
+                    if (ammoDisplay) ammoDisplay.style.display = 'block';
+                    if (mouseIndicator) mouseIndicator.style.display = 'block';
+                    
+                    // 射击按钮事件
+                    fireBtn.addEventListener('touchstart', (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        this.fireBullet();
+                    }, { passive: false });
+                    fireBtn.addEventListener('mousedown', (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        this.fireBullet();
+                    });
+                }
+                
                 // 鼠标事件（桌面端）
                 canvas.addEventListener('mousemove', (e) => {
                     if (this.isTouchDevice) return;  // 触摸设备不处理鼠标事件
@@ -2328,64 +2419,11 @@
                     }
                 });
                 
-                // 鼠标点击发射子弹
+            // 射击按钮点击事件（桌面端）
                 canvas.addEventListener('mousedown', (e) => {
-                    if (this.isTouchDevice) return;
+                    if (this.isTouchDevice) return;  // 触摸设备用按钮
                     if (!this.isRunning || this.isPaused || this.isGameOver) return;
-                    
-                    const player = this.worms[0];
-                    if (!player || !player.isAlive) return;
-                    if (!player.bulletCount || player.bulletCount <= 0) return;
-                    
-                    // 发射子弹
-                    const rect = canvas.getBoundingClientRect();
-                    const scaleX = CONFIG.CANVAS_WIDTH / rect.width;
-                    const scaleY = CONFIG.CANVAS_HEIGHT / rect.height;
-                    const mouseX = (e.clientX - rect.left) * scaleX;
-                    const mouseY = (e.clientY - rect.top) * scaleY;
-                    
-                    // 子弹方向：嘴部开合的方向（基于头部到第二段的向量）
-                    let mouthAngle = Math.atan2(player.velocity.y, player.velocity.x);
-                    if (player.segments.length > 1) {
-                        const dir = player.head.sub(player.segments[1]);
-                        if (dir.mag() > 0) {
-                            mouthAngle = Math.atan2(dir.y, dir.x);
-                        }
-                    }
-                    const direction = new Vector(Math.cos(mouthAngle), Math.sin(mouthAngle));
-                    const bulletPos = player.head.add(direction.mult(CONFIG.SEGMENT_RADIUS + 5));
-                    
-                    this.bullets.push(new Bullet(bulletPos.x, bulletPos.y, direction));
-                    player.bulletCount--;
-                    
-                    // 每射1发子弹，减少第一个红色段的强度
-                    let strengthReduced = false;
-                    for (let i = 0; i < player.redStrengths.length; i++) {
-                        if (player.redStrengths[i] > 0) {
-                            player.redStrengths[i]--;
-                            strengthReduced = true;
-                            
-                            // 当该段强度为0时，减少红色段数
-                            if (player.redStrengths[i] === 0) {
-                                player.redSegments--;
-                                player.redStrengths.splice(i, 1);  // 从数组中移除
-                                // 更新子弹数量
-                                player.bulletCount = player.redSegments * 5;
-                            }
-                            break;  // 只减少一个段的强度
-                        }
-                    }
-                    
-                    // 如果没有红色段可用，消耗身体
-                    if (!strengthReduced && player.segments.length > 1) {
-                        player.segments.pop();
-                        player.targetLength--;
-                    }
-                    
-                    // 发射音效
-                    if (typeof musicSystem !== 'undefined') {
-                        musicSystem.playNote(800, 50);
-                    }
+                    this.fireBullet();
                 });
                 
                 // 触摸事件（移动端）- 在 Canvas 上触摸也控制方向
@@ -2557,6 +2595,12 @@
                 document.getElementById('bulletDisplay').textContent = player.bulletCount || 0;
                 document.getElementById('splitCount').textContent = this.splitCount;
                 document.getElementById('wormCount').textContent = this.worms.filter(w => w.isAlive).length;
+                
+                // 移动端弹仓显示
+                const ammoCount = document.getElementById('ammoCount');
+                if (ammoCount && this.isTouchDevice) {
+                    ammoCount.textContent = player.bulletCount || 0;
+                }
             }
 
             loop(timestamp) {
@@ -2911,6 +2955,118 @@
 
                 // 12. 更新 UI
                 this.updateUI();
+                
+                // 13. 更新移动端鼠标指示器
+                this.updateMouseIndicator();
+            }
+            
+            /**
+             * 发射子弹（桌面端和移动端共用）
+             */
+            fireBullet() {
+                if (!this.isRunning || this.isPaused || this.isGameOver) return;
+                
+                const player = this.worms[0];
+                if (!player || !player.isAlive) return;
+                if (!player.bulletCount || player.bulletCount <= 0) return;
+                
+                // 子弹方向：嘴部开合的方向（基于头部到第二段的向量）
+                let mouthAngle = Math.atan2(player.velocity.y, player.velocity.x);
+                if (player.segments.length > 1) {
+                    const dir = player.head.sub(player.segments[1]);
+                    if (dir.mag() > 0) {
+                        mouthAngle = Math.atan2(dir.y, dir.x);
+                    }
+                }
+                const direction = new Vector(Math.cos(mouthAngle), Math.sin(mouthAngle));
+                const bulletPos = player.head.add(direction.mult(CONFIG.SEGMENT_RADIUS + 5));
+                
+                this.bullets.push(new Bullet(bulletPos.x, bulletPos.y, direction));
+                player.bulletCount--;
+                
+                // 每射1发子弹，减少第一个红色段的强度
+                let strengthReduced = false;
+                for (let i = 0; i < player.redStrengths.length; i++) {
+                    if (player.redStrengths[i] > 0) {
+                        player.redStrengths[i]--;
+                        strengthReduced = true;
+                        
+                        // 当该段强度为0时，减少红色段数
+                        if (player.redStrengths[i] === 0) {
+                            player.redSegments--;
+                            player.redStrengths.splice(i, 1);  // 从数组中移除
+                            // 更新子弹数量
+                            player.bulletCount = player.redSegments * 5;
+                        }
+                        break;  // 只减少一个段的强度
+                    }
+                }
+                
+                // 如果没有红色段可用，消耗身体
+                if (!strengthReduced && player.segments.length > 1) {
+                    player.segments.pop();
+                    player.targetLength--;
+                }
+                
+                // 发射音效
+                if (typeof musicSystem !== 'undefined') {
+                    musicSystem.playNote(800, 50);
+                }
+            }
+            
+            /**
+             * 更新移动端鼠标指示器
+             */
+            updateMouseIndicator() {
+                if (!this.isTouchDevice) return;
+                
+                const indicator = document.getElementById('mouseIndicator');
+                if (!indicator) return;
+                
+                // 获取玩家头部位置
+                const player = this.worms[0];
+                if (!player) return;
+                
+                // 检查玩家是否静止（速度接近0）
+                const speed = player.velocity.mag();
+                const isStationary = speed < 0.1;
+                
+                // 获取鼠标位置（摇杆控制的方向）
+                let indicatorX, indicatorY;
+                
+                if (isStationary) {
+                    // 静止时：不显示指示器（隐藏）
+                    indicator.style.opacity = '0';
+                    return;
+                }
+                
+                // 移动时：显示指示器（在摇杆方向的前方）
+                if (this.joystickDirection && this.joystickDirection.mag() > 0) {
+                    const head = player.head;
+                    const dir = this.joystickDirection;
+                    indicatorX = head.x + dir.x * 100;
+                    indicatorY = head.y + dir.y * 100;
+                } else {
+                    // 如果没有摇杆方向，使用鼠标位置
+                    if (this.mousePos) {
+                        indicatorX = this.mousePos.x;
+                        indicatorY = this.mousePos.y;
+                    } else {
+                        return;
+                    }
+                }
+                
+                // 转换为屏幕坐标
+                const rect = canvas.getBoundingClientRect();
+                const scaleX = rect.width / CONFIG.CANVAS_WIDTH;
+                const scaleY = rect.height / CONFIG.CANVAS_HEIGHT;
+                const screenX = rect.left + indicatorX * scaleX;
+                const screenY = rect.top + indicatorY * scaleY;
+                
+                // 更新指示器位置
+                indicator.style.left = screenX + 'px';
+                indicator.style.top = screenY + 'px';
+                indicator.style.opacity = '1';
             }
             
             /**
