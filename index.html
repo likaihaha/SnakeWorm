@@ -969,6 +969,10 @@
                 
                 // 预警闪烁
                 this.warningFlashTimer = 0;  // 预警闪烁计时器
+                
+                // 磁力效果（橙色宝珠触发）
+                this.magnetTimer = 0;  // 磁力计时器
+                this.magnetCombo = 0;  // 磁力连击数
             }
 
             get head() { return this.segments[0]; }
@@ -1039,6 +1043,7 @@
                 if (this.activationTimer > 0) this.activationTimer -= dt;
                 if (this.mouthCloseTimer > 0) this.mouthCloseTimer -= dt;
                 if (this.warningFlashTimer > 0) this.warningFlashTimer -= dt;
+                if (this.magnetTimer > 0) this.magnetTimer -= dt;
                 
                 // 更新黄光效果：从嘴部到尾部逐个闪光
                 if (this.yellowGlowTimer > 0) {
@@ -1535,6 +1540,24 @@
                     ctx.shadowBlur = 0;
                 }
                 
+                // 绘制磁力脉冲光环（橙色宝珠效果）
+                if (this.magnetTimer > 0 && this.segments.length > 0) {
+                    const head = this.segments[0];
+                    const pulsePhase = Math.sin(this.magnetTimer * 15) * 0.5 + 0.5;  // 脉冲
+                    const pulseRadius = 40 + pulsePhase * 30;  // 40~70 像素
+                    
+                    ctx.globalCompositeOperation = 'screen';
+                    ctx.beginPath();
+                    ctx.arc(head.x, head.y, pulseRadius, 0, Math.PI * 2);
+                    ctx.strokeStyle = `rgba(255, 140, 0, ${0.2 + pulsePhase * 0.3})`;
+                    ctx.lineWidth = 3;
+                    ctx.shadowBlur = 15;
+                    ctx.shadowColor = '#ff8c00';
+                    ctx.stroke();
+                    ctx.shadowBlur = 0;
+                    ctx.globalCompositeOperation = 'source-over';
+                }
+
                 // 绘制预警闪烁环（当进入预警线时）
                 if (this.warningFlashTimer > 0 && this.isPlayer && this.segments.length > 0) {
                     const flashIntensity = Math.sin(this.warningFlashTimer * 20) * 0.5 + 0.5;  // 快速闪烁
@@ -2289,6 +2312,10 @@
                             worm.pendingGrowCount = 2;  // 等黄光结束后逐节长2格
                             worm.grownCount = 0;
                             worm.growStepTimer = 0;
+                        } else if (food.type.score === 60) {  // 橙色宝珠：触发磁力效果
+                            worm.magnetTimer = 1.5;  // 磁力持续 1.5 秒
+                            worm.magnetCombo = 0;  // 重置连击数
+                            worm.grow(CONFIG.GROWTH_PER_FOOD);
                         } else {
                             worm.grow(CONFIG.GROWTH_PER_FOOD);
                         }
@@ -2392,6 +2419,47 @@
                         }
                         this.brokenTails.splice(i, 1);
                     }
+                }
+
+                // 7.5 磁力吸引效果（橙色宝珠触发）
+                if (player.magnetTimer > 0) {
+                    const magnetRange = 150;  // 磁力范围
+                    const playerHead = player.head;
+                    
+                    for (const food of this.foods) {
+                        const dist = playerHead.dist(food.pos);
+                        if (dist > magnetRange) continue;  // 超出范围
+                        
+                        // 计算吸引力强度
+                        let attractStrength;
+                        if (food.type.score === 10) {  // 绿色宝珠：完全吸引
+                            attractStrength = 1.0;
+                        } else {
+                            // 其他宝珠：根据稀有度减弱，最多移动 1/2 距离
+                            attractStrength = Math.max(0.1, 1 - food.type.score / 150);
+                        }
+                        
+                        // 计算吸引方向和距离
+                        const dirToPlayer = playerHead.sub(food.pos).normalize();
+                        const maxMove = dist * 0.5 * attractStrength;  // 最多移动 1/2 距离
+                        const moveSpeed = Math.min(8, maxMove * dt * 5);  // 速度限制
+                        
+                        // 移动宝珠
+                        food.pos = food.pos.add(dirToPlayer.mult(moveSpeed));
+                    }
+                }
+                
+                // 磁力效果结束时结算连击
+                if (player.magnetTimer <= 0 && player.magnetCombo > 0) {
+                    // 播放叮叮声（每个被吸引的宝珠响一声）
+                    for (let i = 0; i < Math.min(player.magnetCombo, 8); i++) {
+                        setTimeout(() => {
+                            if (typeof musicSystem !== 'undefined') {
+                                musicSystem.playNote(1200 + i * 100, 80);  // 递增音高
+                            }
+                        }, i * 100);
+                    }
+                    player.magnetCombo = 0;  // 重置连击
                 }
 
                 // 8. 更新食物动画
