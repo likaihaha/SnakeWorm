@@ -1005,12 +1005,13 @@
                     // 目标位置：在基础位置后方一个间距的位置
                     const targetPos = basePos.add(direction.mult(CONFIG.SEGMENT_SPACING));
                     
-                    // 添加到生长队列
+                    // 添加到生长队列（startPos 设为 null，会在开始绘制时动态获取当前位置）
                     this.growingSegments.push({
                         targetPos: targetPos,
                         progress: 0,
                         direction: direction,
-                        startPos: new Vector(basePos.x, basePos.y)
+                        startPos: null,  // 动态获取
+                        basePos: new Vector(basePos.x, basePos.y)  // 用于计算目标位置
                     });
                 }
                 this.targetLength += amount;
@@ -1056,7 +1057,26 @@
                 if (this.pendingGrowCount > 0 && this.grownCount < this.pendingGrowCount) {
                     this.growStepTimer -= dt;
                     if (this.growStepTimer <= 0) {
-                        this.grow(1);  // 长一节
+                        // 直接添加生长动画（不通过 grow，避免 startPos 固定）
+                        let direction = new Vector(0, 0);
+                        if (this.segments.length >= 2) {
+                            const tail = this.segments[this.segments.length - 1];
+                            const beforeTail = this.segments[this.segments.length - 2];
+                            direction = tail.sub(beforeTail).normalize();
+                        } else if (this.segments.length === 1) {
+                            direction = this.velocity.clone();
+                        }
+                        
+                        // 添加到生长队列（startPos 为 null，会在更新时动态获取）
+                        this.growingSegments.push({
+                            targetPos: new Vector(0, 0),  // 会在更新时重新计算
+                            progress: 0,
+                            direction: direction,
+                            startPos: null,  // 动态获取当前位置
+                            basePos: null
+                        });
+                        
+                        this.targetLength++;
                         this.grownCount++;
                         this.growStepTimer = 0.4;  // 下一节间隔 0.4 秒
                         
@@ -1245,6 +1265,33 @@
                 // 更新尾部生长动画
                 for (let i = this.growingSegments.length - 1; i >= 0; i--) {
                     const growing = this.growingSegments[i];
+                    
+                    // 如果 startPos 为 null，从当前尾部位置开始（动态获取）
+                    if (growing.startPos === null) {
+                        // 获取当前真正的尾部位置
+                        let currentTailPos;
+                        if (this.growingSegments.length > 1 && i > 0) {
+                            // 如果前面还有正在生长的节，从前面那个的目标位置开始
+                            currentTailPos = this.growingSegments[i - 1].targetPos;
+                        } else {
+                            // 从当前 segments 的尾部开始
+                            currentTailPos = this.segments.length > 0 
+                                ? this.segments[this.segments.length - 1]
+                                : new Vector(0, 0);
+                        }
+                        
+                        growing.startPos = new Vector(currentTailPos.x, currentTailPos.y);
+                        
+                        // 重新计算目标位置（基于当前尾部位置）
+                        let direction = growing.direction;
+                        if (direction.mag() === 0 && this.segments.length >= 2) {
+                            const tail = this.segments[this.segments.length - 1];
+                            const beforeTail = this.segments[this.segments.length - 2];
+                            direction = tail.sub(beforeTail).normalize();
+                        }
+                        growing.targetPos = currentTailPos.add(direction.mult(CONFIG.SEGMENT_SPACING));
+                    }
+                    
                     growing.progress += dt * 4;  // 生长速度
                     
                     if (growing.progress >= 1) {
