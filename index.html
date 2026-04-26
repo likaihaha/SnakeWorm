@@ -652,14 +652,18 @@
             }
             
             // 播放黄色宝珠的琶音（水晶序曲音符，数量等于段数）
+            // 如果段数超过音符总数，先完整播放一遍，再循环剩余的
             playYellowBeadArpeggio(segmentCount) {
                 // 使用与普通宝珠相同的水晶序曲音符序列
                 const song = this.songs['水晶序曲'];
                 if (!song) return;
                 
-                // 播放 segmentCount 个音符（循环使用音符序列）
+                const totalNotes = song.length;  // 46 个音符
+                
+                // 播放 segmentCount 个音符
+                // 如果 segmentCount > totalNotes，先完整播放一遍，再循环剩余的
                 for (let i = 0; i < segmentCount; i++) {
-                    const noteIndex = i % song.length;  // 循环使用音符
+                    const noteIndex = i % totalNotes;  // 循环使用音符
                     const note = song[noteIndex];
                     setTimeout(() => {
                         this.playNote(note.freq, note.duration);
