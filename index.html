@@ -24,7 +24,6 @@
         #gameCanvas {
             border: 1px solid rgba(255, 107, 107, 0.2);
             background: #2d2d3a;
-            cursor: none;  // 隐藏默认鼠标，使用自定义圆环
             max-width: 100%;
             max-height: 65vh;  // 减小高度，给摇杆留空间
             touch-action: none;  // 禁止默认触摸行为
@@ -1649,118 +1648,7 @@
                     }
                 }
 
-                this.updateSpeed();
-                
-                // 处理出场动画
-                if (this.isEntering && this.enterPhase === 0) {
-                    this.enterPhase = 1;  // 开始动画第一阶段
-                    this.enterStartTime = performance.now() / 1000;
-                }
-                
-                if (this.enterPhase === 1) {
-                    // 第一阶段：从框外正弦波游到画面中央
-                    const currentTime = performance.now() / 1000;
-                    const elapsed = currentTime - this.enterStartTime;
-                    const progress = Math.min(elapsed / this.enterDuration1, 1);
-                    
-                    const startX = this.enterStartPos.x;
-                    const endX = this.enterMidPos.x;
-                    const startY = this.enterStartPos.y;
-                    const endY = this.enterMidPos.y;
-                    
-                    // 水平方向：线性移动
-                    const currentX = startX + (endX - startX) * progress;
-                    
- // 垂直方向：正弦波摆动
-                    const amplitude = 16;  // 一个身体直径
-                    const frequency = 2;
-                    const currentY = startY + (endY - startY) * progress + Math.sin(progress * Math.PI * frequency) * amplitude;
-                    
-                    const head = this.segments[0];
-                    const newHead = new Vector(currentX, currentY);
-                    this.velocity = newHead.sub(head).normalize();
-                    this.segments[0] = newHead;
-                    
-                    // 身体跟随
-                    for (let i = 1; i < this.segments.length; i++) {
-                        const prev = this.segments[i - 1];
-                        const curr = this.segments[i];
-                        const dir = prev.sub(curr);
-                        const dist = dir.mag();
-
-                        if (dist > CONFIG.SEGMENT_SPACING) {
-                            const targetPos = prev.sub(dir.normalize().mult(CONFIG.SEGMENT_SPACING));
-                            this.segments[i] = new Vector(
-                                curr.x + (targetPos.x - curr.x) * 0.3,
-                                curr.y + (targetPos.y - curr.y) * 0.3
-                            );
-                        }
-                    }
-                    
-                    if (progress >= 1) {
-                        this.enterPhase = 2;  // 进入第二阶段
-                        this.enterStartTime = performance.now() / 1000;  // 重置时间
-                    }
-                    
-                    return;
-                }
-                
- if (this.enterPhase === 2) {
-                    // 第二阶段：从画面中央游到鼠标位置（最多游到中央）
-                    const currentTime = performance.now() / 1000;
-                    const elapsed = currentTime - this.enterStartTime;
-                    const progress = Math.min(elapsed / this.enterDuration2, 1);
-                    
-                    const head = this.segments[0];
-                    const startHead = new Vector(this.enterMidPos.x, this.enterMidPos.y);
-                    
-                    // 如果鼠标位置就是中央，直接完成
-                    const mousePos = new Vector(targetPos.x, targetPos.y);
-                    const distanceToMouse = startHead.dist(mousePos);
-                    
-                    if (distanceToMouse < 5) {
-                        // 鼠标没动，直接完成动画
-                        this.enterPhase = 3;
-                        this.isEntering = false;
-                        return;
-                    }
-                    
-                    // 计算目标位置（最多移动 distanceToMouse * progress 距离）
-                    const direction = mousePos.sub(startHead).normalize();
-                    const moveDistance = distanceToMouse * progress;
-                    const currentX = startHead.x + direction.x * moveDistance;
-                    const currentY = startHead.y + direction.y * moveDistance;
-                    
-                    const newHead = new Vector(currentX, currentY);
-                    this.velocity = newHead.sub(head).normalize();
-                    this.segments[0] = newHead;
-                    
-                    // 身体跟随
-                    for (let i = 1; i < this.segments.length; i++) {
-                        const prev = this.segments[i - 1];
-                        const curr = this.segments[i];
-                        const dir = prev.sub(curr);
-                        const dist = dir.mag();
-
-                        if (dist > CONFIG.SEGMENT_SPACING) {
-                            const targetPos = prev.sub(dir.normalize().mult(CONFIG.SEGMENT_SPACING));
-                            this.segments[i] = new Vector(
-                                curr.x + (targetPos.x - curr.x) * 0.3,
-                                curr.y + (targetPos.y - curr.y) * 0.3
-                            );
-                        }
-                    }
-                    
-                    if (progress >= 1) {
-                        this.enterPhase = 3;  // 完成
-                        this.isEntering = false;
-                    }
-                    
-                    return;
-                }
-
-                // 正常控制逻辑
-                this.updateSpeed();
+               this.updateSpeed();
 
                 let moveTarget = targetPos;
 
@@ -2013,6 +1901,117 @@
                     }
                 }
                 return null;
+            }
+
+            updateEntering(dt) {
+                // 处理出场动画
+                if (this.isEntering && this.enterPhase === 0) {
+                    this.enterPhase = 1;  // 开始动画第一阶段
+                    this.enterStartTime = performance.now() / 1000;
+                    console.log('[出场动画] 切换到phase 1, enterStartTime=', this.enterStartTime);
+                }
+                
+                if (this.enterPhase === 1) {
+                    // 第一阶段：从框外正弦波游到画面中央
+                    const currentTime = performance.now() / 1000;
+                    const elapsed = currentTime - this.enterStartTime;
+                    const progress = Math.min(elapsed / this.enterDuration1, 1);
+                    console.log('[出场动画] phase 1: elapsed=', elapsed.toFixed(3), 'progress=', progress.toFixed(3), 'headX=', this.segments[0].x.toFixed(1));
+                    
+                    const startX = this.enterStartPos.x;
+                    const endX = this.enterMidPos.x;
+                    const startY = this.enterStartPos.y;
+                    const endY = this.enterMidPos.y;
+                    
+                    // 水平方向：线性移动
+                    const currentX = startX + (endX - startX) * progress;
+                    
+                    // 垂直方向：正弦波摆动
+                    const amplitude = 16;  // 一个身体直径
+                    const frequency = 2;
+                    const currentY = startY + (endY - startY) * progress + Math.sin(progress * Math.PI * frequency) * amplitude;
+                    
+                    const head = this.segments[0];
+                    const newHead = new Vector(currentX, currentY);
+                    this.velocity = newHead.sub(head).normalize();
+                    this.segments[0] = newHead;
+                    
+                    // 身体跟随
+                    for (let i = 1; i < this.segments.length; i++) {
+                        const prev = this.segments[i - 1];
+                        const curr = this.segments[i];
+                        const dir = prev.sub(curr);
+                        const dist = dir.mag();
+
+                        if (dist > CONFIG.SEGMENT_SPACING) {
+                            const targetPos = prev.sub(dir.normalize().mult(CONFIG.SEGMENT_SPACING));
+                            this.segments[i] = new Vector(
+                                curr.x + (targetPos.x - curr.x) * 0.3,
+                                curr.y + (targetPos.y - curr.y) * 0.3
+                            );
+                        }
+                    }
+                    
+                    if (progress >= 1) {
+                        this.enterPhase = 2;  // 进入第二阶段
+                        this.enterStartTime = performance.now() / 1000;  // 重置时间
+                    }
+                    
+                    return;
+                }
+                
+                if (this.enterPhase === 2) {
+                    // 第二阶段：从当前位置游到鼠标位置
+                    const currentTime = performance.now() / 1000;
+                    const elapsed = currentTime - this.enterStartTime;
+                    const progress = Math.min(elapsed / this.enterDuration2, 1);
+                    
+                    const head = this.segments[0];
+                    
+                    // 使用enterTargetPos作为鼠标位置（在mouse事件中设置）
+                    const mousePos = this.enterTargetPos || head;
+                    const distanceToMouse = head.dist(mousePos);
+                    
+                    if (distanceToMouse < 5) {
+                        // 鼠标没动，直接完成动画
+                        this.enterPhase = 3;
+                        this.isEntering = false;
+                        return;
+                    }
+                    
+                    // 计算目标位置（从当前位置向鼠标位置移动）
+                    const direction = mousePos.sub(head).normalize();
+                    const moveDistance = distanceToMouse * progress;
+                    const currentX = head.x + direction.x * moveDistance;
+                    const currentY = head.y + direction.y * moveDistance;
+                    
+                    const newHead = new Vector(currentX, currentY);
+                    this.velocity = newHead.sub(head).normalize();
+                    this.segments[0] = newHead;
+                    
+                    // 身体跟随
+                    for (let i = 1; i < this.segments.length; i++) {
+                        const prev = this.segments[i - 1];
+                        const curr = this.segments[i];
+                        const dir = prev.sub(curr);
+                        const dist = dir.mag();
+
+                        if (dist > CONFIG.SEGMENT_SPACING) {
+                            const targetPos = prev.sub(dir.normalize().mult(CONFIG.SEGMENT_SPACING));
+                            this.segments[i] = new Vector(
+                                curr.x + (targetPos.x - curr.x) * 0.3,
+                                curr.y + (targetPos.y - curr.y) * 0.3
+                            );
+                        }
+                    }
+                    
+                    if (progress >= 1) {
+                        this.enterPhase = 3;  // 完成
+                        this.isEntering = false;
+                    }
+                    
+                    return;
+                }
             }
 
             draw(ctx) {
@@ -2691,12 +2690,11 @@
                             // 鼠标进入白圈范围（白圈直径24px，半径12px内）
                             if (distance <= cursorRadius + 5) {
                                 this.waitingForPlayer = false;
-                                // 开始控制蚯蚓：执行出场动画
+                                // 开始控制蚯蚓
                                 const player = this.worms[0];
-                                player.isEntering = true;
-                                player.enterPhase = 0;
-                                player.enterTime = 0;
-                                // 更新鼠标位置为目标位置
+                                // 出场动画在waitingForPlayer期间已经完成，直接结束入场状态
+                                player.isEntering = false;
+                                // 更新鼠标位置
                                 this.mousePos = new Vector(x, y);
                             }
                         }
@@ -2974,10 +2972,12 @@
 
                 // 等待玩家控制阶段：执行出场动画，暂停其他游戏逻辑
                 if (this.waitingForPlayer) {
+                    console.log('[waitingForPlayer] player存在:', !!player, 'isEntering:', player?.isEntering, 'enterPhase:', player?.enterPhase);
                     // 确保出场动画启动
                     if (player && player.isEntering && player.enterPhase === 0) {
                         player.enterPhase = 1;  // 立即切换到phase 1
                         player.enterStartTime = performance.now() / 1000;
+                        console.log('[waitingForPlayer] 切换到phase 1');
                     }
                     // 更新蚯蚓出场动画
                     if (player && player.isEntering) {
@@ -3029,17 +3029,19 @@
 
                 // 重力宝珠不需要追踪逻辑，由 Food.update 处理掉落
 
-                // 玩家出场动画期间，强制设置鼠标位置为画面中央
+                // 检测玩家是否在出场动画中
                 const isPlayerEntering = player && player.isEntering;
-                if (isPlayerEntering) {
-                    this.mousePos = new Vector(CONFIG.CANVAS_WIDTH / 2, CONFIG.CANVAS_HEIGHT / 2);
-                }
 
                 // 1. 更新所有蚯蚓
                 for (const worm of this.worms) {
                     if (!worm.isAlive || worm.segments.length === 0) continue;
 
                     if (worm.isPlayer) {
+                        // 出场动画期间，继续执行updateEntering，跳过普通update
+                        if (worm.isEntering) {
+                            worm.updateEntering(dt);
+                            continue;
+                        }
                         if (this.mouseInCanvas) {
                             worm.update(this.mousePos, dt, this.foods, this.worms);
                         } else {

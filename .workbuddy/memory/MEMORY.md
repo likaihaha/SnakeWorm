@@ -50,9 +50,22 @@
 - test_music.html有控制面板可实时调节参数
 
 ## 游戏节奏/进度系统（2026-04-26）
-- RHYTHM配置：YELLOW_UNLOCK_TIME=10s, RED_UNLOCK_LENGTH=15节, ORANGE_UNLOCK_TIME=60s, YELLOW_COOLDOWN=5.0s
-- 宝珠解锁顺序：🟢绿(始终) → 🟡黄(10s) → 🟠橙(60s) → 🔴红(身长15)
+- RHYTHM配置：YELLOW_UNLOCK_TIME=30s, RED_UNLOCK_LENGTH=15节, ORANGE_UNLOCK_TIME=60s, YELLOW_COOLDOWN=5.0s
+- 宝珠解锁顺序：🟢绿(始终) → 🟡黄(30s) → 🟠橙(60s) → 🔴红(身长15)
 - 黄色宝珠冷却机制：吃完后等待旋律播完(3s)+间隔(2s)=5秒冷却
 - UI显示：底部节奏提示显示当前可用宝珠和冷却倒计时
 - 解锁通知：新宝珠类型解锁时显示浮动文字提示
 - 目标：让玩家情绪曲线螺旋上升
+
+## 宝珠边界系统（2026-04-26）
+- 死亡线边距：WALL_MARGIN * 2 + SEGMENT_RADIUS * 2 = 36像素
+- 宝珠生成和边界反弹都使用死亡线边距，防止宝珠落入死亡区
+- 四边界反弹：左右上下都有碰撞检测
+- 宝珠随机生成：x在死亡线内随机，y从-20到-120随机（避免排成直线）
+- 生成概率：30%概率生成，增加时间随机性
+
+## 调试原则（2026-04-27）
+- **连续2次修不好同一问题时，必须让用户检查F12控制台输出**，不要继续猜测
+- 日志比猜测可靠100倍，浏览器控制台能直接看到变量状态和执行流程
+- 出场动画系统关键变量：isEntering、enterPhase(0→1→2→3)、enterStartTime、enterTargetPos
+- waitingForPlayer期间出场动画会自动完成（phase 1→2→3），鼠标进入白圈时应直接isEntering=false
