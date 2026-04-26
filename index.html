@@ -379,13 +379,6 @@
     </style>
 </head>
 <body>
-    <!-- 横屏提示 -->
-    <div id="landscapeNotice">
-        <div class="icon">📱</div>
-        <div>建议横屏游玩，体验更好！</div>
-        <div style="font-size: 14px; margin-top: 10px; color: #888;">或点击右上角 ⛶ 进入全屏</div>
-    </div>
-    
     <!-- 全屏按钮 -->
     <div id="fullscreenBtn" onclick="game.requestFullscreen()">⛶</div>
     
@@ -1633,20 +1626,10 @@
             }
             
             /**
-             * 检查横屏状态
+             * 检查横屏状态（不显示遮罩，横屏竖屏都能玩）
              */
             checkOrientation() {
-                const isLandscape = window.innerWidth > window.innerHeight;
-                const notice = document.getElementById('landscapeNotice');
-                
-                if (notice) {
-                    // 如果是竖屏且是触摸设备，显示横屏提示
-                    if (!isLandscape && this.isTouchDevice) {
-                        notice.style.display = 'flex';
-                    } else {
-                        notice.style.display = 'none';
-                    }
-                }
+                // 横屏竖屏都能正常玩，不显示遮罩提示
             }
             
             /**
