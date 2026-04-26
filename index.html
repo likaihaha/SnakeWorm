@@ -511,7 +511,8 @@
             <p>🎨 <b>Screen 混合模式：身体重叠部分颜色叠加变亮，红 + 绿 + 蓝 = 白色</b></p>
             <p>🔮 <b>5 种宝珠：绿 + 黄 + 橙 + 红 + 紫，不同颜色不同分数，从上往下掉落，速度形态不同</b></p>
             <p>🎵 <b>连续吃宝珠触发八音盒音效，形成旋律！</b></p>
-                <button onclick="game.startGame()">开始实验</button>
+                <button id="startBtn" onclick="game.startGame()">开始实验</button>
+                <div id="audioLoading" style="display:none; color:#00ff41; font-size:12px; margin-top:8px;">🎵 正在加载音效...</div>
             </div>
             <div id="pauseScreen" style="display: none;">
                 <h2>⏸️ 实验暂停</h2>
@@ -744,6 +745,23 @@
                 if (!this.audioContext) {
                     this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
                     this._createReverb();
+                    // 预热音频系统：播放一个静音音符确保系统就绪
+                    this._warmup();
+                }
+            }
+            
+            // 预热音频系统
+            _warmup() {
+                try {
+                    const osc = this.audioContext.createOscillator();
+                    const gain = this.audioContext.createGain();
+                    gain.gain.setValueAtTime(0, this.audioContext.currentTime);
+                    osc.connect(gain);
+                    gain.connect(this.audioContext.destination);
+                    osc.start();
+                    osc.stop(this.audioContext.currentTime + 0.01);
+                } catch(e) {
+                    // 忽略预热错误
                 }
             }
             
@@ -751,18 +769,18 @@
             _createReverb() {
                 try {
                     const sampleRate = this.audioContext.sampleRate;
-                    const length = sampleRate * 2; // 2秒混响尾
+                    const length = sampleRate * 1; // 1秒混响尾（优化性能）
                     const impulse = this.audioContext.createBuffer(2, length, sampleRate);
                     
                     // 左声道 - 指数衰减的噪声脉冲
                     const leftCh = impulse.getChannelData(0);
                     for (let i = 0; i < length; i++) {
-                        leftCh[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / length, 2.5);
+                        leftCh[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / length, 3);
                     }
                     // 右声道 - 略有不同
                     const rightCh = impulse.getChannelData(1);
                     for (let i = 0; i < length; i++) {
-                        rightCh[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / length, 2.2);
+                        rightCh[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / length, 2.8);
                     }
                     
                     this.convolver = this.audioContext.createConvolver();
@@ -2663,11 +2681,35 @@
             }
 
             startGame() {
-                document.getElementById('startScreen').style.display = 'none';
-                this.resizeCanvas();  // 调整 Canvas 大小
-                this.restart();
-                this.lastTime = performance.now();  // 重置时间
-                this.loop(this.lastTime);
+                // 显示音频加载提示
+                const startBtn = document.getElementById('startBtn');
+                const audioLoading = document.getElementById('audioLoading');
+                if (startBtn) startBtn.style.display = 'none';
+                if (audioLoading) audioLoading.style.display = 'block';
+                
+                // 预初始化音频系统（避免首次播放音符时的延迟）
+                const initAudio = () => {
+                    if (typeof musicSystem !== 'undefined') {
+                        musicSystem.init();
+                        // 确保AudioContext已恢复
+                        if (musicSystem.audioContext && musicSystem.audioContext.state === 'suspended') {
+                            musicSystem.audioContext.resume();
+                        }
+                    }
+                    // 隐藏加载提示，开始游戏
+                    document.getElementById('startScreen').style.display = 'none';
+                    this.resizeCanvas();
+                    this.restart();
+                    this.lastTime = performance.now();
+                    this.loop(this.lastTime);
+                };
+                
+                // 使用requestAnimationFrame确保UI更新后再初始化音频
+                requestAnimationFrame(() => {
+                    requestAnimationFrame(() => {
+                        initAudio();
+                    });
+                });
             }
             
             /**
