@@ -3390,7 +3390,7 @@
                 }
 
                 // 7. 玩家碰到其他蚯蚓身体（只有咬到尾部才能咬断，其他地方不咬断）
-                if (!this.playerDeadWaitingForBodies) {
+                if (player && !this.playerDeadWaitingForBodies) {
                     const otherCollision = player.checkOtherWormCollision(activeWorms);
                     if (otherCollision) {
                         if (player.invincibleTimer > 0) {
@@ -3482,7 +3482,7 @@
                 }
                 
                 // 磁力效果结束时结算连击
-                if (player.magnetTimer <= 0 && player.magnetCombo > 0) {
+                if (player && player.magnetTimer <= 0 && player.magnetCombo > 0) {
                     // 播放叮叮声（每个被吸引的宝珠响一声）
                     for (let i = 0; i < Math.min(player.magnetCombo, 8); i++) {
                         setTimeout(() => {
