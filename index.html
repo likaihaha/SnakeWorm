@@ -252,6 +252,10 @@
             color: #a8e6cf;
             font-style: italic;
         }
+        .inst-danger {
+            color: #ff6b6b;
+            font-weight: bold;
+        }
         
         .split-notice {
             position: absolute;
@@ -554,15 +558,11 @@
                     </div>
                     <div class="inst-row inst-rule">
                         <span class="inst-icon">🔮</span>
-                        <span>4 种宝珠渐进解锁：🟢绿 → 🟡黄 (30s) → 🔴红 (60s+身长20) → 🟠橙 (90s)</span>
+                        <span>🟢绿(+分) → 🟡黄(长身体+旋律) → 🔴红(子弹) → 🟠橙(磁力吸引)</span>
                     </div>
-                    <div class="inst-row inst-special">
-                        <span class="inst-icon">🔫</span>
-                        <span>🔴 红色宝珠：获得子弹，点击鼠标发射，击中减速敌人</span>
-                    </div>
-                    <div class="inst-row inst-music">
-                        <span class="inst-icon">🎵</span>
-                        <span>连续吃宝珠触发八音盒音效，形成旋律！</span>
+                    <div class="inst-row inst-danger">
+                        <span class="inst-icon">💀</span>
+                        <span>死亡：头碰自己身体 · 头碰红色死亡线</span>
                     </div>
                 </div>
                 <button id="startBtn" onclick="game.startGame()">开始游戏</button>
