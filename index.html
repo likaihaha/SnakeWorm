@@ -931,7 +931,8 @@
                 
                 // 黄光效果状态（吃到黄色宝珠时触发）
                 this.yellowGlowTimer = 0;  // 黄光计时器
-                this.yellowGlowProgress = 0;  // 黄光进度（0~1，从嘴部到尾部）
+                this.yellowGlowIndex = 0;  // 当前闪光的段索引（从嘴部开始）
+                this.yellowGlowStepTimer = 0;  // 步进计时器（控制每个段闪光的间隔）
             }
 
             get head() { return this.segments[0]; }
@@ -964,11 +965,16 @@
                 if (this.activationTimer > 0) this.activationTimer -= dt;
                 if (this.mouthCloseTimer > 0) this.mouthCloseTimer -= dt;
                 
-                // 更新黄光效果
+                // 更新黄光效果：从嘴部到尾部逐个闪光
                 if (this.yellowGlowTimer > 0) {
                     this.yellowGlowTimer -= dt;
-                    // 黄光进度：从 0 到 1，从嘴部到尾部依次发光
-                    this.yellowGlowProgress = Math.min(1, this.yellowGlowProgress + dt * 2);
+                    this.yellowGlowStepTimer -= dt;
+                    
+                    // 每隔 0.1 秒，下一个段闪光
+                    if (this.yellowGlowStepTimer <= 0) {
+                        this.yellowGlowIndex++;
+                        this.yellowGlowStepTimer = 0.1;  // 间隔 0.1 秒
+                    }
                 }
 
                 this.updateSpeed();
@@ -1309,18 +1315,14 @@
                         let alpha = 0.3 + 0.5 * (1 - i / this.segments.length);
                         let color = this.color;
                         
-                        // 黄光效果：从嘴部到尾部依次发黄光
-                        if (this.yellowGlowTimer > 0) {
-                            // 计算当前段是否应该发光（根据进度）
-                            const segmentProgress = 1 - (i / this.segments.length);  // 0=尾部, 1=头部
-                            if (segmentProgress <= this.yellowGlowProgress) {
-                                // 该段应该发光
-                                const glowIntensity = Math.sin(this.yellowGlowTimer * 10) * 0.3 + 0.7;  // 闪烁效果
-                                color = '#ffe66d';  // 黄色
-                                alpha = glowIntensity;
-                                ctx.shadowBlur = 10;
-                                ctx.shadowColor = '#ffe66d';
-                            }
+                        // 黄光效果：从嘴部到尾部逐个闪光（每个段只闪一次）
+                        if (this.yellowGlowTimer > 0 && i === this.yellowGlowIndex) {
+                            // 当前段正在闪光
+                            const glowIntensity = 1.0;  // 全亮度闪光
+                            color = '#ffe66d';  // 黄色
+                            alpha = glowIntensity;
+                            ctx.shadowBlur = 15;
+                            ctx.shadowColor = '#ffe66d';
                         }
                         
                         ctx.fillStyle = this.hexToRgba(color, alpha);
@@ -2065,9 +2067,10 @@
                         // 黄色宝珠特殊处理：长2格
                         if (food.type.score === 30) {  // 黄色宝珠
                             worm.grow(2);
-                            // 触发黄光效果
-                            worm.yellowGlowTimer = 2.0;  // 黄光持续 2 秒
-                            worm.yellowGlowProgress = 0;
+                            // 触发黄光效果：从嘴部到尾部逐个闪光
+                            worm.yellowGlowTimer = worm.segments.length * 0.1;  // 根据段数计算总时间
+                            worm.yellowGlowIndex = 0;  // 从第 0 段（嘴部）开始
+                            worm.yellowGlowStepTimer = 0;
                         } else {
                             worm.grow(CONFIG.GROWTH_PER_FOOD);
                         }
