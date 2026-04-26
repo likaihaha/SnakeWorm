@@ -1500,6 +1500,9 @@
 
                 // 绘制正在生长的新节（从尾部延伸出去的动画）
                 for (const growing of this.growingSegments) {
+                    // 如果 startPos 或 targetPos 为 null，跳过绘制（等待 update 初始化）
+                    if (!growing.startPos || !growing.targetPos) continue;
+                    
                     const progress = Math.min(1, growing.progress);
                     const currentPos = growing.startPos.add(
                         growing.targetPos.sub(growing.startPos).mult(progress)
