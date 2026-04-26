@@ -558,7 +558,7 @@
                     </div>
                     <div class="inst-row inst-rule">
                         <span class="inst-icon">🔮</span>
-                        <span>🟢绿(+分) → 🟡黄(长身体+旋律) → 🔴红(子弹) → 🟠橙(磁力吸引)</span>
+                        <span>🟢绿(+分) → 🟡黄(长2节+旋律) → 🔴红(子弹) → 🟠橙(磁力吸引)</span>
                     </div>
                     <div class="inst-row inst-danger">
                         <span class="inst-icon">💀</span>
@@ -1262,13 +1262,15 @@
                 // 使用死亡线边距，确保宝珠不会在死亡区内生成
                 const margin = CONFIG.WALL_MARGIN * 2 + CONFIG.SEGMENT_RADIUS * 2;
                 const foodType = type || Food.weightedRandom();
-                // 随机位置：x随机分散，y从画布上方不同高度开始（避免排成直线）
-                const startY = -30 - Math.random() * 200;  // y在-30到-230之间随机，范围更大
-                return new Food(
-                    margin + Math.random() * (CONFIG.CANVAS_WIDTH - margin * 2),
-                    startY,
-                    foodType
-                );
+                // 在框体内均匀随机出生
+                const x = margin + Math.random() * (CONFIG.CANVAS_WIDTH - margin * 2);
+                const y = margin + Math.random() * (CONFIG.CANVAS_HEIGHT - margin * 2);
+                const food = new Food(x, y, foodType);
+                // 如果在下半部分出生，给一点向上初速度，避免马上落出底部
+                if (y > CONFIG.CANVAS_HEIGHT / 2) {
+                    food.velocity.y = -(0.3 + Math.random() * 0.5);  // 向上初速度
+                }
+                return food;
             }
             
             update(dt) {
