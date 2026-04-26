@@ -504,14 +504,15 @@
         <div class="split-notice" id="splitNotice">⚡ 咬尾分裂！新蚯蚓诞生！</div>
         <div id="startScreen">
                 <h2>🎵 Melody Worm 旋律虫虫</h2>
-                <p>鼠标控制方向 · 吃食物增长</p>
+                <p>🖱️ 鼠标控制方向 · 点击鼠标发射子弹（有红色宝珠时）</p>
                 <p>🔴 <b>任何蚯蚓咬到其他蚯蚓的尾巴 → 被咬者断尾分裂！</b></p>
             <p>🟢 <b>玩家也可以咬 AI 蚯蚓的尾巴，触发分裂！</b></p>
                 <p>⚠️ 头碰自己身体 → 分裂</p>
             <p>🎨 <b>Screen 混合模式：身体重叠部分颜色叠加变亮，红 + 绿 + 蓝 = 白色</b></p>
-            <p>🔮 <b>5 种宝珠：绿 + 黄 + 橙 + 红 + 紫，不同颜色不同分数，从上往下掉落，速度形态不同</b></p>
+            <p>🔮 <b>4 种宝珠：🟢绿(始终) → 🟡黄(30s) → 🔴红(60s+身长20) → 🟠橙(90s)，渐进解锁</b></p>
+            <p>🔫 <b>红色宝珠：获得子弹，点击鼠标发射，击中减速蚯蚓和宝珠</b></p>
             <p>🎵 <b>连续吃宝珠触发八音盒音效，形成旋律！</b></p>
-                <button id="startBtn" onclick="game.startGame()">开始实验</button>
+                <button id="startBtn" onclick="game.startGame()">开始游戏</button>
                 <div id="audioLoading" style="display:none; color:#00ff41; font-size:12px; margin-top:8px;">🎵 正在加载音效...</div>
             </div>
             <div id="pauseScreen" style="display: none;">
