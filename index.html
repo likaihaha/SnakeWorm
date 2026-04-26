@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SnakeWorm v0.11-实验 - 新实验</title>
+    <title>SnakeWorm - 吃豆人蚯蚓</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -23,8 +23,9 @@
             background: #2d2d3a;
             cursor: none;  // 隐藏默认鼠标，使用自定义圆环
             max-width: 100%;
-            max-height: 70vh;
+            max-height: 65vh;  // 减小高度，给摇杆留空间
             touch-action: none;  // 禁止默认触摸行为
+            margin-top: 10px;  // Canvas 上移
         }
         #ui {
             margin-top: 10px;
@@ -219,17 +220,17 @@
                 margin-top: 5px !important;
             }
             
-            /* 摇杆位置和大小 */
+           /* 摇杆位置和大小 - 增大摇杆 */
             #joystick {
-                bottom: 90px !important;  // 摇杆上移，避开浏览器控件
-                left: 20px !important;
-                width: 90px !important;
-                height: 90px !important;
+                bottom: 70px !important;  // 摇杆下移
+                left: 30px !important;
+                width: 130px !important;  // 增大摇杆
+                height: 130px !important;
             }
             
             #joystickKnob {
-                width: 36px !important;
-                height: 36px !important;
+                width: 52px !important;  // 增大摇杆钮
+                height: 52px !important;
             }
             
             /* 弹窗优化 */
@@ -267,8 +268,7 @@
     </div>
     
     <div style="display: flex; align-items: center; justify-content: center; gap: 12px; margin-bottom: 10px;">
-        <h1 style="margin: 0;">🐍 SnakeWorm v0.7-实验 - 重力宝珠</h1>
-        <div class="experiment-badge experiment-badge-outside">🧪 分支实验</div>
+        <h1 style="margin: 0;">🐍 SnakeWorm - 吃豆人蚯蚓</h1>
     </div>
     <div style="display: flex; align-items: center; justify-content: center; gap: 12px;">
         <div style="position:relative;">
