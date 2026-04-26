@@ -6,7 +6,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="format-detection" content="telephone=no">
-    <title>Melody Worm v0.33 - 旋律虫虫</title>
+    <title>Melody Worm v0.43 - 旋律虫虫</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -594,7 +594,7 @@
     </div>
     <div id="controls">
         🖱️ 鼠标移动控制方向 | 🔮 <b>宝珠渐进解锁：🟢绿→🟡黄(30s)→🔴红(60s+身长20)→🟠橙(90s)</b><br>
-        🔴 <b>咬尾巴 → 断尾分裂</b> | ⚠️ <b>头碰身体中段 → 自己分裂</b><br>
+        🔴 <b>咬尾巴 → 断尾分裂</b>（只咬尾巴才分裂，咬身体不触发）<br>
         🎵 <b>吃黄宝珠后等待旋律播完再出现下一颗</b> | 🎨 <b>Screen 混合模式</b>
     </div>
     <div id="gameOver">
@@ -607,7 +607,7 @@
 
     <script>
         /**
-         * Melody Worm v0.33 - 旋律虫虫
+         * Melody Worm v0.43 - 旋律虫虫
          * 
          * 实验机制:
          * - 任何蚯蚓的头部咬到任何其他蚯蚓的尾巴（最后 1/3 段）→ 被咬者断尾分裂
@@ -1876,7 +1876,31 @@
             }
 
             /**
-             * 检测头部是否碰到其他蚯蚓的身体段（非尾巴）
+             * 检测头部是否碰到其他蚯蚓的颈部段（索引 1 ~ len/3）
+             * 返回：{ worm: 被咬的蚯蚓，segmentIndex: 被咬的段索引 } 或 null
+             */
+            checkNeckBite(otherWorms) {
+                if (this.segments.length === 0) return null;
+                const head = this.segments[0];
+                const collisionDist = CONFIG.SEGMENT_RADIUS * 1.2;
+
+                for (const other of otherWorms) {
+                    if (other === this || !other.isAlive) continue;
+                    if (other.invincibleTimer > 0) continue;
+                    if (other.activationTimer > 0) continue;
+
+                    const neckIndices = other.neckSegmentIndices;
+                    for (const segIndex of neckIndices) {
+                        if (head.dist(other.segments[segIndex]) < collisionDist) {
+                            return { worm: other, segmentIndex: segIndex };
+                        }
+                    }
+                }
+                return null;
+            }
+
+            /**
+             * 检测头部是否碰到其他蚯蚓的身体段（非尾巴、非颈部）
              * 跳过无敌状态的蚯蚓
              */
             checkOtherWormCollision(otherWorms) {
@@ -1891,10 +1915,14 @@
 
                     const tailIndices = other.tailSegmentIndices;
                     const tailSet = new Set(tailIndices);
+                    const neckIndices = other.neckSegmentIndices;
+                    const neckSet = new Set(neckIndices);
 
                     for (let i = 0; i < other.segments.length; i++) {
                         // 跳过尾巴段（尾巴 bite 有单独处理）
                         if (tailSet.has(i)) continue;
+                        // 跳过颈部段（颈部 bite 有单独处理，直接死亡）
+                        if (neckSet.has(i)) continue;
                         if (head.dist(other.segments[i]) < collisionDist) {
                             return { worm: other, segmentIndex: i };
                         }
@@ -2105,6 +2133,11 @@
                         this.drawHeadIndicator(ctx, seg, radius, this.isPlayer);
                     }
 
+                    // 颈部段视觉标识：短放射线
+                    if (neckIndices.has(i)) {
+                        this.drawNeckIndicator(ctx, seg, radius, this.isPlayer);
+                    }
+
                     // 尾巴段视觉标识：黄色 / 红色虚线边框 + 半透明填充
                     if (isTail) {
                         this.drawTailIndicator(ctx, seg, radius, this.isPlayer);
@@ -2217,6 +2250,41 @@
                 ctx.beginPath();
                 ctx.arc(seg.x, seg.y, radius - 1, 0, Math.PI * 2);
                 ctx.fill();
+                ctx.restore();
+            }
+
+            /**
+             * 绘制颈部标识：短放射线，颜色比身体亮一点
+             * @param {boolean} isPlayer - 是否为玩家蚯蚓
+             */
+            drawNeckIndicator(ctx, seg, radius, isPlayer) {
+                ctx.save();
+                
+                // 放射线数量：8条
+                const rayCount = 8;
+                const rayInner = radius * 0.6;   // 放射线内端（在圆内）
+                const rayOuter = radius * 1.3;   // 放射线外端（超出圆）
+                const rayWidth = 1.5;
+                
+                // 玩家用浅绿色（比身体#4ecca3亮），AI用浅蓝色
+                const rayColor = isPlayer ? 'rgba(120, 255, 200, 0.7)' : 'rgba(100, 200, 255, 0.6)';
+                
+                ctx.strokeStyle = rayColor;
+                ctx.lineWidth = rayWidth;
+                
+                for (let i = 0; i < rayCount; i++) {
+                    const angle = (i / rayCount) * Math.PI * 2;
+                    const x1 = seg.x + Math.cos(angle) * rayInner;
+                    const y1 = seg.y + Math.sin(angle) * rayInner;
+                    const x2 = seg.x + Math.cos(angle) * rayOuter;
+                    const y2 = seg.y + Math.sin(angle) * rayOuter;
+                    
+                    ctx.beginPath();
+                    ctx.moveTo(x1, y1);
+                    ctx.lineTo(x2, y2);
+                    ctx.stroke();
+                }
+                
                 ctx.restore();
             }
 
@@ -2486,11 +2554,86 @@
             }
         }
 
+        /* ========== 尸体下沉类 ========== */
+        class DeadBody {
+            constructor(segments, originalColor) {
+                this.segments = segments.map(s => new Vector(s.x, s.y));
+                this.originalColor = originalColor;
+                // 每段独立的速度，避免共用velocity导致异常累积
+                this.velocities = segments.map(() => new Vector(0, 0));
+                this.isFinished = false;
+                this.hasEmitted = false;  // 是否已发射宝珠
+            }
+
+            update(dt, canvasHeight) {
+                // 柔软无力地下沉：缓慢向下移动 + 轻微摆动
+                for (let i = 0; i < this.segments.length; i++) {
+                    const seg = this.segments[i];
+                    const vel = this.velocities[i];
+                    
+                    // 向下重力
+                    vel.y += 50 * dt;  // 重力加速度
+                    
+                    // 轻微左右摆动（柔软无力）
+                    vel.x += Math.sin(performance.now() / 500 + i * 0.5) * 20 * dt;
+                    
+                    // 阻尼
+                    vel.x *= 0.98;
+                    vel.y *= 0.98;
+                    
+                    seg.x += vel.x * dt;
+                    seg.y += vel.y * dt;
+                }
+
+                // 检查是否有段碰到框体底部
+                for (const seg of this.segments) {
+                    if (seg.y >= canvasHeight - CONFIG.WALL_MARGIN) {
+                        // 碰到底部，发射宝珠
+                        if (!this.hasEmitted) {
+                            this.hasEmitted = true;
+                            return 'emit';  // 返回特殊标记，通知主类发射宝珠
+                        }
+                    }
+                }
+
+                // 如果所有段都超出底部，标记为完成
+                const allOutOfBounds = this.segments.every(seg => 
+                    seg.y > canvasHeight + 50 || seg.x < -50 || seg.x > CONFIG.CANVAS_WIDTH + 50
+                );
+                if (allOutOfBounds) {
+                    this.isFinished = true;
+                }
+
+                return null;
+            }
+
+            draw(ctx) {
+                ctx.globalCompositeOperation = 'screen';
+                
+                for (let i = this.segments.length - 1; i >= 0; i--) {
+                    const seg = this.segments[i];
+                    const isHead = i === 0;
+                    const sizeRatio = isHead ? 1.0 : (0.7 + 0.3 * (1 - i / this.segments.length));
+                    const radius = CONFIG.SEGMENT_RADIUS * sizeRatio;
+                    
+                    // 尸体颜色：半透明灰色
+                    const alpha = 0.4;
+                    ctx.beginPath();
+                    ctx.arc(seg.x, seg.y, radius, 0, Math.PI * 2);
+                    ctx.fillStyle = `rgba(150, 150, 150, ${alpha})`;
+                    ctx.fill();
+                }
+                
+                ctx.globalCompositeOperation = 'source-over';
+            }
+        }
+
         /* ========== 游戏主类 ========== */
         class Game {
             constructor() {
                 this.worms = [];
                 this.brokenTails = [];
+                this.deadBodies = [];  // 尸体下沉动画
                 this.foods = [];
                 this.particles = [];  // 粒子效果
                 this.floatingTexts = [];  // 浮动文字
@@ -2513,6 +2656,7 @@
                 this.gameTime = 0;  // 游戏时间（秒）
                 this.rhythmNotified = {};  // 节奏解锁通知追踪
                 this.joystickDirection = new Vector(0, 0);  // 摇杆方向
+                this.playerDeadWaitingForBodies = false;  // 玩家死亡等待尸体处理
                 // 初始化每种宝珠的计时器
                 CONFIG.FOOD_TYPES.forEach(type => {
                     this.foodRespawnTimers[type.score] = 0;
@@ -2865,6 +3009,7 @@
     restart() {
                 this.worms = [];
                 this.brokenTails = [];
+                this.deadBodies = [];
                 this.foods = [];
                 this.score = 0;
                 this.splitCount = 0;
@@ -2878,6 +3023,7 @@
                 this.isPaused = false;
                 this.isGameOver = false;
                 this.waitingForPlayer = true;  // 等待玩家鼠标移入白圈
+                this.playerDeadWaitingForBodies = false;  // 重置玩家死亡等待标志
 
                 // 玩家蚯蚓从框外左边开始（完全不可见）
                 const player = new Worm(
@@ -3189,15 +3335,6 @@
                     }
                 }
 
-                // 5. 玩家自噬检测（咬身体中段，出场动画期间不检测）
-                if (this.splitCooldown <= 0 && !player.isEntering) {
-                    const selfCollisionIndex = player.checkSelfCollision();
-                    if (selfCollisionIndex !== -1) {
-                        this.handleSplit(player, selfCollisionIndex);
-                        this.splitCooldown = 2.0;
-                    }
-                }
-
                 // 5. 【实验机制】所有蚯蚓咬到其他蚯蚓的尾巴 → 被咬者断尾分裂
                 const activeWorms = this.worms.filter(w => 
                     w.isAlive && w.invincibleTimer <= 0 && w.activationTimer <= 0
@@ -3218,21 +3355,38 @@
                     }
                 }
 
-                // 6. 玩家碰到其他蚯蚓身体（只有咬到尾部才能咬断，其他地方不咬断）
-                const otherCollision = player.checkOtherWormCollision(activeWorms);
-                if (otherCollision) {
-                    if (player.invincibleTimer > 0) {
-                        // 玩家处于无敌状态，不被吞噬也不咬断对方
-                    } else {
-                        // 玩家碰到其他蚯蚓身体，被吞噬
-                        this.gameOver();
-                        return;
+              // 6. 检测所有蚯蚓颈部被咬（被咬的死，不是咬人的死）
+                for (const worm of this.worms) {
+                    if (!worm.isAlive || worm.isEntering || worm.invincibleTimer > 0) continue;
+                    
+                    const neckBite = worm.checkNeckBite(activeWorms);
+                    if (neckBite) {
+                        const biter = worm.isPlayer ? '玩家' : 'AI';
+                        const bitee = neckBite.worm.isPlayer ? '玩家' : 'AI';
+                        console.log(`[颈部被咬] ${biter}咬到${bitee}的颈部！${bitee}被咬死！段索引=${neckBite.segmentIndex}`);
+                        this.handleNeckBiteDeath(neckBite.worm, neckBite.segmentIndex);
+                        this.splitCooldown = 2.0;
+                        break;
+                    }
+                }
+
+                // 7. 玩家碰到其他蚯蚓身体（只有咬到尾部才能咬断，其他地方不咬断）
+                if (!this.playerDeadWaitingForBodies) {
+                    const otherCollision = player.checkOtherWormCollision(activeWorms);
+                    if (otherCollision) {
+                        if (player.invincibleTimer > 0) {
+                            // 玩家处于无敌状态，不被吞噬也不咬断对方
+                        } else {
+                            // 玩家碰到其他蚯蚓身体，被吞噬
+                            this.gameOver();
+                            return;
+                        }
                     }
                 }
 
                 // 6.5 AI蚯蚓头部互撞：不咬断，只是碰撞
 
-                // 7. 更新断尾
+                // 8. 更新断尾
                 for (let i = this.brokenTails.length - 1; i >= 0; i--) {
                     const tail = this.brokenTails[i];
                     const finished = tail.update(dt);
@@ -3248,7 +3402,28 @@
                     }
                 }
 
-                // 7.5 磁力吸引效果（橙色宝珠触发）
+                // 9. 更新尸体下沉动画
+                for (let i = this.deadBodies.length - 1; i >= 0; i--) {
+                    const body = this.deadBodies[i];
+                    const result = body.update(dt, CONFIG.CANVAS_HEIGHT);
+
+                    // 如果碰到底部，发射宝珠（update内部已检查hasEmitted，此处直接触发）
+                    if (result === 'emit') {
+                        this.emitFoodFromBottom();
+                    }
+
+                    if (body.isFinished) {
+                        this.deadBodies.splice(i, 1);
+                    }
+                }
+
+                // 10. 检查玩家死亡是否等待尸体处理完成
+                if (this.playerDeadWaitingForBodies && this.deadBodies.length === 0) {
+                    this.playerDeadWaitingForBodies = false;
+                    this.showPlayerDeathDialog();
+                }
+
+                // 11. 磁力吸引效果（橙色宝珠触发）
                 if (player.magnetTimer > 0) {
                     const magnetRange = 150;  // 磁力范围（减半）
                     const playerHead = player.head;
@@ -3704,6 +3879,38 @@
             }
 
             /**
+             * 处理颈部被咬死亡：从被咬处断开，两部分身体柔软无力地下沉
+             * @param {Worm} worm - 被咬的蚯蚓
+             * @param {number} biteIndex - 被咬的段索引
+             */
+            handleNeckBiteDeath(worm, biteIndex) {
+                // 从被咬处断开：保留头部段（0 ~ biteIndex-1）和尾巴段（biteIndex ~ end）
+                const headSegments = worm.segments.slice(0, biteIndex);
+                const tailSegments = worm.segments.slice(biteIndex);
+
+                // 标记蚯蚓死亡
+                worm.isAlive = false;
+                worm.segments = [];
+
+                // 创建两个尸体部分
+                if (headSegments.length > 0) {
+                    const deadBody1 = new DeadBody(headSegments, worm.color);
+                    this.deadBodies.push(deadBody1);
+                }
+                if (tailSegments.length > 0) {
+                    const deadBody2 = new DeadBody(tailSegments, worm.color);
+                    this.deadBodies.push(deadBody2);
+                }
+
+                console.log(`[颈部被咬死亡] 头部段=${headSegments.length}, 尾巴段=${tailSegments.length}`);
+
+                // 如果是玩家死亡，等待尸体处理完后弹框
+                if (worm.isPlayer) {
+                    this.playerDeadWaitingForBodies = true;
+                }
+            }
+
+            /**
              * 处理自噬分裂（原有逻辑）
              */
             handleSplit(worm, collisionIndex) {
@@ -3726,6 +3933,60 @@
                 notice.offsetHeight;
                 notice.style.animation = 'fadeInOut 2s ease-in-out';
                 setTimeout(() => { notice.style.display = 'none'; }, 2000);
+            }
+
+            /**
+             * 从底部随机发射一颗宝珠
+             */
+            emitFoodFromBottom() {
+                // 随机选择宝珠类型
+                const typeIndex = Math.floor(Math.random() * CONFIG.FOOD_TYPES.length);
+                const type = CONFIG.FOOD_TYPES[typeIndex];
+                
+                // 随机x位置
+                const x = CONFIG.WALL_MARGIN + Math.random() * (CONFIG.CANVAS_WIDTH - 2 * CONFIG.WALL_MARGIN);
+                
+                // 创建宝珠（从底部下方生成，给一个向上的初速度）
+                const food = new Food(x, CONFIG.CANVAS_HEIGHT + 20, type);
+                food.velocity.y = -(2.0 + Math.random() * 1.5);  // 向上初速度，确保能飞入画面
+                this.foods.push(food);
+                
+                console.log(`[底部发射] 宝珠类型=${type.score}, 位置=(${x.toFixed(1)}, ${CONFIG.CANVAS_HEIGHT + 20})`);
+            }
+
+            /**
+             * 显示玩家死亡对话框
+             */
+            showPlayerDeathDialog() {
+                // 创建死亡对话框
+                const dialog = document.createElement('div');
+                dialog.id = 'playerDeathDialog';
+                dialog.style.cssText = `
+                    position: fixed;
+                    top: 50%;
+                    left: 50%;
+                    transform: translate(-50%, -50%);
+                    background: rgba(0, 0, 0, 0.9);
+                    border: 2px solid #ff6b6b;
+                    border-radius: 10px;
+                    padding: 30px;
+                    text-align: center;
+                    z-index: 10000;
+                    min-width: 300px;
+                `;
+                
+                dialog.innerHTML = `
+                    <h2 style="color: #ff6b6b; margin-bottom: 20px;">💀 你被咬死了！</h2>
+                    <p style="color: #fff; margin-bottom: 10px;">最终长度: <span id="deathLength">${this.worms[0]?.segments?.length || 0}</span></p>
+                    <p style="color: #fff; margin-bottom: 10px;">最终分数: <span id="deathScore">${this.score}</span></p>
+                    <p style="color: #fff; margin-bottom: 20px;">分裂次数: <span id="deathSplits">${this.splitCount}</span></p>
+                    <button onclick="document.getElementById('playerDeathDialog').remove(); location.reload();" 
+                            style="background: #ff6b6b; color: #fff; border: none; padding: 10px 30px; font-size: 16px; border-radius: 5px; cursor: pointer;">
+                        重新开始
+                    </button>
+                `;
+                
+                document.body.appendChild(dialog);
             }
 
             draw() {
@@ -3754,6 +4015,9 @@
                     
                     worm.draw(ctx);
                 }
+
+                // 绘制尸体下沉动画
+                this.deadBodies.forEach(body => body.draw(ctx));
 
                 // 绘制浮动文字
                 this.floatingTexts.forEach(t => t.draw(ctx));
