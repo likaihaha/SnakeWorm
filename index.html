@@ -966,6 +966,9 @@
                 
                 // 尾部生长动画
                 this.growingSegments = [];  // 正在生长的新节 [{targetPos, progress, direction}]
+                
+                // 预警闪烁
+                this.warningFlashTimer = 0;  // 预警闪烁计时器
             }
 
             get head() { return this.segments[0]; }
@@ -1035,6 +1038,7 @@
                 if (this.invincibleTimer > 0) this.invincibleTimer -= dt;
                 if (this.activationTimer > 0) this.activationTimer -= dt;
                 if (this.mouthCloseTimer > 0) this.mouthCloseTimer -= dt;
+                if (this.warningFlashTimer > 0) this.warningFlashTimer -= dt;
                 
                 // 更新黄光效果：从嘴部到尾部逐个闪光
                 if (this.yellowGlowTimer > 0) {
@@ -1326,9 +1330,18 @@
                 return this.head.add(this.aiWanderDir.mult(100));
             }
 
+            // 死亡线检测（外框，加宽一倍）
             checkWallCollision() {
                 const head = this.segments[0];
-                const margin = (CONFIG.WALL_MARGIN + CONFIG.SEGMENT_RADIUS) * 2;  // 加宽一倍
+                const margin = (CONFIG.WALL_MARGIN + CONFIG.SEGMENT_RADIUS) * 2;  // 死亡线：加宽一倍
+                return head.x < margin || head.x > CONFIG.CANVAS_WIDTH - margin ||
+                       head.y < margin || head.y > CONFIG.CANVAS_HEIGHT - margin;
+            }
+            
+            // 预警线检测（内框，原始宽度）
+            checkWarningLine() {
+                const head = this.segments[0];
+                const margin = CONFIG.WALL_MARGIN + CONFIG.SEGMENT_RADIUS;  // 预警线：原始宽度
                 return head.x < margin || head.x > CONFIG.CANVAS_WIDTH - margin ||
                        head.y < margin || head.y > CONFIG.CANVAS_HEIGHT - margin;
             }
@@ -1519,6 +1532,23 @@
                     ctx.shadowBlur = 5 * progress;
                     ctx.shadowColor = this.color;
                     ctx.fill();
+                    ctx.shadowBlur = 0;
+                }
+                
+                // 绘制预警闪烁环（当进入预警线时）
+                if (this.warningFlashTimer > 0 && this.isPlayer && this.segments.length > 0) {
+                    const flashIntensity = Math.sin(this.warningFlashTimer * 20) * 0.5 + 0.5;  // 快速闪烁
+                    const head = this.segments[0];
+                    const flashRadius = CONFIG.SEGMENT_RADIUS * 2.5;
+                    
+                    ctx.globalCompositeOperation = 'source-over';
+                    ctx.beginPath();
+                    ctx.arc(head.x, head.y, flashRadius, 0, Math.PI * 2);
+                    ctx.strokeStyle = `rgba(255, 50, 50, ${0.3 + flashIntensity * 0.5})`;
+                    ctx.lineWidth = 3;
+                    ctx.shadowBlur = 10 + flashIntensity * 10;
+                    ctx.shadowColor = '#ff3333';
+                    ctx.stroke();
                     ctx.shadowBlur = 0;
                 }
 
@@ -2230,7 +2260,12 @@
                 // 总控AI：检测AI蚯蚓是否聚集，如果聚集就让它们分散
                 this.updateAIDispersal();
 
- // 2. 玩家撞墙（出场动画期间不检测）
+ // 2. 玩家进入预警线（显示红色闪烁预警）
+                if (this.mouseInCanvas && !player.isEntering && player.checkWarningLine()) {
+                    player.warningFlashTimer = 0.5;  // 预警闪烁 0.5 秒
+                }
+                
+                // 2.1 玩家撞死亡线（游戏结束）
                 if (this.mouseInCanvas && !player.isEntering && player.checkWallCollision()) {
                     this.gameOver();
                     return;
@@ -2549,10 +2584,17 @@
             }
 
             drawWalls() {
+                // 预警线（内框）- 半透明红色
                 ctx.strokeStyle = 'rgba(255, 107, 107, 0.3)';
                 ctx.lineWidth = 2;
-                const m = CONFIG.WALL_MARGIN;
-                ctx.strokeRect(m, m, CONFIG.CANVAS_WIDTH - m * 2, CONFIG.CANVAS_HEIGHT - m * 2);
+                const m1 = CONFIG.WALL_MARGIN + CONFIG.SEGMENT_RADIUS;
+                ctx.strokeRect(m1, m1, CONFIG.CANVAS_WIDTH - m1 * 2, CONFIG.CANVAS_HEIGHT - m1 * 2);
+                
+                // 死亡线（外框）- 更明显的红色
+                ctx.strokeStyle = 'rgba(255, 60, 60, 0.5)';
+                ctx.lineWidth = 3;
+                const m2 = (CONFIG.WALL_MARGIN + CONFIG.SEGMENT_RADIUS) * 2;
+                ctx.strokeRect(m2, m2, CONFIG.CANVAS_WIDTH - m2 * 2, CONFIG.CANVAS_HEIGHT - m2 * 2);
             }
 
             /**
