@@ -311,22 +311,13 @@
             flex-shrink: 0;
             position: relative;
         }
-        /* 颈部标识：放射线效果（与游戏内drawNeckIndicator一致） */
-        .legend-neck::before {
-            content: '';
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            width: 140%;
-            height: 140%;
-            transform: translate(-50%, -50%);
-            background:
-                linear-gradient(0deg, transparent 40%, currentColor 40%, currentColor 60%, transparent 60%),
-                linear-gradient(45deg, transparent 40%, currentColor 40%, currentColor 60%, transparent 60%),
-                linear-gradient(90deg, transparent 40%, currentColor 40%, currentColor 60%, transparent 60%),
-                linear-gradient(135deg, transparent 40%, currentColor 40%, currentColor 60%, transparent 60%);
-            opacity: 0.7;
-            pointer-events: none;
+        /* 颈部标识：用canvas绘制真实游戏效果 */
+        .legend-neck-canvas {
+            width: 20px;
+            height: 20px;
+            display: inline-block;
+            flex-shrink: 0;
+            vertical-align: middle;
         }
         .legend-outside {
             position: static;
@@ -597,8 +588,8 @@
         </div>
         <div class="legend legend-outside">
             <div style="font-weight:bold; margin-bottom:5px;">📖 区域标识</div>
-            <div><span class="legend-color legend-neck" style="border-color: rgba(120, 255, 200, 0.9); background: rgba(120, 255, 200, 0.15); color: rgba(120, 255, 200, 0.9);"></span> 玩家颈部 (前 1/3)</div>
-            <div><span class="legend-color legend-neck" style="border-color: rgba(100, 220, 255, 0.8); background: rgba(100, 220, 255, 0.12); color: rgba(100, 220, 255, 0.8);"></span> AI 蚯蚓颈部 (前 1/3)</div>
+            <div><canvas class="legend-neck-canvas" data-player="true" width="20" height="20"></canvas> 玩家颈部 (前 1/3)</div>
+            <div><canvas class="legend-neck-canvas" data-player="false" width="20" height="20"></canvas> AI 蚯蚓颈部 (前 1/3)</div>
             <div><span class="legend-color" style="border-color: rgba(255, 230, 109, 0.9); background: rgba(255, 230, 109, 0.2);"></span> 玩家尾巴 (后 1/3)</div>
             <div><span class="legend-color" style="border-color: rgba(255, 100, 100, 0.8); background: rgba(255, 80, 80, 0.15);"></span> AI 蚯蚓尾巴 (后 1/3)</div>
             <div style="color:#888; margin-top:5px; font-size:10px;">咬颈部→被咬死 | 咬尾巴→触发分裂!</div>
@@ -4194,6 +4185,44 @@
         }
 
         const game = new Game();
+
+        // 初始化图例颈部canvas（用游戏真实drawNeckIndicator绘制）
+        document.querySelectorAll('.legend-neck-canvas').forEach(canvas => {
+            const ctx = canvas.getContext('2d');
+            const isPlayer = canvas.dataset.player === 'true';
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            const radius = 6;
+
+            // 绘制身体底色（与游戏内一致）
+            ctx.fillStyle = isPlayer ? '#4ecca3' : '#ff6b6b';
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 绘制颈部放射线（与drawNeckIndicator完全一致）
+            const rayCount = 8;
+            const rayInner = radius * 0.6;
+            const rayOuter = radius * 1.3;
+            const rayWidth = 1.5;
+            const rayColor = isPlayer ? 'rgba(120, 255, 200, 0.7)' : 'rgba(100, 200, 255, 0.6)';
+
+            ctx.strokeStyle = rayColor;
+            ctx.lineWidth = rayWidth;
+
+            for (let i = 0; i < rayCount; i++) {
+                const angle = (i / rayCount) * Math.PI * 2;
+                const x1 = centerX + Math.cos(angle) * rayInner;
+                const y1 = centerY + Math.sin(angle) * rayInner;
+                const x2 = centerX + Math.cos(angle) * rayOuter;
+                const y2 = centerY + Math.sin(angle) * rayOuter;
+
+                ctx.beginPath();
+                ctx.moveTo(x1, y1);
+                ctx.lineTo(x2, y2);
+                ctx.stroke();
+            }
+        });
     </script>
 </body>
 </html>
