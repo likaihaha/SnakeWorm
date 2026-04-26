@@ -650,6 +650,28 @@
                     this.noteIndex = 0;
                 }
             }
+            
+            // 播放黄色宝珠的琶音（最终幻想水晶序曲的分解和弦）
+            playYellowBeadArpeggio() {
+                // 水晶序曲的分解和弦琶音序列
+                const arpeggio = [
+                    { freq: 392.00, duration: 100 },  // G4
+                    { freq: 493.88, duration: 100 },  // B4
+                    { freq: 659.25, duration: 100 },  // E5
+                    { freq: 783.99, duration: 100 },  // G5
+                    { freq: 987.77, duration: 100 },  // B5
+                    { freq: 1174.66, duration: 100 }, // D6
+                    { freq: 1318.51, duration: 100 }, // E6
+                    { freq: 1567.98, duration: 150 }, // G6
+                ];
+                
+                // 播放琶音序列
+                arpeggio.forEach((note, index) => {
+                    setTimeout(() => {
+                        this.playNote(note.freq, note.duration);
+                    }, index * 80);  // 每个音符间隔 80ms
+                });
+            }
         }
 
         // 全局音效系统实例
@@ -902,6 +924,14 @@
                 this.aiTarget = null;
                 this.aiWanderTimer = 0;
                 this.aiWanderDir = Vector.randomDir();
+                
+                // 嘴巴动画状态
+                this.mouthCloseTimer = 0;  // 闭嘴计时器（吃宝珠时触发）
+                this.isMoving = false;  // 是否在移动
+                
+                // 黄光效果状态（吃到黄色宝珠时触发）
+                this.yellowGlowTimer = 0;  // 黄光计时器
+                this.yellowGlowProgress = 0;  // 黄光进度（0~1，从嘴部到尾部）
             }
 
             get head() { return this.segments[0]; }
@@ -932,6 +962,14 @@
     update(targetPos, dt, allFoods = [], allWorms = []) {
                 if (this.invincibleTimer > 0) this.invincibleTimer -= dt;
                 if (this.activationTimer > 0) this.activationTimer -= dt;
+                if (this.mouthCloseTimer > 0) this.mouthCloseTimer -= dt;
+                
+                // 更新黄光效果
+                if (this.yellowGlowTimer > 0) {
+                    this.yellowGlowTimer -= dt;
+                    // 黄光进度：从 0 到 1，从嘴部到尾部依次发光
+                    this.yellowGlowProgress = Math.min(1, this.yellowGlowProgress + dt * 2);
+                }
 
                 this.updateSpeed();
                 
@@ -1061,9 +1099,13 @@
                 const direction = moveTarget.sub(head).normalize();
                 const distanceToTarget = head.dist(moveTarget);
                 
-                // 如果已经到达目标附近，停止移动
+                // 如果已经到达目标附近，停止移动（添加随机小幅度波形让蚯蚓更鲜活）
                 if (distanceToTarget < 15) {
-                    this.segments[0] = moveTarget;
+                    // 随机小幅度波形：让蚯蚓在静止时也有轻微摆动
+                    const waveX = (Math.random() - 0.5) * 2;  // -1 ~ 1
+                    const waveY = (Math.random() - 0.5) * 2;
+                    this.segments[0] = new Vector(moveTarget.x + waveX, moveTarget.y + waveY);
+                    this.isMoving = false;  // 停止状态
                     // 不更新 velocity，保持静止
                 } else {
                     // 更新 velocity
@@ -1075,6 +1117,7 @@
                     const moveStep = this.velocity.mult(this.speed * dt * 60);
                     const newHead = head.add(moveStep);
                     this.segments[0] = newHead;
+                    this.isMoving = true;  // 移动状态
                 }
 
                 for (let i = 1; i < this.segments.length; i++) {
@@ -1125,7 +1168,7 @@
 
             checkWallCollision() {
                 const head = this.segments[0];
-                const margin = CONFIG.WALL_MARGIN + CONFIG.SEGMENT_RADIUS;
+                const margin = (CONFIG.WALL_MARGIN + CONFIG.SEGMENT_RADIUS) * 2;  // 加宽一倍
                 return head.x < margin || head.x > CONFIG.CANVAS_WIDTH - margin ||
                        head.y < margin || head.y > CONFIG.CANVAS_HEIGHT - margin;
             }
@@ -1263,10 +1306,29 @@
                         // 身体段保持圆形
                         ctx.beginPath();
                         ctx.arc(seg.x, seg.y, radius, 0, Math.PI * 2);
-                        const alpha = 0.3 + 0.5 * (1 - i / this.segments.length);
-                        ctx.fillStyle = this.hexToRgba(this.color, alpha);
-                        ctx.shadowBlur = 0;
+                        let alpha = 0.3 + 0.5 * (1 - i / this.segments.length);
+                        let color = this.color;
+                        
+                        // 黄光效果：从嘴部到尾部依次发黄光
+                        if (this.yellowGlowTimer > 0) {
+                            // 计算当前段是否应该发光（根据进度）
+                            const segmentProgress = 1 - (i / this.segments.length);  // 0=尾部, 1=头部
+                            if (segmentProgress <= this.yellowGlowProgress) {
+                                // 该段应该发光
+                                const glowIntensity = Math.sin(this.yellowGlowTimer * 10) * 0.3 + 0.7;  // 闪烁效果
+                                color = '#ffe66d';  // 黄色
+                                alpha = glowIntensity;
+                                ctx.shadowBlur = 10;
+                                ctx.shadowColor = '#ffe66d';
+                            }
+                        }
+                        
+                        ctx.fillStyle = this.hexToRgba(color, alpha);
+                        if (ctx.shadowBlur === 0) {
+                            ctx.shadowBlur = 0;
+                        }
                         ctx.fill();
+                        ctx.shadowBlur = 0;  // 重置
                     }
 
                     // 头部区域视觉标识：蓝色虚线边框 + 半透明蓝色填充
@@ -1352,13 +1414,25 @@
                     }
                 }
                 
-                // 动画效果：嘴巴一张一合（周期约 0.3 秒）
-                // animPhase: 0~1 循环
-                const animPhase = (Math.sin(performance.now() / 150) + 1) / 2;  // 0~1
+                // 嘴巴动画逻辑：
+                // - 移动时：保持张开，有小幅度合嘴动作（表现张嘴冲向宝珠）
+                // - 闭嘴计时器 > 0 时：完全闭合（吃到宝珠时）
+                let mouthOpenRatio;
+                if (this.mouthCloseTimer > 0) {
+                    // 吃到宝珠时：完全闭合
+                    mouthOpenRatio = 0;
+                } else if (this.isMoving) {
+                    // 移动时：保持张开，有小幅度合嘴动作
+                    const smallAnim = (Math.sin(performance.now() / 200) + 1) / 2;  // 0~1
+                    mouthOpenRatio = 0.7 + smallAnim * 0.3;  // 0.7 ~ 1.0（大部分时间张开）
+                } else {
+                    // 停止时：正常张合动画
+                    mouthOpenRatio = (Math.sin(performance.now() / 150) + 1) / 2;  // 0~1
+                }
                 
                 // 嘴巴开口角度：从 0（完全闭合）到 2.09 弧度（120 度扇形）
                 const maxMouthOpen = 2.09;  // 120 度 = π * 2/3 ≈ 2.09 弧度
-                const animMouthOpen = maxMouthOpen * animPhase;  // 0 ~ 2.09 弧度
+                const animMouthOpen = maxMouthOpen * mouthOpenRatio;  // 0 ~ 2.09 弧度
                 
                 // 绘制带缺口的圆形（吃豆人形状）
                 // arc(x, y, radius, startAngle, endAngle, counterclockwise)
@@ -1987,7 +2061,19 @@
                         const food = this.foods[eatenIndex];
                         const foodPos = food.pos;
                         this.foods.splice(eatenIndex, 1);
-                        worm.grow(CONFIG.GROWTH_PER_FOOD);
+                        
+                        // 黄色宝珠特殊处理：长2格
+                        if (food.type.score === 30) {  // 黄色宝珠
+                            worm.grow(2);
+                            // 触发黄光效果
+                            worm.yellowGlowTimer = 2.0;  // 黄光持续 2 秒
+                            worm.yellowGlowProgress = 0;
+                        } else {
+                            worm.grow(CONFIG.GROWTH_PER_FOOD);
+                        }
+                        
+                        // 吃宝珠时触发闭嘴动画
+                        worm.mouthCloseTimer = 0.3;  // 闭嘴 0.3 秒
                         
                         if (worm.isPlayer) {
                             this.score += food.type.score;
@@ -2007,7 +2093,12 @@
                         
                         // 触发音效
                         if (worm.isPlayer) {
-                            musicSystem.onEatFood(food);
+                            // 黄色宝珠：播放最终幻想水晶序曲琶音
+                            if (food.type.score === 30) {
+                                musicSystem.playYellowBeadArpeggio();
+                            } else {
+                                musicSystem.onEatFood(food);
+                            }
                         }
                     }
                 }
