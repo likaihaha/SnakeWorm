@@ -2733,15 +2733,6 @@
                     }
                 }, 500);
                 
-                // 初始化虚拟摇杆
-                this.initJoystick();
-                
-                // 显示全屏按钮（移动端）
-                const fullscreenBtn = document.getElementById('fullscreenBtn');
-                if (fullscreenBtn && this.isTouchDevice) {
-                    fullscreenBtn.style.display = 'flex';
-                }
-                
                 // 初始检查横屏
                 this.checkOrientation();
             }
@@ -2757,7 +2748,7 @@
              * 初始化虚拟摇杆
              */
             initJoystick() {
-                if (!this.isTouchDevice) return;  // 非触摸设备不初始化
+                // 只在实际触摸事件后调用（已由touchstart事件保证）
                 
                 const joystick = document.getElementById('joystick');
                 const knob = document.getElementById('joystickKnob');
@@ -2841,33 +2832,10 @@
             setupInput() {
                 this.mouseInCanvas = false;
                 this.isTouchDevice = false;  // 标记是否为触摸设备
+                this.mobileUIInitialized = false;  // 移动端UI是否已初始化
                 
-                // 检测触摸设备
-                this.isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-                
-                // 触摸设备显示移动端UI
-                if (this.isTouchDevice) {
-                    const joystick = document.getElementById('joystick');
-                    const fireBtn = document.getElementById('fireBtn');
-                    const ammoDisplay = document.getElementById('ammoDisplay');
-                    const mouseIndicator = document.getElementById('mouseIndicator');
-                    if (joystick) joystick.style.display = 'block';
-                    if (fireBtn) fireBtn.style.display = 'flex';
-                    if (ammoDisplay) ammoDisplay.style.display = 'block';
-                    if (mouseIndicator) mouseIndicator.style.display = 'block';
-                    
-                    // 射击按钮事件
-                    fireBtn.addEventListener('touchstart', (e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        this.fireBullet();
-                    }, { passive: false });
-                    fireBtn.addEventListener('mousedown', (e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        this.fireBullet();
-                    });
-                }
+                // 不再使用能力检测（navigator.maxTouchPoints在Windows PC上经常误报）
+                // 改为实际触摸事件触发后才启用移动端UI
                 
                 // 鼠标事件（桌面端）
                 canvas.addEventListener('mousemove', (e) => {
@@ -2921,6 +2889,41 @@
                 canvas.addEventListener('touchstart', (e) => {
                     e.preventDefault();
                     this.isTouchDevice = true;
+                    
+                    // 首次触摸时动态初始化移动端UI
+                    if (!this.mobileUIInitialized) {
+                        this.mobileUIInitialized = true;
+                        const joystick = document.getElementById('joystick');
+                        const fireBtn = document.getElementById('fireBtn');
+                        const ammoDisplay = document.getElementById('ammoDisplay');
+                        const mouseIndicator = document.getElementById('mouseIndicator');
+                        if (joystick) joystick.style.display = 'block';
+                        if (fireBtn) fireBtn.style.display = 'flex';
+                        if (ammoDisplay) ammoDisplay.style.display = 'block';
+                        if (mouseIndicator) mouseIndicator.style.display = 'block';
+                        
+                        // 射击按钮事件
+                        if (fireBtn) {
+                            fireBtn.addEventListener('touchstart', (e2) => {
+                                e2.preventDefault();
+                                e2.stopPropagation();
+                                this.fireBullet();
+                            }, { passive: false });
+                            fireBtn.addEventListener('mousedown', (e2) => {
+                                e2.preventDefault();
+                                e2.stopPropagation();
+                                this.fireBullet();
+                            });
+                        }
+                        
+                        // 初始化摇杆
+                        this.initJoystick();
+                        
+                        // 显示全屏按钮
+                        const fullscreenBtn = document.getElementById('fullscreenBtn');
+                        if (fullscreenBtn) fullscreenBtn.style.display = 'flex';
+                    }
+                    
                     // 如果摇杆存在，使用摇杆；否则使用触摸点
                     if (this.joystickDirection.mag() > 0) {
                         // 摇杆正在使用，忽略 Canvas 触摸
@@ -3197,15 +3200,6 @@
                     // 更新蚯蚓出场动画
                     if (player && player.isEntering) {
                         player.updateEntering(dt);
-                    }
-                    // 出场动画完成后自动开始游戏（不再要求用户手动移入白圈）
-                    if (player && !player.isEntering && player.enterPhase >= 3) {
-                        this.waitingForPlayer = false;
-                        // 确保鼠标位置有效
-                        if (!this.mouseInCanvas) {
-                            this.mousePos = new Vector(CONFIG.CANVAS_WIDTH / 2, CONFIG.CANVAS_HEIGHT / 2);
-                            this.mouseInCanvas = true;
-                        }
                     }
                     return;
                 }
