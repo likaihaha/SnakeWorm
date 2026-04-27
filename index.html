@@ -2163,9 +2163,9 @@
                         this.drawNeckIndicator(ctx, seg, radius, this.isPlayer);
                     }
 
-                    // 尾巴段视觉标识：仅玩家显示（AI不显示）
-                    if (isTail && this.isPlayer) {
-                        this.drawTailIndicator(ctx, seg, radius, true);
+                    // 尾巴段视觉标识：黄色 / 红色虚线边框 + 半透明填充
+                    if (isTail) {
+                        this.drawTailIndicator(ctx, seg, radius, this.isPlayer);
                     }
                 }
 
