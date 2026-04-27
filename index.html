@@ -2704,6 +2704,32 @@
                     this.checkOrientation();
                 });
                 
+                // 检测浏览器缩放（Ctrl+滚轮 / Ctrl+加减键）
+                // 方案1：监听 wheel 事件（Ctrl+滚轮缩放）
+                window.addEventListener('wheel', (e) => {
+                    if (e.ctrlKey) {
+                        // Ctrl+滚轮触发缩放，延迟重新计算尺寸
+                        setTimeout(() => this.resizeCanvas(), 100);
+                    }
+                }, { passive: true });
+                
+                // 方案2：定期检测 devicePixelRatio 变化（覆盖 Ctrl+加减键、菜单缩放等）
+                let lastDevicePixelRatio = window.devicePixelRatio;
+                setInterval(() => {
+                    if (window.devicePixelRatio !== lastDevicePixelRatio) {
+                        lastDevicePixelRatio = window.devicePixelRatio;
+                        this.resizeCanvas();
+                    }
+                }, 500);
+                
+                // 方案3：ResizeObserver 监听容器尺寸变化（最可靠）
+                if (typeof ResizeObserver !== 'undefined') {
+                    const resizeObserver = new ResizeObserver(() => {
+                        this.resizeCanvas();
+                    });
+                    resizeObserver.observe(canvas.parentElement);
+                }
+                
                 // 初始化虚拟摇杆
                 this.initJoystick();
                 
