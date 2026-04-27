@@ -549,7 +549,7 @@
     <div style="display: flex; align-items: center; justify-content: center; gap: 12px; margin-bottom: 10px;">
         <h1 style="margin: 0;">🎵 Melody Worm - 旋律虫虫</h1>
     </div>
-    <div style="display: flex; align-items: center; justify-content: center; gap: 12px;">
+    <div id="gameContainer" style="display: flex; align-items: center; justify-content: center; gap: 12px;">
         <div style="position:relative;">
             <canvas id="gameCanvas" width="800" height="600"></canvas>
         <div class="split-notice" id="splitNotice">⚡ 咬尾分裂！新蚯蚓诞生！</div>
@@ -3023,10 +3023,11 @@
              */
             resizeCanvas() {
                 // 获取实际可用尺寸（兼容 iframe 嵌入环境）
-                // 优先使用父容器尺寸，fallback 到 window 尺寸
-                const container = canvas.parentElement;
-                const availWidth = container ? container.clientWidth : window.innerWidth;
-                const availHeight = container ? container.clientHeight : window.innerHeight;
+                // 优先使用 #gameContainer，fallback 到 body，最后用 window
+                const gameContainer = document.getElementById('gameContainer');
+                const container = gameContainer || document.body;
+                const availWidth = container.clientWidth || window.innerWidth;
+                const availHeight = container.clientHeight || window.innerHeight;
                 
                 // 检查是否为横屏模式
                 const isLandscape = availWidth > availHeight;
