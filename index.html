@@ -192,13 +192,16 @@
             top: 50%; left: 50%;
             transform: translate(-50%, -50%);
             background: rgba(0, 0, 0, 0.9);
-            padding: 40px 60px;
+            padding: 20px 25px;
             border-radius: 10px;
             border: 2px solid #ff6b6b;
             text-align: center;
             z-index: 100;
+            max-width: 90%;  /* 不超过容器宽度 */
+            min-width: 280px;  /* 防止太窄 */
+            box-sizing: border-box;
         }
-        #startScreen h2 { color: #ff6b6b; margin-bottom: 20px; font-size: 28px; }
+        #startScreen h2 { color: #ff6b6b; margin-bottom: 15px; font-size: 22px; }
         #pauseScreen h2 { color: #ffe66d; margin-bottom: 20px; font-size: 28px; }
         #startScreen button, #pauseScreen button {
             margin-top: 20px;
