@@ -3189,16 +3189,23 @@
 
                 // 等待玩家控制阶段：执行出场动画，暂停其他游戏逻辑
                 if (this.waitingForPlayer) {
-                    console.log('[waitingForPlayer] player存在:', !!player, 'isEntering:', player?.isEntering, 'enterPhase:', player?.enterPhase);
                     // 确保出场动画启动
                     if (player && player.isEntering && player.enterPhase === 0) {
                         player.enterPhase = 1;  // 立即切换到phase 1
                         player.enterStartTime = performance.now() / 1000;
-                        console.log('[waitingForPlayer] 切换到phase 1');
                     }
                     // 更新蚯蚓出场动画
                     if (player && player.isEntering) {
                         player.updateEntering(dt);
+                    }
+                    // 出场动画完成后自动开始游戏（不再要求用户手动移入白圈）
+                    if (player && !player.isEntering && player.enterPhase >= 3) {
+                        this.waitingForPlayer = false;
+                        // 确保鼠标位置有效
+                        if (!this.mouseInCanvas) {
+                            this.mousePos = new Vector(CONFIG.CANVAS_WIDTH / 2, CONFIG.CANVAS_HEIGHT / 2);
+                            this.mouseInCanvas = true;
+                        }
                     }
                     return;
                 }
