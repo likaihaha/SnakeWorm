@@ -6,7 +6,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="format-detection" content="telephone=no">
-    <title>Melody Worm v0.74 - 旋律虫虫</title>
+    <title>Melody Worm v0.75 - 旋律虫虫</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -269,6 +269,7 @@
             color: #1a1a2e;
             padding: 8px 20px;
             border-radius: 20px;
+            pointer-events: none;  /* 不拦截鼠标事件 */
             font-weight: bold;
             display: none;
             animation: fadeInOut 2s ease-in-out;
@@ -621,7 +622,7 @@
 
     <script>
         /**
-         * Melody Worm v0.74 - 旋律虫虫
+         * Melody Worm v0.75 - 旋律虫虫
          * 
          * 实验机制:
          * - 任何蚯蚓的头部咬到任何其他蚯蚓的尾巴（最后 1/3 段）→ 被咬者断尾分裂
