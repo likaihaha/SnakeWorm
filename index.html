@@ -26,7 +26,9 @@
             background: #2d2d3a;
             touch-action: none;  // 禁止默认触摸行为
             margin-top: 10px;  // Canvas 上移
-            /* 不设 max-width/max-height，完全由 JS resizeCanvas() 控制等比缩放 */
+            /* JS resizeCanvas() 控制等比缩放，CSS 只做兜底保护 */
+            max-width: 100%;
+            height: auto;
         }
         #ui {
             margin-top: 10px;
@@ -2701,22 +2703,28 @@
 
                 this.setupInput();
                 
-                // 窗口大小改变时重新调整 Canvas
+                // 初始化时调整 Canvas 尺寸
+                this.resizeCanvas();
+                
+                // 窗口大小改变时重新调整 Canvas（防抖）
+                let resizeTimeout;
                 window.addEventListener('resize', () => {
-                    this.resizeCanvas();
-                    this.checkOrientation();
+                    clearTimeout(resizeTimeout);
+                    resizeTimeout = setTimeout(() => {
+                        this.resizeCanvas();
+                        this.checkOrientation();
+                    }, 100);
                 });
                 
                 // 检测浏览器缩放（Ctrl+滚轮 / Ctrl+加减键）
-                // 方案1：监听 wheel 事件（Ctrl+滚轮缩放）
                 window.addEventListener('wheel', (e) => {
                     if (e.ctrlKey) {
-                        // Ctrl+滚轮触发缩放，延迟重新计算尺寸
-                        setTimeout(() => this.resizeCanvas(), 100);
+                        clearTimeout(resizeTimeout);
+                        resizeTimeout = setTimeout(() => this.resizeCanvas(), 150);
                     }
                 }, { passive: true });
                 
-                // 方案2：定期检测 devicePixelRatio 变化（覆盖 Ctrl+加减键、菜单缩放等）
+                // 定期检测 devicePixelRatio 变化（覆盖 Ctrl+加减键、菜单缩放等）
                 let lastDevicePixelRatio = window.devicePixelRatio;
                 setInterval(() => {
                     if (window.devicePixelRatio !== lastDevicePixelRatio) {
@@ -2724,14 +2732,6 @@
                         this.resizeCanvas();
                     }
                 }, 500);
-                
-                // 方案3：ResizeObserver 监听容器尺寸变化（最可靠）
-                if (typeof ResizeObserver !== 'undefined') {
-                    const resizeObserver = new ResizeObserver(() => {
-                        this.resizeCanvas();
-                    });
-                    resizeObserver.observe(canvas.parentElement);
-                }
                 
                 // 初始化虚拟摇杆
                 this.initJoystick();
@@ -3022,33 +3022,30 @@
              * 响应式调整 Canvas 大小
              */
             resizeCanvas() {
-                // 获取实际可用尺寸（兼容 iframe 嵌入环境）
-                // 优先使用 #gameContainer，fallback 到 body，最后用 window
-                const gameContainer = document.getElementById('gameContainer');
-                const container = gameContainer || document.body;
-                const availWidth = container.clientWidth || window.innerWidth;
-                const availHeight = container.clientHeight || window.innerHeight;
+                // 使用 documentElement.clientWidth/Height，不包括滚动条，更稳定
+                const availWidth = document.documentElement.clientWidth;
+                const availHeight = document.documentElement.clientHeight;
                 
                 // 检查是否为横屏模式
                 const isLandscape = availWidth > availHeight;
                 
+                // 计算可用空间（留出边距和UI空间）
+                let maxWidth, maxHeight;
                 if (isLandscape) {
-                    // 横屏模式：Canvas 占满可用空间
-                    const maxWidth = Math.min(availWidth - 20, 800);
-                    const maxHeight = Math.min(availHeight - 80, 600);  // 留出 UI 空间
-                    const scale = Math.min(maxWidth / CONFIG.CANVAS_WIDTH, maxHeight / CONFIG.CANVAS_HEIGHT);
-                    
-                    canvas.style.width = (CONFIG.CANVAS_WIDTH * scale) + 'px';
-                    canvas.style.height = (CONFIG.CANVAS_HEIGHT * scale) + 'px';
+                    maxWidth = Math.min(availWidth - 40, 800);
+                    maxHeight = Math.min(availHeight - 100, 600);
                 } else {
-                    // 竖屏模式
-                    const maxWidth = Math.min(availWidth - 20, 800);
-                    const maxHeight = Math.min(availHeight * 0.65, 600);  // 留出摇杆空间
-                    const scale = Math.min(maxWidth / CONFIG.CANVAS_WIDTH, maxHeight / CONFIG.CANVAS_HEIGHT);
-                    
-                    canvas.style.width = (CONFIG.CANVAS_WIDTH * scale) + 'px';
-                    canvas.style.height = (CONFIG.CANVAS_HEIGHT * scale) + 'px';
+                    maxWidth = Math.min(availWidth - 40, 800);
+                    maxHeight = Math.min(availHeight * 0.6, 600);
                 }
+                
+                // 计算等比缩放比例
+                let scale = Math.min(maxWidth / CONFIG.CANVAS_WIDTH, maxHeight / CONFIG.CANVAS_HEIGHT);
+                // 限制最小缩放比例，防止 canvas 太小
+                scale = Math.max(scale, 0.35);
+                
+                canvas.style.width = (CONFIG.CANVAS_WIDTH * scale) + 'px';
+                canvas.style.height = (CONFIG.CANVAS_HEIGHT * scale) + 'px';
             }
             
             /**
