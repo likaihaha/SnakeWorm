@@ -7,7 +7,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="format-detection" content="telephone=no">
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐛</text></svg>">
-    <title>Melody Worm v0.94 - 旋律虫虫</title>
+    <title>Melody Worm v0.95 - 旋律虫虫</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -118,8 +118,8 @@
             width: 80px;
             height: 80px;
             border-radius: 50%;
-            background: rgba(255, 107, 107, 0.7);
-            border: 3px solid rgba(255, 107, 107, 0.9);
+            background: rgba(77, 171, 247, 0.7);
+            border: 3px solid rgba(77, 171, 247, 0.9);
             color: white;
             font-size: 16px;
             font-weight: bold;
@@ -131,7 +131,7 @@
             user-select: none;
         }
         #fireBtn:active {
-            background: rgba(255, 107, 107, 1);
+            background: rgba(77, 171, 247, 1);
             transform: scale(0.95);
         }
         /* 移动端弹仓显示 */
@@ -140,7 +140,7 @@
             bottom: 150px;
             right: 40px;
             background: rgba(0, 0, 0, 0.8);
-            border: 2px solid #ff6b6b;
+            border: 2px solid #4dabf7;
             border-radius: 10px;
             padding: 10px 15px;
             color: white;
@@ -152,7 +152,7 @@
         #ammoDisplay .count {
             font-size: 24px;
             font-weight: bold;
-            color: #ff6b6b;
+            color: #4dabf7;
         }
         /* 移动端小指针 */
         #mouseIndicator {
@@ -557,7 +557,7 @@
         <div id="joystickKnob"></div>
     </div>
     <!-- 移动端射击按钮 -->
-    <div id="fireBtn">🔥</div>
+    <div id="fireBtn">❄️</div>
     <!-- 移动端弹仓显示 -->
     <div id="ammoDisplay">
         <div>弹药</div>
@@ -567,19 +567,19 @@
     <div id="mouseIndicator"></div>
     
     <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 8px; box-sizing: border-box; width: 100%; height: 100vh;">
-        <h1 style="margin: 0; font-size: 20px; white-space: nowrap;">🎵 Melody Worm <span style="color:#888; font-size:14px;">v0.94</span> - 旋律虫虫</h1>
+        <h1 style="margin: 0; font-size: 20px; white-space: nowrap;">🎵 Melody Worm <span style="color:#888; font-size:14px;">v0.95</span> - 旋律虫虫</h1>
         <div style="display: flex; align-items: center; gap: 20px; font-size: 11px; color: #ccc;">
-            <span>🎮 鼠标控制方向 | 左键发射子弹 | 咬尾分裂 | 碰颈/框死</span>
+            <span>🎮 鼠标控制方向 | 按住左键连续射击 | 咬尾分裂 | 碰颈/框死</span>
         </div>
         <div id="gameContainer" style="position:relative; flex: 1; display: flex; align-items: center; justify-content: center; width: 100%;">
             <canvas id="gameCanvas" width="800" height="600"></canvas>
             <div class="split-notice" id="splitNotice">⚡ 咬尾分裂！新蚯蚓诞生！</div>
             <div id="startScreen">
-                <h2>🎵 Melody Worm<br>旋律虫虫 <span style="color:#888; font-size:14px;">v0.94</span></h2>
+                <h2>🎵 Melody Worm<br>旋律虫虫 <span style="color:#888; font-size:14px;">v0.95</span></h2>
                 <div class="start-instructions">
                     <div class="inst-row inst-main">
                         <span class="inst-icon">🖱️</span>
-                        <span>鼠标控制方向，点左键发射子弹（吃🔵后）</span>
+                        <span>鼠标控制方向，按住左键连续射击（吃🔵后）</span>
                     </div>
                     <div class="inst-row inst-rule">
                         <span class="inst-icon">🔮</span>
@@ -619,7 +619,7 @@
         <div id="rhythmHint" style="color:#ffd700; font-size:10px; margin-top:3px;"></div>
     </div>
     <div id="controls">
-        🖱️ 鼠标控制方向，点左键发射子弹（吃🔵后） | 🔮 <b>吃 🟢绿(+1节)→🟡黄(+2节+旋律)→🔵蓝(发射减速子弹)→🟠橙(磁力吸引)</b><br>
+        🖱️ 鼠标控制方向，按住左键连续射击（吃🔵后） | 🔮 <b>吃 🟢绿(+1节)→🟡黄(+2节+旋律)→🔵蓝(发射减速子弹)→🟠橙(磁力吸引)</b><br>
         ⚡ <b>任何虫咬中虫的尾部 → 被咬者断尾分裂</b><br>
         💀 <b>任何虫咬其他虫颈部 → 被咬者死</b> | 💀 <b>头部碰边框死</b> | 🎵 <b>吃黄宝珠后等待旋律播完再出现下一颗</b>
     </div>
@@ -633,7 +633,7 @@
 
     <script>
         /**
-         * Melody Worm v0.94 - 旋律虫虫
+         * Melody Worm v0.95 - 旋律虫虫
          * 
          * 实验机制:
          * - 任何蚯蚓的头部咬到任何其他蚯蚓的尾巴（最后 1/3 段）→ 被咬者断尾分裂
@@ -1118,8 +1118,8 @@
             RHYTHM: {
                 YELLOW_UNLOCK_TIME: 25,      // 25秒后解锁黄色宝珠（提前）
                 YELLOW_UNLOCK_LENGTH: 10,    // 身体10节后也可解锁黄色宝珠
-                RED_UNLOCK_TIME: 30,         // 30秒后解锁红色宝珠（加快2倍）
-                RED_UNLOCK_LENGTH: 15,       // 身体15节后解锁红色宝珠（降低门槛配合加快节奏）
+                RED_UNLOCK_TIME: 30,         // 30秒后解锁蓝色宝珠（加快2倍）
+                RED_UNLOCK_LENGTH: 15,       // 身体15节后解锁蓝色宝珠（降低门槛配合加快节奏）
                 ORANGE_UNLOCK_TIME: 90,      // 90秒后解锁橙色宝珠
                 YELLOW_COOLDOWN: 15.0,       // 吃黄宝珠后冷却15秒（旋律播完后等待）
             }
@@ -2058,17 +2058,17 @@
                         if (shrinking.pos.y >= CONFIG.CANVAS_HEIGHT - CONFIG.WALL_MARGIN && !shrinking.emitted) {
                             shrinking.emitted = true;
                             
-                            // 发射宝珠（概率与尸体相同：70%绿、15%红、10%黄、5%橙）
+                            // 发射宝珠（概率与尸体相同：70%绿、15%蓝、10%黄、5%橙）
                             const roll = Math.random();
                             let type;
                             if (roll < 0.70) {
                                 type = CONFIG.FOOD_TYPES[0];  // 绿色
                             } else if (roll < 0.85) {
-                                type = CONFIG.FOOD_TYPES[1];  // 红色
+                                type = CONFIG.FOOD_TYPES[3];  // 蓝色
                             } else if (roll < 0.95) {
-                                type = CONFIG.FOOD_TYPES[2];  // 黄色
+                                type = CONFIG.FOOD_TYPES[1];  // 黄色
                             } else {
-                                type = CONFIG.FOOD_TYPES[3];  // 橙色
+                                type = CONFIG.FOOD_TYPES[2];  // 橙色
                             }
                             
                             const food = new Food(shrinking.pos.x, shrinking.pos.y, type);
@@ -2851,6 +2851,13 @@
                 this.hasNewHead = false;
                 this.isFinished = false;
                 this.flashPhase = 0;
+                
+                // 壁虎断尾正弦波跳动
+                this.wavePhase = Math.random() * Math.PI * 2;  // 随机初始相位
+                this.waveAmplitude = 3.5;  // 跳动幅度（像素）
+                this.waveFrequency = 12;   // 跳动频率（快，模拟惊慌跳动）
+                this.waveDecay = 0.92;     // 衰减系数（每秒）
+                this.originalPositions = segments.map(s => ({ x: s.x, y: s.y }));  // 保存原始位置
             }
 
             update(dt) {
@@ -2860,6 +2867,19 @@
                 this.growHeadTimer -= dt;
                 this.totalTimer -= dt;
                 this.flashPhase += dt * 8;
+                
+                // 正弦波跳动：快速衰减的横向摆动
+                this.wavePhase += dt * this.waveFrequency;
+                this.waveAmplitude *= Math.pow(this.waveDecay, dt * 60);  // 按帧衰减
+                // 每段施加不同相位的正弦偏移（从头到尾波浪传递）
+                for (let i = 0; i < this.segments.length; i++) {
+                    const t = i / Math.max(1, this.segments.length - 1);  // 0→1
+                    const phaseOffset = t * Math.PI * 1.5;  // 尾部相位延迟
+                    const offset = Math.sin(this.wavePhase + phaseOffset) * this.waveAmplitude * (0.3 + 0.7 * t);
+                    // 垂直于原始连线方向偏移（简化：用x方向偏移模拟左右抖动）
+                    this.segments[i].x = this.originalPositions[i].x + offset;
+                    this.segments[i].y = this.originalPositions[i].y + Math.sin(this.wavePhase * 0.7 + phaseOffset) * this.waveAmplitude * 0.3 * t;
+                }
 
                 if (this.colorTimer <= 0) {
                     this.colorProgress = 1;
@@ -3015,13 +3035,13 @@
                     
                     // 碰底检测：该段尸体转化为宝珠向上发射
                     if (seg.y >= canvasHeight - CONFIG.WALL_MARGIN) {
-                        // 尸体爆宝珠概率：70%绿、15%红、10%黄、5%橙
+                        // 尸体爆宝珠概率：70%绿、15%蓝、10%黄、5%橙
                         const roll = Math.random();
                         let type;
                         if (roll < 0.70) {
                             type = CONFIG.FOOD_TYPES[0]; // 绿色
                         } else if (roll < 0.85) {
-                            type = CONFIG.FOOD_TYPES[3]; // 红色
+                            type = CONFIG.FOOD_TYPES[3]; // 蓝色
                         } else if (roll < 0.95) {
                             type = CONFIG.FOOD_TYPES[1]; // 黄色
                         } else {
@@ -3085,6 +3105,8 @@
                 this.crosshairHintTimer = 0;  // 瞄准镜提示计时器
                 this.slowedWorms = new Map();  // 减速的蚯蚓 {worm: slowTimer}
                 this.mousePos = new Vector(CONFIG.CANVAS_WIDTH / 2, CONFIG.CANVAS_HEIGHT / 2);
+                this.isMouseDown = false;  // 鼠标按下状态（连续射击）
+                this.fireCooldown = 0;  // 射击冷却计时器
                 this.score = 0;
                 this.isRunning = false;
                 this.isPaused = false;
@@ -3298,11 +3320,19 @@
                     }
                 });
                 
-            // 射击按钮点击事件（桌面端）
+            // 射击按钮点击事件（桌面端）- 按住连续射击
                 canvas.addEventListener('mousedown', (e) => {
                     if (this.isTouchDevice) return;  // 触摸设备用按钮
                     if (!this.isRunning || this.isPaused || this.isGameOver) return;
+                    this.isMouseDown = true;
                     this.fireBullet();
+                    this.fireCooldown = 0.15;  // 首发后0.15秒开始连续射击
+                });
+                canvas.addEventListener('mouseup', (e) => {
+                    this.isMouseDown = false;
+                });
+                canvas.addEventListener('mouseleave', (e) => {
+                    this.isMouseDown = false;
                 });
                 
                 // 触摸事件（移动端）- 在 Canvas 上触摸也控制方向
@@ -3322,17 +3352,28 @@
                         if (ammoDisplay) ammoDisplay.style.display = 'block';
                         if (mouseIndicator) mouseIndicator.style.display = 'block';
                         
-                        // 射击按钮事件
+                        // 射击按钮事件（按住连续射击）
                         if (fireBtn) {
                             fireBtn.addEventListener('touchstart', (e2) => {
                                 e2.preventDefault();
                                 e2.stopPropagation();
+                                this.isMouseDown = true;
                                 this.fireBullet();
+                                this.fireCooldown = 0.15;
                             }, { passive: false });
+                            fireBtn.addEventListener('touchend', (e2) => {
+                                e2.preventDefault();
+                                this.isMouseDown = false;
+                            });
                             fireBtn.addEventListener('mousedown', (e2) => {
                                 e2.preventDefault();
                                 e2.stopPropagation();
+                                this.isMouseDown = true;
                                 this.fireBullet();
+                                this.fireCooldown = 0.15;
+                            });
+                            fireBtn.addEventListener('mouseup', (e2) => {
+                                this.isMouseDown = false;
                             });
                         }
                         
@@ -3514,6 +3555,8 @@
                 this.waitingForPlayer = true;  // 等待玩家鼠标移入白圈
                 this.playerDeadWaitingForBodies = false;  // 重置玩家死亡等待标志
                 this.playerDeathLength = 0;  // 重置玩家死亡长度
+                this.isMouseDown = false;  // 重置鼠标按下状态
+                this.fireCooldown = 0;  // 重置射击冷却
 
                 // 玩家蚯蚓从框外左边开始（完全不可见）
                 const player = new Worm(
@@ -3584,9 +3627,9 @@
                     if (this.gameTime >= CONFIG.RHYTHM.ORANGE_UNLOCK_TIME) {
                         hints.push('🟠');
                     }
-                    // 红色：60秒后 + 身体20节后
+                    // 蓝色：30秒后 + 身体15节后
                     if (this.gameTime >= CONFIG.RHYTHM.RED_UNLOCK_TIME && player.length >= CONFIG.RHYTHM.RED_UNLOCK_LENGTH) {
-                        hints.push('🔴');
+                        hints.push('🔵');
                     }
                     rhythmHint.textContent = hints.join(' ');
                 }
@@ -3679,6 +3722,15 @@
                 if (!this.rhythmNotified.red && this.gameTime >= CONFIG.RHYTHM.RED_UNLOCK_TIME && player.length >= CONFIG.RHYTHM.RED_UNLOCK_LENGTH) {
                     this.rhythmNotified.red = true;
                     this.floatingTexts.push(new FloatingText(CONFIG.CANVAS_WIDTH / 2, CONFIG.CANVAS_HEIGHT / 2 - 50, '🔵 蓝色宝珠已解锁！可以发射减速子弹！', '#4dabf7'));
+                }
+
+                // 按住鼠标连续射击
+                if (this.isMouseDown && this.fireCooldown <= 0) {
+                    this.fireBullet();
+                    this.fireCooldown = 0.12;  // 每0.12秒射一发（约8发/秒）
+                }
+                if (this.fireCooldown > 0) {
+                    this.fireCooldown -= dt;
                 }
 
                 // 更新宝珠刷新计时器
@@ -3794,7 +3846,7 @@
                             worm.bulletFiredCount = 0;  // 重置已发射计数
                             this.floatingTexts.push(new FloatingText(foodPos.x, foodPos.y - 20, '🔫 +5', '#4dabf7'));
                             worm.grow(CONFIG.GROWTH_PER_FOOD);
-                            // 第一次吃到红宝珠：显示瞄准镜提示
+                            // 第一次吃到蓝宝珠：显示瞄准镜提示
                             if (!this.rhythmNotified.redAim) {
                                 this.rhythmNotified.redAim = true;
                                 this.showCrosshairHint = true;  // 显示瞄准镜提示
@@ -4149,7 +4201,7 @@
                         case 60:  // 橙色：90秒后
                             canSpawn = this.gameTime >= CONFIG.RHYTHM.ORANGE_UNLOCK_TIME;
                             break;
-                        case 120: // 红色：60秒后 + 身体20节后
+                        case 120: // 蓝色：30秒后 + 身体15节后
                             canSpawn = this.gameTime >= CONFIG.RHYTHM.RED_UNLOCK_TIME 
                                 && playerLength >= CONFIG.RHYTHM.RED_UNLOCK_LENGTH;
                             break;
@@ -4656,7 +4708,7 @@
             }
 
             /**
-             * 绘制自定义鼠标光标：有红色宝珠时显示瞄准镜，否则显示圆环
+             * 绘制自定义鼠标光标：有蓝色弹舱时显示瞄准镜，否则显示圆环
              */
             drawCustomCursor() {
                 if (!this.mouseInCanvas) return;
@@ -4705,6 +4757,16 @@
                     ctx.arc(cursorX, cursorY, 2, 0, Math.PI * 2);
                     ctx.fillStyle = 'rgba(77, 171, 247, 0.9)';
                     ctx.fill();
+                    
+                    // 按住射击时的脉冲光环
+                    if (this.isMouseDown) {
+                        const pulse = Math.sin(Date.now() * 0.01) * 0.3 + 0.7;
+                        ctx.beginPath();
+                        ctx.arc(cursorX, cursorY, radius + 4, 0, Math.PI * 2);
+                        ctx.strokeStyle = `rgba(77, 171, 247, ${pulse * 0.5})`;
+                        ctx.lineWidth = 2;
+                        ctx.stroke();
+                    }
                 } else {
                     // 普通圆环（白色）
                     const radius = 18;
@@ -4741,6 +4803,7 @@
             }
 
             gameOver(reason = 'eaten') {
+                this.isMouseDown = false;  // 停止连续射击
                 const player = this.worms.find(w => w.isPlayer);
                 
                 // 保存死亡长度
@@ -4807,7 +4870,7 @@
             }
         });
 
-        // 初始化图例红色弹夹canvas（绘制2/5扇形红色弹夹）
+        // 初始化图例蓝色弹夹canvas（绘制2/5扇形蓝色弹夹）
         document.querySelectorAll('.legend-mag-canvas').forEach(canvas => {
             const ctx = canvas.getContext('2d');
             const centerX = canvas.width / 2;
@@ -4820,8 +4883,8 @@
             ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
             ctx.fill();
 
-            // 绘制2/5扇形红色填充（有子弹的部分）
-            ctx.fillStyle = '#ff6b6b';
+            // 绘制2/5扇形蓝色填充（有子弹的部分）
+            ctx.fillStyle = '#4dabf7';
             ctx.beginPath();
             ctx.moveTo(centerX, centerY);
             ctx.arc(centerX, centerY, radius, -Math.PI / 2, -Math.PI / 2 + (Math.PI * 2 * 2 / 5));
@@ -4829,7 +4892,7 @@
             ctx.fill();
 
             // 外圈描边
-            ctx.strokeStyle = '#ff4444';
+            ctx.strokeStyle = '#339af0';
             ctx.lineWidth = 1.5;
             ctx.beginPath();
             ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
