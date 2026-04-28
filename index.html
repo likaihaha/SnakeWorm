@@ -7,7 +7,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="format-detection" content="telephone=no">
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐛</text></svg>">
-    <title>Melody Worm v0.98 - 旋律虫虫</title>
+    <title>Melody Worm v0.99 - 旋律虫虫</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -567,7 +567,7 @@
     <div id="mouseIndicator"></div>
     
     <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 8px; box-sizing: border-box; width: 100%; height: 100vh;">
-        <h1 style="margin: 0; font-size: 20px; white-space: nowrap;">🎵 Melody Worm <span style="color:#888; font-size:14px;">v0.98</span> - 旋律虫虫</h1>
+        <h1 style="margin: 0; font-size: 20px; white-space: nowrap;">🎵 Melody Worm <span style="color:#888; font-size:14px;">v0.99</span> - 旋律虫虫</h1>
         <div style="display: flex; align-items: center; gap: 20px; font-size: 11px; color: #ccc;">
             <span>🎮 鼠标控制方向 | 按住左键连续射击 | 咬尾分裂 | 碰颈/框死</span>
         </div>
@@ -575,7 +575,7 @@
             <canvas id="gameCanvas" width="800" height="600"></canvas>
             <div class="split-notice" id="splitNotice">⚡ 咬尾分裂！新蚯蚓诞生！</div>
             <div id="startScreen">
-                <h2>🎵 Melody Worm<br>旋律虫虫 <span style="color:#888; font-size:14px;">v0.98</span></h2>
+                <h2>🎵 Melody Worm<br>旋律虫虫 <span style="color:#888; font-size:14px;">v0.99</span></h2>
                 <div class="start-instructions">
                     <div class="inst-row inst-main">
                         <span class="inst-icon">🖱️</span>
@@ -633,7 +633,7 @@
 
     <script>
         /**
-         * Melody Worm v0.98 - 旋律虫虫
+         * Melody Worm v0.99 - 旋律虫虫
          * 
          * 实验机制:
          * - 任何蚯蚓的头部咬到任何其他蚯蚓的尾巴（最后 1/3 段）→ 被咬者断尾分裂
@@ -1924,6 +1924,7 @@
                             dashProgress: 0,    // 虚线缩小进度
                             sinking: false,     // 是否开始下沉
                             velocity: new Vector(0, 0),  // 下沉速度
+                            initialVelocity: this.velocity.clone(),  // 保留虫虫的初始速度
                             emitted: false      // 是否已发射宝珠
                         });
                         
@@ -2060,7 +2061,13 @@
                         if (shrinking.progress >= 1) {
                             shrinking.showDash = false;
                             shrinking.sinking = true;  // 开始下沉
-                            shrinking.velocity = new Vector(0, 30 + Math.random() * 30);  // 初始下沉速度
+                            // 保留虫虫的初始水平速度，加上垂直下沉速度
+                            const initialVx = shrinking.initialVelocity ? shrinking.initialVelocity.x * 0.5 : 0;  // 水平速度保留50%
+                            const initialVy = shrinking.initialVelocity ? shrinking.initialVelocity.y * 0.3 : 0;  // 垂直速度保留30%
+                            shrinking.velocity = new Vector(
+                                initialVx + (Math.random() - 0.5) * 10,  // 水平：初始速度 + 随机偏移
+                                30 + Math.random() * 30 + initialVy       // 垂直：下沉速度 + 初始垂直速度
+                            );
                         }
                     }
                     
