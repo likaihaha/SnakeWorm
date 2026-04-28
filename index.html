@@ -7,7 +7,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="format-detection" content="telephone=no">
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐛</text></svg>">
-    <title>Melody Worm v1.03 - 旋律虫虫</title>
+    <title>Melody Worm v1.04 - 旋律虫虫</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -567,7 +567,7 @@
     <div id="mouseIndicator"></div>
     
     <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 8px; box-sizing: border-box; width: 100%; height: 100vh;">
-        <h1 style="margin: 0; font-size: 20px; white-space: nowrap;">🎵 Melody Worm <span style="color:#888; font-size:14px;">v1.03</span> - 旋律虫虫</h1>
+        <h1 style="margin: 0; font-size: 20px; white-space: nowrap;">🎵 Melody Worm <span style="color:#888; font-size:14px;">v1.04</span> - 旋律虫虫</h1>
         <div style="display: flex; align-items: center; gap: 20px; font-size: 11px; color: #ccc;">
             <span>🎮 鼠标控制方向 | 按住左键连续射击 | 咬尾分裂 | 碰颈/框死</span>
         </div>
@@ -576,7 +576,7 @@
             <div class="split-notice" id="splitNotice">⚡ 咬尾分裂！新蚯蚓诞生！</div>
             <div class="split-notice" id="familyNotice" style="color: #FFD700; font-size: 16px;">👶 你就要有一个孩子了！保护好他！</div>
             <div id="startScreen">
-                <h2>🎵 Melody Worm<br>旋律虫虫 <span style="color:#888; font-size:14px;">v1.03</span></h2>
+                <h2>🎵 Melody Worm<br>旋律虫虫 <span style="color:#888; font-size:14px;">v1.04</span></h2>
                 <div class="start-instructions">
                     <div class="inst-row inst-main">
                         <span class="inst-icon">🖱️</span>
@@ -634,7 +634,7 @@
 
     <script>
         /**
-         * Melody Worm v1.03 - 旋律虫虫
+         * Melody Worm v1.04 - 旋律虫虫
          * 
          * 实验机制:
          * - 任何蚯蚓的头部咬到任何其他蚯蚓的尾巴（最后 1/3 段）→ 被咬者断尾分裂
@@ -1631,6 +1631,9 @@
                 this.adultHitCount = 0;  // 成年体被击中次数
                 this.juvenileFearTimer = 0;  // 幼体害怕状态计时器
                 this.juvenileFollowTarget = null;  // 幼体跟随目标
+                this.bittenSegments = new Set();  // 被敌人咬住的段索引集合
+                this.isStruggling = false;  // 是否在挣扎
+                this.strugglePhase = 0;  // 挣扎动画相位
                 
                 // 冰晶覆盖效果
                 this.iceOverlays = [];  // [{segmentIndex, timer, maxTimer}]
@@ -2192,6 +2195,17 @@
             juvenileThink(foods, allWorms, dt, enemies, brokenTails) {
                 this.juvenileFearTimer -= dt;
                 
+                // 0. 如果正在被咬，在原地挣扎游走
+                if (this.bittenSegments && this.bittenSegments.size > 0) {
+                    this.isStruggling = true;
+                    this.strugglePhase += dt * 10;
+                    const wriggleX = Math.sin(this.strugglePhase) * 15;
+                    const wriggleY = Math.cos(this.strugglePhase * 1.3) * 15;
+                    return new Vector(this.head.x + wriggleX, this.head.y + wriggleY);
+                } else {
+                    this.isStruggling = false;
+                }
+                
                 // 1. 检查附近是否有敌人（害怕）
                 let nearestEnemy = null;
                 let enemyDist = Infinity;
@@ -2631,6 +2645,16 @@
                             ctx.arc(seg.x, seg.y, radius, 0, Math.PI * 2);
                             ctx.fillStyle = `rgba(100, 180, 255, ${slowAlpha})`;  // 浅蓝色覆盖
                             ctx.fill();
+                        }
+                        
+                        // 被咬段视觉效果：红色脉冲标记
+                        if (this.bittenSegments && this.bittenSegments.has(i)) {
+                            const pulse = 0.5 + 0.3 * Math.sin(Date.now() * 0.01);
+                            ctx.beginPath();
+                            ctx.arc(seg.x, seg.y, radius + 2, 0, Math.PI * 2);
+                            ctx.strokeStyle = `rgba(255, 50, 50, ${pulse})`;
+                            ctx.lineWidth = 2;
+                            ctx.stroke();
                         }
                     }
 
@@ -3102,6 +3126,11 @@
                 this.sinkSpeed = 0;  // 下沉速度
                 this.bounceVelocity = null;  // 弹开速度
                 
+                // 咬住幼体相关
+                this.latchedJuvenile = null;  // 咬住的幼体引用
+                this.latchedSegmentIndex = -1;  // 咬住的段索引
+                this.biteDamageTimer = 0;  // 伤害计时器
+                
                 // 初始化身体节段
                 for (let i = 0; i < this.segmentCount; i++) {
                     this.segments.push(new Vector(x - i * 8, y));
@@ -3146,6 +3175,51 @@
                 this.phase += dt * 3;
                 this.hitTimer -= dt;
                 this.wanderTimer -= dt;
+                
+                // 如果咬住了幼体，停留在被咬段附近并持续造成伤害
+                if (this.latchedJuvenile) {
+                    if (!this.latchedJuvenile.isAlive || !this.latchedJuvenile.isJuvenile) {
+                        this.release();
+                    } else {
+                        const targetSeg = this.latchedJuvenile.segments[this.latchedSegmentIndex];
+                        if (!targetSeg) {
+                            this.release();
+                        } else {
+                            // 移向被咬的身体段
+                            const dir = targetSeg.sub(this.pos);
+                            if (dir.length() > this.size) {
+                                this.velocity = dir.normalize().mult(CONFIG.FAMILY.ENEMY_CHASE_SPEED);
+                                this.pos = this.pos.add(this.velocity.mult(dt * 60));
+                            }
+                            // 持续造成伤害
+                            this.biteDamageTimer -= dt;
+                            if (this.biteDamageTimer <= 0) {
+                                this.biteDamageTimer = 1.0;  // 每秒造成一次伤害
+                                this.latchedJuvenile.juvenileHitCount++;
+                                this.hit();
+                                if (this.latchedJuvenile.juvenileHitCount >= CONFIG.FAMILY.JUVENILE_HITS_TO_LOSE) {
+                                    this.latchedJuvenile.juvenileHitCount = 0;
+                                    if (this.latchedJuvenile.segments.length > 3) {
+                                        this.release();
+                                        this.latchedJuvenile.segments.pop();
+                                        this.latchedJuvenile.targetLength = this.latchedJuvenile.segments.length;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    // 更新身体节段位置（跟随头部）
+                    if (this.segments.length > 0) {
+                        this.segments[0] = this.pos;
+                        for (let i = 1; i < this.segments.length; i++) {
+                            const prev = this.segments[i - 1];
+                            const curr = this.segments[i];
+                            const dir = prev.sub(curr).normalize();
+                            this.segments[i] = prev.sub(dir.mult(8));
+                        }
+                    }
+                    return;
+                }
                 
                 // 寻找最近的幼体
                 let nearestJuvenile = null;
@@ -3318,11 +3392,20 @@
             }
             
             checkCollisionWithJuvenile(juvenile) {
-                if (!this.isAlive || !juvenile.isAlive || !juvenile.isJuvenile) return false;
+                if (!this.isAlive || !juvenile.isAlive || !juvenile.isJuvenile) return -1;
+                if (this.latchedJuvenile) return -1;  // 已经咬住了一个
                 const head = this.segments[0];
-                if (!head) return false;
-                const dist = head.dist(juvenile.head);
-                return dist < this.size + CONFIG.SEGMENT_RADIUS;
+                if (!head) return -1;
+                
+                // 检查所有身体段，跳过已被其他敌人咬住的段
+                for (let i = 0; i < juvenile.segments.length; i++) {
+                    if (juvenile.bittenSegments && juvenile.bittenSegments.has(i)) continue;
+                    const dist = head.dist(juvenile.segments[i]);
+                    if (dist < this.size + CONFIG.SEGMENT_RADIUS) {
+                        return i;
+                    }
+                }
+                return -1;
             }
             
             checkCollisionWithPlayer(player) {
@@ -3338,6 +3421,7 @@
             }
             
             die(bounceDir) {
+                this.release();  // 释放咬住的幼体段
                 this.isDying = true;
                 this.deathTimer = this.deathDuration;
                 this.sinkSpeed = 30;  // 初始下沉速度
@@ -3347,6 +3431,30 @@
                 } else {
                     this.bounceVelocity = this.velocity.mult(-2);
                 }
+            }
+            
+            /**
+             * 咬住幼体的某个身体段
+             */
+            latch(juvenile, segmentIndex) {
+                this.latchedJuvenile = juvenile;
+                this.latchedSegmentIndex = segmentIndex;
+                if (!juvenile.bittenSegments) juvenile.bittenSegments = new Set();
+                juvenile.bittenSegments.add(segmentIndex);
+            }
+            
+            /**
+             * 释放咬住的幼体段
+             */
+            release() {
+                if (this.latchedJuvenile && this.latchedSegmentIndex >= 0) {
+                    if (this.latchedJuvenile.bittenSegments) {
+                        this.latchedJuvenile.bittenSegments.delete(this.latchedSegmentIndex);
+                    }
+                }
+                this.latchedJuvenile = null;
+                this.latchedSegmentIndex = -1;
+                this.biteDamageTimer = 0;
             }
         }
 
@@ -4453,7 +4561,7 @@
                 );
                 
                 for (const worm of this.worms) {
-                    if (!worm.isAlive || worm.isEntering) continue;
+                    if (!worm.isAlive || worm.isEntering || worm.isJuvenile) continue;
                     
                     const others = activeWorms.filter(w => w !== worm);
                     const tailBite = worm.checkTailBite(others);
@@ -4469,7 +4577,7 @@
 
               // 6. 检测所有蚯蚓颈部被咬（被咬的死，不是咬人的死）
                 for (const worm of this.worms) {
-                    if (!worm.isAlive || worm.isEntering || worm.invincibleTimer > 0) continue;
+                    if (!worm.isAlive || worm.isEntering || worm.invincibleTimer > 0 || worm.isJuvenile) continue;
                     
                     const neckBite = worm.checkNeckBite(activeWorms);
                     if (neckBite) {
@@ -4484,7 +4592,8 @@
 
                 // 7. 玩家碰到其他蚯蚓身体（只有咬到尾部才能咬断，其他地方不咬断）
                 if (player && player.isAlive && !this.playerDeadWaitingForBodies) {
-                    const otherCollision = player.checkOtherWormCollision(activeWorms);
+                    const adultWorms = activeWorms.filter(w => !w.isJuvenile);
+                    const otherCollision = player.checkOtherWormCollision(adultWorms);
                     if (otherCollision) {
                         if (player.invincibleTimer > 0) {
                             // 玩家处于无敌状态，不被吞噬也不咬断对方
@@ -5145,19 +5254,14 @@
                     const enemy = this.enemies[i];
                     enemy.update(dt, juveniles, player);
                     
-                    // 检测敌人与幼体碰撞
-                    for (const worm of this.worms) {
-                        if (!worm.isAlive || !worm.isJuvenile) continue;
-                        if (enemy.checkCollisionWithJuvenile(worm)) {
-                            worm.juvenileHitCount++;
-                            enemy.hit();
-                            if (worm.juvenileHitCount >= CONFIG.FAMILY.JUVENILE_HITS_TO_LOSE) {
-                                worm.juvenileHitCount = 0;
-                                // 幼体掉1节
-                                if (worm.segments.length > 3) {
-                                    worm.segments.pop();
-                                    worm.targetLength = worm.segments.length;
-                                }
+                    // 检测敌人与幼体碰撞（咬住身体任意部位，多敌人不咬同一部位）
+                    if (!enemy.latchedJuvenile) {
+                        for (const worm of this.worms) {
+                            if (!worm.isAlive || !worm.isJuvenile) continue;
+                            const segIndex = enemy.checkCollisionWithJuvenile(worm);
+                            if (segIndex >= 0) {
+                                enemy.latch(worm, segIndex);
+                                break;
                             }
                         }
                     }
