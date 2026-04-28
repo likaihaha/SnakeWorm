@@ -6,7 +6,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="format-detection" content="telephone=no">
-    <title>Melody Worm v0.86 - 旋律虫虫</title>
+    <title>Melody Worm v0.87 - 旋律虫虫</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -1755,7 +1755,11 @@
                 
                 // 饥饿消耗系统
                 this.hungerTimer += dt;
-                const hungerRate = this.isMoving ? this.hungerRateMoving : this.hungerRateIdle;
+                let hungerRate = this.isMoving ? this.hungerRateMoving : this.hungerRateIdle;
+                // 身体小于10节时消耗减半
+                if (this.segments.length < 10) {
+                    hungerRate *= 2;  // 时间翻倍 = 消耗减半
+                }
                 if (this.hungerTimer >= hungerRate) {
                     this.hungerTimer -= hungerRate;
                     // 消耗一节身体
