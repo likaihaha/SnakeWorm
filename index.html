@@ -7,7 +7,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="format-detection" content="telephone=no">
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐛</text></svg>">
-    <title>Melody Worm v0.96 - 旋律虫虫</title>
+    <title>Melody Worm v0.97 - 旋律虫虫</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -567,7 +567,7 @@
     <div id="mouseIndicator"></div>
     
     <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 8px; box-sizing: border-box; width: 100%; height: 100vh;">
-        <h1 style="margin: 0; font-size: 20px; white-space: nowrap;">🎵 Melody Worm <span style="color:#888; font-size:14px;">v0.96</span> - 旋律虫虫</h1>
+        <h1 style="margin: 0; font-size: 20px; white-space: nowrap;">🎵 Melody Worm <span style="color:#888; font-size:14px;">v0.97</span> - 旋律虫虫</h1>
         <div style="display: flex; align-items: center; gap: 20px; font-size: 11px; color: #ccc;">
             <span>🎮 鼠标控制方向 | 按住左键连续射击 | 咬尾分裂 | 碰颈/框死</span>
         </div>
@@ -575,7 +575,7 @@
             <canvas id="gameCanvas" width="800" height="600"></canvas>
             <div class="split-notice" id="splitNotice">⚡ 咬尾分裂！新蚯蚓诞生！</div>
             <div id="startScreen">
-                <h2>🎵 Melody Worm<br>旋律虫虫 <span style="color:#888; font-size:14px;">v0.96</span></h2>
+                <h2>🎵 Melody Worm<br>旋律虫虫 <span style="color:#888; font-size:14px;">v0.97</span></h2>
                 <div class="start-instructions">
                     <div class="inst-row inst-main">
                         <span class="inst-icon">🖱️</span>
@@ -633,7 +633,7 @@
 
     <script>
         /**
-         * Melody Worm v0.96 - 旋律虫虫
+         * Melody Worm v0.97 - 旋律虫虫
          * 
          * 实验机制:
          * - 任何蚯蚓的头部咬到任何其他蚯蚓的尾巴（最后 1/3 段）→ 被咬者断尾分裂
@@ -2802,12 +2802,24 @@
             }
             
             drawEye(ctx, headPos, mouthAngle, drawRadius) {
-                // 眼睛始终在嘴巴反方向（避免嘴巴张开时眼睛掉进嘴里）
+                // 眼睛位置逻辑：
+                // - 头向上时（mouthAngle接近-PI/2）：眼睛往后拉（嘴巴反方向）
+                // - 头左右移动时：眼睛保持在头顶位置（固定向上）
                 const eyeOffset = drawRadius * 0.5;  // 从中心到眼睛的距离
                 const eyeRadius = 1.5;  // 眼睛半径（小一点）
                 
-                // 眼睛在嘴巴反方向：mouthAngle + PI
-                const eyeAngle = mouthAngle + Math.PI;
+                // 判断是否向上（mouthAngle在-PI/2附近，范围约±45度）
+                const isUpward = mouthAngle < -Math.PI/4 && mouthAngle > -Math.PI*3/4;
+                
+                let eyeAngle;
+                if (isUpward) {
+                    // 向上时：眼睛往后拉（嘴巴反方向）
+                    eyeAngle = mouthAngle + Math.PI;
+                } else {
+                    // 左右移动时：眼睛固定在头顶（向上）
+                    eyeAngle = -Math.PI/2;  // 固定向上
+                }
+                
                 const eyeX = headPos.x + Math.cos(eyeAngle) * eyeOffset;
                 const eyeY = headPos.y + Math.sin(eyeAngle) * eyeOffset;
                 
@@ -4337,7 +4349,7 @@
                 
                 // 发射音效（立体声定位）
                 if (typeof musicSystem !== 'undefined') {
-                    const headX = this.segments[0] ? this.segments[0].x : 400;
+                    const headX = player.segments[0] ? player.segments[0].x : 400;
                     musicSystem.playNote(800, 50, undefined, undefined, headX);
                 }
             }
