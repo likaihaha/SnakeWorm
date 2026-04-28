@@ -6,7 +6,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="format-detection" content="telephone=no">
-    <title>Melody Worm v0.85 - 旋律虫虫</title>
+    <title>Melody Worm v0.86 - 旋律虫虫</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -1484,6 +1484,11 @@
                 // AI射击相关
                 this.aiShootTimer = 0;  // AI射击冷却计时器
                 this.aiShootInterval = 2.0 + Math.random() * 2;  // AI射击间隔（2-4秒随机）
+                
+                // 饥饿消耗系统
+                this.hungerTimer = 0;  // 饥饿计时器
+                this.hungerRateIdle = 1.0;  // 不动时消耗速率（1秒/节）
+                this.hungerRateMoving = 0.5;  // 运动时消耗速率（0.5秒/节，即1秒2节）
             }
 
             get head() { return this.segments[0]; }
@@ -1746,6 +1751,31 @@
                     const newHead = head.add(moveStep);
                     this.segments[0] = newHead;
                     this.isMoving = true;  // 移动状态
+                }
+                
+                // 饥饿消耗系统
+                this.hungerTimer += dt;
+                const hungerRate = this.isMoving ? this.hungerRateMoving : this.hungerRateIdle;
+                if (this.hungerTimer >= hungerRate) {
+                    this.hungerTimer -= hungerRate;
+                    // 消耗一节身体
+                    if (this.segments.length > 2) {
+                        this.segments.pop();
+                        this.targetLength--;
+                        // 如果有红色段，也减少
+                        if (this.redSegments > 0) {
+                            this.redSegments--;
+                            if (this.redStrengths.length > 0) {
+                                this.redStrengths.pop();
+                            }
+                            this.bulletCount = this.redSegments * 5;
+                        }
+                    } else if (this.segments.length <= 2) {
+                        // 饿死判定
+                        this.isAlive = false;
+                        this.segments = [];
+                        return;
+                    }
                 }
 
                 for (let i = 1; i < this.segments.length; i++) {
@@ -3324,6 +3354,11 @@
                         } else {
                             worm.update(null, dt, this.foods, this.worms);
                         }
+                        // 检查玩家是否饿死
+                        if (!worm.isAlive) {
+                            this.gameOver('hunger');
+                            return;
+                        }
                     } else {
                         // 玩家出场动画期间，AI 蚯蚓不更新
                         if (isPlayerEntering) {
@@ -4329,6 +4364,12 @@
                         '💀 成为其他虫虫的美餐！',
                         '💀 被吞噬了！',
                         '💀 被咬死了！'
+                    ],
+                    hunger: [
+                        '💀 饿死了！身体消耗殆尽...',
+                        '💀 饥饿而亡！需要更多宝珠！',
+                        '💀 能量耗尽！身体消失了...',
+                        '💀 因饥饿而陨落！'
                     ]
                 };
                 
