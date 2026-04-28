@@ -6,7 +6,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="format-detection" content="telephone=no">
-    <title>Melody Worm v0.83 - 旋律虫虫</title>
+    <title>Melody Worm v0.84 - 旋律虫虫</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -1110,6 +1110,9 @@
                 { color: '#ff6b6b', score: 120, radius: 8, gravity: 0.04, wobble: 0, weight: 4, maxCount: 2, respawnTime: 1.0 },  // 红色：中速直落（maxCount翻倍，respawnTime减半）
                 { color: '#c77dff', score: 300, radius: 8, gravity: 0.05, wobble: 0.7, weight: 1, maxCount: 0, respawnTime: 2.5 }  // 紫色：稍快 + 大幅摆动（暂时禁用）
             ],
+            // FPS配置
+            TARGET_FPS: 60,  // 目标帧率
+            SHOW_FPS: false,  // 是否显示FPS
             // 游戏节奏配置
             RHYTHM: {
                 YELLOW_UNLOCK_TIME: 25,      // 25秒后解锁黄色宝珠（提前）
@@ -2124,7 +2127,6 @@
                     const isHead = i === 0;
                     // 嘴部（索引 0）永远不属于尾巴区域，避免双重标识
                     const isTail = i > 0 && tailIndices.has(i);
-                    const isHeadRegion = headIndices.has(i);
                     const sizeRatio = isHead ? 1.0 : (0.7 + 0.3 * (1 - i / this.segments.length));
                     let radius = CONFIG.SEGMENT_RADIUS * sizeRatio;
                     if (isHead) {
@@ -2188,11 +2190,6 @@
                             ctx.fill();
                             ctx.shadowBlur = 0;  // 重置
                         }
-                    }
-
-                    // 头部区域视觉标识：蓝色虚线边框 + 半透明蓝色填充
-                    if (isHeadRegion) {
-                        this.drawHeadIndicator(ctx, seg, radius, this.isPlayer);
                     }
 
                     // 颈部段视觉标识：短放射线（红色弹舱段用高对比度白色）
@@ -2268,25 +2265,6 @@
 
                 // 恢复默认混合模式
                 ctx.globalCompositeOperation = 'source-over';
-            }
-
-            /**
-             * 绘制头部标识：虚线边框 + 颜色填充
-             * @param {boolean} isPlayer - 是否为玩家蚯蚓 (玩家用蓝色，AI 用青色)
-             */
-            drawHeadIndicator(ctx, seg, radius, isPlayer) {
-                const fillColor = isPlayer ? 'rgba(100, 180, 255, 0.15)' : 'rgba(100, 220, 220, 0.12)';
-
-                ctx.save();
-                // 切换到source-over混合模式，避免Screen模式下颜色叠加异常
-                ctx.globalCompositeOperation = 'source-over';
-                // 去掉外层虚线圆圈，只保留内部半透明填充
-                // 内部半透明填充
-                ctx.fillStyle = fillColor;
-                ctx.beginPath();
-                ctx.arc(seg.x, seg.y, radius + 4, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.restore();
             }
 
             /**
@@ -2745,6 +2723,12 @@
                 this.playerDeathLength = 0;  // 玩家死亡时的长度（用于显示）
                 this.waitingForPlayer = false;  // 等待玩家鼠标移入白圈
                 this.mouseInCanvas = false;  // 鼠标是否在Canvas内
+                // FPS相关
+                this.showFPS = CONFIG.SHOW_FPS;
+                this.targetFPS = CONFIG.TARGET_FPS;
+                this.fpsAccumulator = 0;
+                this.fpsDisplay = 0;
+                this.fpsUpdateTimer = 0;
                 // 初始化每种宝珠的计时器
                 CONFIG.FOOD_TYPES.forEach(type => {
                     this.foodRespawnTimers[type.score] = 0;
@@ -3015,6 +2999,10 @@
                             this.resumeGame();
                         }
                     }
+                    // F键切换FPS显示
+                    if (e.key === 'f' || e.key === 'F') {
+                        this.showFPS = !this.showFPS;
+                    }
                 });
             }
             
@@ -3229,8 +3217,24 @@
                 const deltaTime = this.lastTime ? (timestamp - this.lastTime) / 1000 : 1 / 60;
                 this.lastTime = timestamp;
 
-                if (this.isRunning && !this.isGameOver && !this.isPaused) {
-                    this.update(deltaTime);
+                // FPS锁定：累积时间，按目标帧率更新
+                this.fpsAccumulator += deltaTime;
+                const targetInterval = 1 / this.targetFPS;
+
+                // FPS显示更新（每秒更新一次）
+                this.fpsUpdateTimer += deltaTime;
+                if (this.fpsUpdateTimer >= 1.0) {
+                    this.fpsDisplay = Math.round(this.frameCount / this.fpsUpdateTimer);
+                    this.frameCount = 0;
+                    this.fpsUpdateTimer = 0;
+                }
+
+                // 按目标帧率执行更新
+                while (this.fpsAccumulator >= targetInterval) {
+                    if (this.isRunning && !this.isGameOver && !this.isPaused) {
+                        this.update(targetInterval);
+                    }
+                    this.fpsAccumulator -= targetInterval;
                 }
 
                 this.draw();
@@ -4169,6 +4173,11 @@
                 this.drawCustomCursor();
 
                 this.drawWalls();
+
+                // 绘制FPS显示
+                if (this.showFPS) {
+                    this.drawFPS();
+                }
             }
 
             drawGrid() {
@@ -4199,6 +4208,17 @@
                 ctx.strokeRect(deathMargin, deathMargin, 
                     CONFIG.CANVAS_WIDTH - deathMargin * 2, 
                     CONFIG.CANVAS_HEIGHT - deathMargin * 2);
+            }
+
+            drawFPS() {
+                ctx.save();
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+                ctx.fillRect(5, 5, 60, 20);
+                ctx.fillStyle = '#00ff00';
+                ctx.font = '12px monospace';
+                ctx.textAlign = 'left';
+                ctx.fillText(`${this.fpsDisplay} FPS`, 10, 18);
+                ctx.restore();
             }
 
             /**
