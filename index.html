@@ -7,7 +7,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="format-detection" content="telephone=no">
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐛</text></svg>">
-    <title>Melody Worm v0.93 - 旋律虫虫</title>
+    <title>Melody Worm v0.94 - 旋律虫虫</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -567,7 +567,7 @@
     <div id="mouseIndicator"></div>
     
     <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 8px; box-sizing: border-box; width: 100%; height: 100vh;">
-        <h1 style="margin: 0; font-size: 20px; white-space: nowrap;">🎵 Melody Worm <span style="color:#888; font-size:14px;">v0.93</span> - 旋律虫虫</h1>
+        <h1 style="margin: 0; font-size: 20px; white-space: nowrap;">🎵 Melody Worm <span style="color:#888; font-size:14px;">v0.94</span> - 旋律虫虫</h1>
         <div style="display: flex; align-items: center; gap: 20px; font-size: 11px; color: #ccc;">
             <span>🎮 鼠标控制方向 | 左键发射子弹 | 咬尾分裂 | 碰颈/框死</span>
         </div>
@@ -575,15 +575,15 @@
             <canvas id="gameCanvas" width="800" height="600"></canvas>
             <div class="split-notice" id="splitNotice">⚡ 咬尾分裂！新蚯蚓诞生！</div>
             <div id="startScreen">
-                <h2>🎵 Melody Worm<br>旋律虫虫 <span style="color:#888; font-size:14px;">v0.93</span></h2>
+                <h2>🎵 Melody Worm<br>旋律虫虫 <span style="color:#888; font-size:14px;">v0.94</span></h2>
                 <div class="start-instructions">
                     <div class="inst-row inst-main">
                         <span class="inst-icon">🖱️</span>
-                        <span>鼠标控制方向，点左键发射子弹（吃🔴后）</span>
+                        <span>鼠标控制方向，点左键发射子弹（吃🔵后）</span>
                     </div>
                     <div class="inst-row inst-rule">
                         <span class="inst-icon">🔮</span>
-                        <span>吃 🟢绿(+1节) → 🟡黄(+2节+旋律) → 🔴红(发射减速子弹) → 🟠橙(磁力吸引)</span>
+                        <span>吃 🟢绿(+1节) → 🟡黄(+2节+旋律) → 🔵蓝(发射减速子弹) → 🟠橙(磁力吸引)</span>
                     </div>
                     <div class="inst-row inst-rule">
                         <span class="inst-icon">⚡</span>
@@ -619,7 +619,7 @@
         <div id="rhythmHint" style="color:#ffd700; font-size:10px; margin-top:3px;"></div>
     </div>
     <div id="controls">
-        🖱️ 鼠标控制方向，点左键发射子弹（吃🔴后） | 🔮 <b>吃 🟢绿(+1节)→🟡黄(+2节+旋律)→🔴红(发射减速子弹)→🟠橙(磁力吸引)</b><br>
+        🖱️ 鼠标控制方向，点左键发射子弹（吃🔵后） | 🔮 <b>吃 🟢绿(+1节)→🟡黄(+2节+旋律)→🔵蓝(发射减速子弹)→🟠橙(磁力吸引)</b><br>
         ⚡ <b>任何虫咬中虫的尾部 → 被咬者断尾分裂</b><br>
         💀 <b>任何虫咬其他虫颈部 → 被咬者死</b> | 💀 <b>头部碰边框死</b> | 🎵 <b>吃黄宝珠后等待旋律播完再出现下一颗</b>
     </div>
@@ -633,7 +633,7 @@
 
     <script>
         /**
-         * Melody Worm v0.93 - 旋律虫虫
+         * Melody Worm v0.94 - 旋律虫虫
          * 
          * 实验机制:
          * - 任何蚯蚓的头部咬到任何其他蚯蚓的尾巴（最后 1/3 段）→ 被咬者断尾分裂
@@ -1108,7 +1108,7 @@
                 { color: '#4ecca3', score: 10, radius: 8, gravity: 0.01, wobble: 0, weight: 60, maxCount: 5, respawnTime: 0.5 },  // 绿色：超慢速直落
                 { color: '#ffe66d', score: 30, radius: 8, gravity: 0.02, wobble: 0.5, weight: 25, maxCount: 1, respawnTime: 1.0 },  // 黄色：慢速 + 大幅摇摆
                 { color: '#ff8c42', score: 60, radius: 8, gravity: 0.03, wobble: 0.6, weight: 10, maxCount: 2, respawnTime: 1.5 },  // 橙色：中速 + 大幅摆动
-                { color: '#ff6b6b', score: 120, radius: 8, gravity: 0.04, wobble: 0, weight: 4, maxCount: 2, respawnTime: 1.0 },  // 红色：中速直落（maxCount翻倍，respawnTime减半）
+                { color: '#4dabf7', score: 120, radius: 8, gravity: 0.04, wobble: 0, weight: 4, maxCount: 2, respawnTime: 1.0 },  // 蓝色：中速直落（maxCount翻倍，respawnTime减半）
                 { color: '#c77dff', score: 300, radius: 8, gravity: 0.05, wobble: 0.7, weight: 1, maxCount: 0, respawnTime: 2.5 }  // 紫色：稍快 + 大幅摆动（暂时禁用）
             ],
             // FPS配置
@@ -1207,13 +1207,13 @@
             }
             
             draw(ctx) {
-                // 子弹外观：红色发光球
+                // 子弹外观：蓝色发光球
                 ctx.globalCompositeOperation = 'screen';
                 ctx.beginPath();
                 ctx.arc(this.pos.x, this.pos.y, this.radius, 0, Math.PI * 2);
-                ctx.fillStyle = 'rgba(255, 80, 80, 0.9)';
+                ctx.fillStyle = 'rgba(77, 171, 247, 0.9)';
                 ctx.shadowBlur = 15;
-                ctx.shadowColor = '#ff4444';
+                ctx.shadowColor = '#339af0';
                 ctx.fill();
                 
                 // 内核高光
@@ -1287,6 +1287,11 @@
                 this.bounces = 0;  // 弹跳次数
                 this.maxBounces = type.wobble > 0 ? 2 : 1;  // 有摆动的宝珠可以弹跳 2 次
                 this.inactiveTimer = 0;  // 初生冷却计时器（尸体转化的宝珠需要散布后才能被互动）
+                // 宝珠初生动画系统：白点 → 变形 → 启用互动
+                this.birthPhase = 'none';  // 'none' | 'white' | 'morphing' | 'active'
+                this.birthTimer = 0;
+                this.morphTimer = 0;
+                this.morphDuration = 0.6;  // 变形动画持续0.6秒
             }
             
             static weightedRandom() {
@@ -1320,12 +1325,27 @@
                     this.inactiveTimer -= dt;
                 }
                 
+                // 宝珠初生动画阶段管理
+                if (this.birthPhase === 'white') {
+                    this.birthTimer -= dt;
+                    if (this.birthTimer <= 0) {
+                        this.birthPhase = 'morphing';
+                        this.morphTimer = this.morphDuration;
+                    }
+                } else if (this.birthPhase === 'morphing') {
+                    this.morphTimer -= dt;
+                    if (this.morphTimer <= 0) {
+                        this.birthPhase = 'active';
+                    }
+                }
+                
                 this.pulsePhase += dt * 3;
                 this.movePhase += dt * 2;
                 
-                // 重力掉落
+                // 重力掉落 + 水平速度
                 this.velocity.y += this.type.gravity * dt * 60;
                 this.pos.y += this.velocity.y;
+                this.pos.x += this.velocity.x;
                 
                 // 水平摆动（如果有 wobble 配置）
                 if (this.type.wobble > 0) {
@@ -1355,6 +1375,81 @@
                 const pulse = Math.sin(this.pulsePhase) * 2;
                 const r = this.radius + pulse;
                 
+                // === 初生动画：白点阶段 ===
+                if (this.birthPhase === 'white') {
+                    // 小白点 + 白色拖尾
+                    const whiteR = 3;
+                    // 白色拖尾
+                    if (this.trail.length > 1) {
+                        ctx.beginPath();
+                        ctx.moveTo(this.trail[0].x, this.trail[0].y);
+                        for (let i = 1; i < this.trail.length; i++) {
+                            ctx.lineTo(this.trail[i].x, this.trail[i].y);
+                        }
+                        ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+                        ctx.lineWidth = 2;
+                        ctx.stroke();
+                    }
+                    // 白色光点
+                    ctx.shadowBlur = 8;
+                    ctx.shadowColor = '#ffffff';
+                    ctx.beginPath();
+                    ctx.arc(this.pos.x, this.pos.y, whiteR, 0, Math.PI * 2);
+                    ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+                    ctx.fill();
+                    ctx.shadowBlur = 0;
+                    ctx.globalCompositeOperation = 'source-over';
+                    return;
+                }
+                
+                // === 初生动画：变形阶段（白点→宝珠） ===
+                if (this.birthPhase === 'morphing') {
+                    const t = 1 - (this.morphTimer / this.morphDuration);  // 0→1
+                    const easeT = t * t * (3 - 2 * t);  // smoothstep
+                    const morphR = 3 + (r - 3) * easeT;  // 从3px渐变到正常半径
+                    
+                    // 拖尾：白色渐变到宝珠颜色
+                    if (this.trail.length > 1) {
+                        ctx.beginPath();
+                        ctx.moveTo(this.trail[0].x, this.trail[0].y);
+                        for (let i = 1; i < this.trail.length; i++) {
+                            ctx.lineTo(this.trail[i].x, this.trail[i].y);
+                        }
+                        const trailAlpha = 0.2 + 0.1 * easeT;
+                        ctx.strokeStyle = easeT < 0.5
+                            ? `rgba(255, 255, 255, ${trailAlpha})`
+                            : this.hexToRgba(this.type.color, trailAlpha);
+                        ctx.lineWidth = 2;
+                        ctx.stroke();
+                    }
+                    
+                    // 变形中的球体：白色与宝珠颜色混合
+                    ctx.shadowBlur = 10;
+                    ctx.shadowColor = this.type.color;
+                    ctx.beginPath();
+                    ctx.arc(this.pos.x, this.pos.y, morphR, 0, Math.PI * 2);
+                    // 颜色从白色渐变到宝珠色
+                    const cr = parseInt(this.type.color.slice(1, 3), 16);
+                    const cg = parseInt(this.type.color.slice(3, 5), 16);
+                    const cb = parseInt(this.type.color.slice(5, 7), 16);
+                    const mixR = Math.round(255 + (cr - 255) * easeT);
+                    const mixG = Math.round(255 + (cg - 255) * easeT);
+                    const mixB = Math.round(255 + (cb - 255) * easeT);
+                    ctx.fillStyle = `rgba(${mixR}, ${mixG}, ${mixB}, ${0.6 + 0.4 * easeT})`;
+                    ctx.fill();
+                    
+                    // 高光
+                    ctx.shadowBlur = 0;
+                    ctx.beginPath();
+                    ctx.arc(this.pos.x - 2, this.pos.y - 2, morphR * 0.35, 0, Math.PI * 2);
+                    ctx.fillStyle = `rgba(255, 255, 255, ${0.3 + 0.2 * easeT})`;
+                    ctx.fill();
+                    
+                    ctx.globalCompositeOperation = 'source-over';
+                    return;
+                }
+                
+                // === 正常态渲染 ===
                 // 拖尾效果
                 if (this.trail.length > 1) {
                     ctx.beginPath();
@@ -1481,14 +1576,21 @@
                 // 射击系统
                 this.bulletCount = 0;  // 弹舱子弹数
                 
-                // 红色腹部效果（红色宝珠触发）
-                this.redSegments = 0;  // 红色段的数量
-                this.redStrengths = [];  // 每个红色段的强度数组（每个元素0-5）
+                // 蓝色腹部效果（蓝色宝珠触发）
+                this.blueSegments = 0;  // 蓝色段的数量
+                this.blueStrengths = [];  // 每个蓝色段的强度数组（每个元素0-5）
                 this.bulletFiredCount = 0;  // 已发射的子弹计数
                 
                 // AI射击相关
                 this.aiShootTimer = 0;  // AI射击冷却计时器
                 this.aiShootInterval = 2.0 + Math.random() * 2;  // AI射击间隔（2-4秒随机）
+                
+                // 减速叠加系统
+                this.slowStacks = 0;  // 减速层数（可叠加）
+                this.slowTimer = 0;   // 减速计时器
+                
+                // 冰晶覆盖效果
+                this.iceOverlays = [];  // [{segmentIndex, timer, maxTimer}]
                 
                 // 饥饿消耗系统
                 this.hungerTimer = 0;  // 饥饿计时器
@@ -1798,7 +1900,7 @@
                         });
                         
                         // 计算普通段数量（总段数 - 头部 - 弹舱段）
-                        const normalSegments = this.segments.length - 1 - this.redSegments;
+                        const normalSegments = this.segments.length - 1 - this.blueSegments;
                         
                         if (normalSegments > 0) {
                             // 还有普通段，只移除普通段
@@ -1808,19 +1910,44 @@
                             // 普通段已耗尽，开始移除弹舱段
                             this.segments.pop();
                             this.targetLength--;
-                            if (this.redSegments > 0) {
-                                this.redSegments--;
-                                if (this.redStrengths.length > 0) {
-                                    this.redStrengths.pop();
+                            if (this.blueSegments > 0) {
+                                this.blueSegments--;
+                                if (this.blueStrengths.length > 0) {
+                                    this.blueStrengths.pop();
                                 }
-                                this.bulletCount = this.redSegments * 5;
+                                this.bulletCount = this.blueSegments * 5;
                             }
                         }
                     } else if (this.segments.length <= 2) {
-                        // 饿死判定
+                        // 饿死判定（保留segments供gameOver创建尸体）
                         this.isAlive = false;
-                        this.segments = [];
                         return;
+                    }
+                }
+
+                // 更新减速计时器
+                if (this.slowTimer > 0) {
+                    this.slowTimer -= dt;
+                    if (this.slowTimer <= 0) {
+                        this.slowStacks = Math.max(0, this.slowStacks - 1);
+                        if (this.slowStacks > 0) {
+                            // 还有层数，重新计算速度并重启计时器
+                            this.updateSpeed();
+                            const slowRatio = Math.pow(0.65, this.slowStacks);
+                            this.speed = Math.max(CONFIG.MIN_SPEED, this.speed * slowRatio);
+                            this.slowTimer = 3.0;
+                        } else {
+                            // 完全恢复
+                            this.updateSpeed();
+                        }
+                    }
+                }
+                
+                // 更新冰晶覆盖效果
+                for (let i = this.iceOverlays.length - 1; i >= 0; i--) {
+                    this.iceOverlays[i].timer -= dt;
+                    if (this.iceOverlays[i].timer <= 0) {
+                        this.iceOverlays.splice(i, 1);
                     }
                 }
 
@@ -1951,6 +2078,9 @@
                             food.velocity.x = speed * Math.cos(angle);
                             food.velocity.y = -speed * Math.sin(angle);
                             food.inactiveTimer = 2.0;  // 初生冷却2秒
+                            // 初生动画：白点1.2秒 → 变形0.6秒 → 激活
+                            food.birthPhase = 'white';
+                            food.birthTimer = 1.2;
                             allFoods.push(food);
                             
                             // 添加粒子特效（存入worm属性，由Game统一收集）
@@ -2310,13 +2440,13 @@
                         // 身体段保持圆形
                         let alpha = 0.3 + 0.5 * (1 - i / this.segments.length);
                         let color = this.color;
-                        const isRedSegment = i > 0 && i <= this.redSegments;
+                        const isBlueSegment = i > 0 && i <= this.blueSegments;
                         
                         // 黄光效果检查（优先级最高，覆盖所有类型）
                         const isYellowGlow = this.yellowGlowTimer > 0 && i === this.yellowGlowIndex;
                         
-                        if (isRedSegment && !isYellowGlow) {
-                            // 红色腹部效果：头部以下的段变红，分成5个扇形
+                        if (isBlueSegment && !isYellowGlow) {
+                            // 蓝色腹部效果：头部以下的段变蓝，分成5个扇形
                             // 临时切换到正常混合模式，避免颜色叠加变白
                             ctx.globalCompositeOperation = 'source-over';
                             
@@ -2326,9 +2456,9 @@
                             ctx.fillStyle = this.hexToRgba(this.color, alpha);
                             ctx.fill();
                             
-                            // 绘制红色扇形（根据当前段的强度绘制相应数量的扇形）
-                            const strengthIndex = i - 1;  // redStrengths数组索引（头部是索引0，红色段从索引1开始）
-                            const segmentStrength = (strengthIndex >= 0 && strengthIndex < this.redStrengths.length) ? this.redStrengths[strengthIndex] : 0;
+                            // 绘制蓝色扇形（根据当前段的强度绘制相应数量的扇形）
+                            const strengthIndex = i - 1;  // blueStrengths数组索引（头部是索引0，蓝色段从索引1开始）
+                            const segmentStrength = (strengthIndex >= 0 && strengthIndex < this.blueStrengths.length) ? this.blueStrengths[strengthIndex] : 0;
                             const sliceAngle = (Math.PI * 2) / 5;  // 每个扇形角度
                             for (let slice = 0; slice < segmentStrength; slice++) {
                                 const startAngle = slice * sliceAngle - Math.PI / 2;  // 从顶部开始
@@ -2337,7 +2467,7 @@
                                 ctx.moveTo(seg.x, seg.y);
                                 ctx.arc(seg.x, seg.y, radius, startAngle, endAngle);
                                 ctx.closePath();
-                                ctx.fillStyle = this.hexToRgba('#ff6b6b', 0.8);
+                                ctx.fillStyle = this.hexToRgba('#4dabf7', 0.8);
                                 ctx.fill();
                             }
                             
@@ -2365,10 +2495,10 @@
                         }
                     }
 
-                    // 颈部段视觉标识：短放射线（红色弹舱段用高对比度白色）
+                    // 颈部段视觉标识：短放射线（蓝色弹舱段用高对比度白色）
                     if (neckIndices.has(i)) {
-                        const isRedSegment = i > 0 && i <= this.redSegments;
-                        this.drawNeckIndicator(ctx, seg, radius, this.isPlayer, isRedSegment);
+                        const isBlueSegment = i > 0 && i <= this.blueSegments;
+                        this.drawNeckIndicator(ctx, seg, radius, this.isPlayer, isBlueSegment);
                     }
 
                     // 尾巴段视觉标识：黄色 / 红色虚线边框 + 半透明填充
@@ -2451,6 +2581,32 @@
                     }
                 }
                 
+                // 绘制冰晶覆盖效果（被蓝色子弹击中）
+                for (const ice of this.iceOverlays) {
+                    if (ice.segmentIndex < this.segments.length) {
+                        const seg = this.segments[ice.segmentIndex];
+                        const alpha = (ice.timer / ice.maxTimer) * 0.5;
+                        const radius = CONFIG.SEGMENT_RADIUS * 1.4;
+                        
+                        // 浅蓝色冰晶底色
+                        ctx.beginPath();
+                        ctx.arc(seg.x, seg.y, radius, 0, Math.PI * 2);
+                        ctx.fillStyle = `rgba(173, 216, 230, ${alpha})`;
+                        ctx.fill();
+                        
+                        // 冰晶边缘高光
+                        ctx.strokeStyle = `rgba(200, 230, 255, ${alpha + 0.2})`;
+                        ctx.lineWidth = 2;
+                        ctx.stroke();
+                        
+                        // 中心闪光点
+                        ctx.beginPath();
+                        ctx.arc(seg.x, seg.y, radius * 0.3, 0, Math.PI * 2);
+                        ctx.fillStyle = `rgba(255, 255, 255, ${alpha + 0.3})`;
+                        ctx.fill();
+                    }
+                }
+                
                 // 绘制磁力脉冲光环（橙色宝珠效果）
                 if (this.magnetTimer > 0 && this.segments.length > 0) {
                     const head = this.segments[0];
@@ -2522,9 +2678,9 @@
             /**
              * 绘制颈部标识：短放射线，颜色比身体亮一点
              * @param {boolean} isPlayer - 是否为玩家蚯蚓
-             * @param {boolean} isRedSegment - 是否为红色弹舱段（使用高对比度白色）
+             * @param {boolean} isBlueSegment - 是否为蓝色弹舱段（使用高对比度白色）
              */
-            drawNeckIndicator(ctx, seg, radius, isPlayer, isRedSegment = false) {
+            drawNeckIndicator(ctx, seg, radius, isPlayer, isBlueSegment = false) {
                 ctx.save();
                 
                 // 放射线数量：8条
@@ -2533,9 +2689,9 @@
                 const rayOuter = radius * 1.3;   // 放射线外端（超出圆）
                 const rayWidth = 1.5;
                 
-                // 红色弹舱段用白色高对比度放射线，普通段：玩家用浅绿色，AI用浅蓝色
+                // 蓝色弹舱段用白色高对比度放射线，普通段：玩家用浅绿色，AI用浅蓝色
                 let rayColor;
-                if (isRedSegment) {
+                if (isBlueSegment) {
                     rayColor = 'rgba(255, 255, 255, 0.9)';
                 } else {
                     rayColor = isPlayer ? 'rgba(120, 255, 200, 0.7)' : 'rgba(100, 200, 255, 0.6)';
@@ -3454,8 +3610,11 @@
 
                 // 按目标帧率执行更新
                 while (this.fpsAccumulator >= targetInterval) {
-                    if (this.isRunning && !this.isGameOver && !this.isPaused) {
-                        this.update(targetInterval);
+                    if (this.isRunning && !this.isPaused) {
+                        // 游戏结束但还有尸体需要处理时，继续更新
+                        if (!this.isGameOver || this.deadBodies.length > 0 || this.playerDeadWaitingForBodies) {
+                            this.update(targetInterval);
+                        }
                     }
                     this.fpsAccumulator -= targetInterval;
                 }
@@ -3519,7 +3678,7 @@
                 }
                 if (!this.rhythmNotified.red && this.gameTime >= CONFIG.RHYTHM.RED_UNLOCK_TIME && player.length >= CONFIG.RHYTHM.RED_UNLOCK_LENGTH) {
                     this.rhythmNotified.red = true;
-                    this.floatingTexts.push(new FloatingText(CONFIG.CANVAS_WIDTH / 2, CONFIG.CANVAS_HEIGHT / 2 - 50, '🔴 红色宝珠已解锁！可以发射子弹！', '#ff6b6b'));
+                    this.floatingTexts.push(new FloatingText(CONFIG.CANVAS_WIDTH / 2, CONFIG.CANVAS_HEIGHT / 2 - 50, '🔵 蓝色宝珠已解锁！可以发射减速子弹！', '#4dabf7'));
                 }
 
                 // 更新宝珠刷新计时器
@@ -3568,8 +3727,8 @@
                             worm.segments[0].y = Math.max(margin, Math.min(CONFIG.CANVAS_HEIGHT - margin, worm.segments[0].y));
                         }
                         
-                        // AI蚯蚓随机射击（有红色段时）
-                        if (worm.redSegments > 0 && worm.bulletCount > 0) {
+                        // AI蚯蚓随机射击（有蓝色段时）
+                        if (worm.blueSegments > 0 && worm.bulletCount > 0) {
                             worm.aiShootTimer -= dt;
                             if (worm.aiShootTimer <= 0) {
                                 // 随机射击
@@ -3628,12 +3787,12 @@
                             worm.magnetTimer = 3.0;  // 磁力持续 3 秒（加倍）
                             worm.magnetCombo = 0;  // 重置连击数
                             worm.grow(CONFIG.GROWTH_PER_FOOD);
-                        } else if (food.type.score === 120) {  // 红色宝珠：增加红色段（每段提供5发子弹）
-                            worm.redSegments = (worm.redSegments || 0) + 1;  // 增加1个红色段
-                            worm.redStrengths.push(5);  // 新红色段强度为5
-                            worm.bulletCount = worm.redSegments * 5;  // 子弹数量 = 红色段数 × 5
+                        } else if (food.type.score === 120) {  // 蓝色宝珠：增加蓝色段（每段提供5发子弹）
+                            worm.blueSegments = (worm.blueSegments || 0) + 1;  // 增加1个蓝色段
+                            worm.blueStrengths.push(5);  // 新蓝色段强度为5
+                            worm.bulletCount = worm.blueSegments * 5;  // 子弹数量 = 蓝色段数 × 5
                             worm.bulletFiredCount = 0;  // 重置已发射计数
-                            this.floatingTexts.push(new FloatingText(foodPos.x, foodPos.y - 20, '🔫 +5', '#ff6b6b'));
+                            this.floatingTexts.push(new FloatingText(foodPos.x, foodPos.y - 20, '🔫 +5', '#4dabf7'));
                             worm.grow(CONFIG.GROWTH_PER_FOOD);
                             // 第一次吃到红宝珠：显示瞄准镜提示
                             if (!this.rhythmNotified.redAim) {
@@ -3785,6 +3944,9 @@
                         food.velocity.x = speed * Math.cos(angle);
                         food.velocity.y = -speed * Math.sin(angle);  // 负号因为y轴向下
                         food.inactiveTimer = 2.0;  // 初生冷却2秒，期间不能被吃、不能被磁力吸引
+                        // 初生动画：白点1.2秒 → 变形0.6秒 → 激活（与inactiveTimer=2.0同步）
+                        food.birthPhase = 'white';
+                        food.birthTimer = 1.2;
                         this.foods.push(food);
                         
                         // 添加粒子特效（尸体段变宝珠的转化效果）
@@ -3801,7 +3963,7 @@
                 // 10. 检查玩家死亡是否等待尸体处理完成
                 if (this.playerDeadWaitingForBodies && this.deadBodies.length === 0) {
                     this.playerDeadWaitingForBodies = false;
-                    this.showPlayerDeathDialog();
+                    this.showPlayerDeathDialog(this.pendingDeathReason || 'eaten');
                 }
 
                 // 11. 磁力吸引效果（橙色宝珠触发）
@@ -3865,9 +4027,9 @@
                             
                             // 击中特效
                             for (let k = 0; k < 4; k++) {
-                                this.particles.push(new Particle(food.pos.x, food.pos.y, '#ff6b6b'));
+                                this.particles.push(new Particle(food.pos.x, food.pos.y, '#4dabf7'));
                             }
-                            this.floatingTexts.push(new FloatingText(food.pos.x, food.pos.y - 15, 'SLOW', '#ff6b6b'));
+                            this.floatingTexts.push(new FloatingText(food.pos.x, food.pos.y - 15, 'SLOW', '#4dabf7'));
                             
                             this.bullets.splice(i, 1);
                             break;
@@ -3879,15 +4041,35 @@
                         for (const worm of this.worms) {
                             if (!worm.isAlive || worm.isPlayer || worm.segments.length === 0) continue;
                             if (bullet.checkWormHit(worm)) {
-                                // 蚯蚓减速
-                                this.slowedWorms.set(worm, 3.0);  // 减速 3 秒
-                                worm.speed *= 0.3;  // 速度降为 30%
+                                // 找到被击中的段索引
+                                let hitSegmentIndex = 0;
+                                for (let si = 0; si < worm.segments.length; si++) {
+                                    if (bullet.pos.dist(worm.segments[si]) < bullet.radius + CONFIG.SEGMENT_RADIUS) {
+                                        hitSegmentIndex = si;
+                                        break;
+                                    }
+                                }
+                                
+                                // 可叠加减速效果
+                                worm.slowStacks = Math.min((worm.slowStacks || 0) + 1, 5);  // 最多5层
+                                worm.updateSpeed();
+                                const slowRatio = Math.pow(0.65, worm.slowStacks);
+                                worm.speed = Math.max(CONFIG.MIN_SPEED, worm.speed * slowRatio);
+                                worm.slowTimer = 3.0;  // 每层持续3秒
+                                
+                                // 添加冰晶覆盖效果
+                                worm.iceOverlays.push({
+                                    segmentIndex: hitSegmentIndex,
+                                    timer: 2.0,
+                                    maxTimer: 2.0
+                                });
                                 
                                 // 击中特效
                                 for (let k = 0; k < 6; k++) {
-                                    this.particles.push(new Particle(worm.head.x, worm.head.y, '#ff6b6b'));
+                                    this.particles.push(new Particle(worm.head.x, worm.head.y, '#4dabf7'));
                                 }
-                                this.floatingTexts.push(new FloatingText(worm.head.x, worm.head.y - 20, 'SLOW!', '#ff6b6b'));
+                                const stackText = worm.slowStacks > 1 ? `SLOW x${worm.slowStacks}!` : 'SLOW!';
+                                this.floatingTexts.push(new FloatingText(worm.head.x, worm.head.y - 20, stackText, '#4dabf7'));
                                 
                                 this.bullets.splice(i, 1);
                                 break;
@@ -4039,38 +4221,38 @@
                 this.bullets.push(new Bullet(bulletPos.x, bulletPos.y, direction));
                 player.bulletCount--;
                 
-                // 每射1发子弹，减少第一个红色段的强度
+                // 每射1发子弹，减少第一个蓝色段的强度
                 let strengthReduced = false;
-                for (let i = 0; i < player.redStrengths.length; i++) {
-                    if (player.redStrengths[i] > 0) {
-                        player.redStrengths[i]--;
+                for (let i = 0; i < player.blueStrengths.length; i++) {
+                    if (player.blueStrengths[i] > 0) {
+                        player.blueStrengths[i]--;
                         strengthReduced = true;
                         
-                        // 当该段强度为0时，减少红色段数并创建消失动画，同时移除该节身体
-                        if (player.redStrengths[i] === 0) {
+                        // 当该段强度为0时，减少蓝色段数并创建消失动画，同时移除该节身体
+                        if (player.blueStrengths[i] === 0) {
                             // 创建消失动画（粒子效果）
                             const segmentIndex = i + 1;  // 对应的身体段索引
                             if (segmentIndex < player.segments.length) {
                                 const segmentPos = player.segments[segmentIndex];
-                                // 创建红色粒子爆炸效果
+                                // 创建蓝色粒子爆炸效果
                                 for (let j = 0; j < 8; j++) {
-                                    this.particles.push(new Particle(segmentPos.x, segmentPos.y, 'rgb(255, 107, 107)'));
+                                    this.particles.push(new Particle(segmentPos.x, segmentPos.y, 'rgb(77, 171, 247)'));
                                 }
                                 // 移除该节身体
                                 player.segments.splice(segmentIndex, 1);
                                 player.targetLength--;
                             }
                             
-                            player.redSegments--;
-                            player.redStrengths.splice(i, 1);  // 从数组中移除
+                            player.blueSegments--;
+                            player.blueStrengths.splice(i, 1);  // 从数组中移除
                             // 更新子弹数量
-                            player.bulletCount = player.redSegments * 5;
+                            player.bulletCount = player.blueSegments * 5;
                         }
                         break;  // 只减少一个段的强度
                     }
                 }
                 
-                // 如果没有红色段可用，消耗身体
+                // 如果没有蓝色段可用，消耗身体
                 if (!strengthReduced && player.segments.length > 1) {
                     player.segments.pop();
                     player.targetLength--;
@@ -4101,15 +4283,15 @@
                 this.bullets.push(new Bullet(bulletPos.x, bulletPos.y, direction));
                 worm.bulletCount--;
                 
-                // 每射1发子弹，减少第一个红色段的强度
-                for (let i = 0; i < worm.redStrengths.length; i++) {
-                    if (worm.redStrengths[i] > 0) {
-                        worm.redStrengths[i]--;
-                        if (worm.redStrengths[i] === 0) {
-                            // 红色段用完，移除
-                            worm.redSegments--;
-                            worm.redStrengths.splice(i, 1);
-                            worm.bulletCount = worm.redSegments * 5;
+                // 每射1发子弹，减少第一个蓝色段的强度
+                for (let i = 0; i < worm.blueStrengths.length; i++) {
+                    if (worm.blueStrengths[i] > 0) {
+                        worm.blueStrengths[i]--;
+                        if (worm.blueStrengths[i] === 0) {
+                            // 蓝色段用完，移除
+                            worm.blueSegments--;
+                            worm.blueStrengths.splice(i, 1);
+                            worm.bulletCount = worm.blueSegments * 5;
                             // 移除该节身体
                             if (worm.segments.length > 3) {
                                 worm.segments.pop();
@@ -4331,7 +4513,7 @@
             /**
              * 显示玩家死亡对话框
              */
-            showPlayerDeathDialog() {
+            showPlayerDeathDialog(reason = 'eaten') {
                 // 创建死亡对话框
                 const dialog = document.createElement('div');
                 dialog.id = 'playerDeathDialog';
@@ -4349,10 +4531,19 @@
                     min-width: 300px;
                 `;
                 
+                // 根据死亡原因显示不同标题
+                const deathTitles = {
+                    wall: ['💀 越界了！边界外是深渊...', '💀 撞上了死亡之墙！', '💀 触碰了禁制之线！', '💀 被边界吞噬了！'],
+                    eaten: ['💀 被猎杀了！', '💀 成为其他虫虫的美餐！', '💀 被吞噬了！', '💀 被咬死了！'],
+                    hunger: ['💀 饿死了！身体消耗殆尽...', '💀 饥饿而亡！需要更多宝珠！', '💀 能量耗尽！身体消失了...', '💀 因饥饿而陨落！']
+                };
+                const titles = deathTitles[reason] || deathTitles.eaten;
+                const randomTitle = titles[Math.floor(Math.random() * titles.length)];
+                
                 // 安全创建DOM元素，避免innerHTML注入风险
                 const h2 = document.createElement('h2');
                 h2.style.cssText = 'color: #ff6b6b; margin-bottom: 20px;';
-                h2.textContent = '💀 你被咬死了！';
+                h2.textContent = randomTitle;
                 dialog.appendChild(h2);
                 
                 const p1 = document.createElement('p');
@@ -4474,7 +4665,7 @@
                 let cursorX = this.mousePos.x;
                 let cursorY = this.mousePos.y;
                 const player = this.worms[0];
-                const hasRedSegments = player && player.redSegments > 0;
+                const hasBlueSegments = player && player.blueSegments > 0;
                 
                 // 等待玩家控制阶段：白圈固定在画面中央
                 if (this.waitingForPlayer) {
@@ -4482,15 +4673,15 @@
                     cursorY = CONFIG.CANVAS_HEIGHT / 2;
                 }
                 
-                if (hasRedSegments) {
-                    // 瞄准镜图样（红色）
+                if (hasBlueSegments) {
+                    // 瞄准镜图样（蓝色）
                     const radius = 20;
                     const lineWidth = 2;
                     
                     // 外圈
                     ctx.beginPath();
                     ctx.arc(cursorX, cursorY, radius, 0, Math.PI * 2);
-                    ctx.strokeStyle = 'rgba(255, 107, 107, 0.8)';
+                    ctx.strokeStyle = 'rgba(77, 171, 247, 0.8)';
                     ctx.lineWidth = lineWidth;
                     ctx.stroke();
                     
@@ -4505,14 +4696,14 @@
                     ctx.lineTo(cursorX, cursorY - radius - 3);
                     ctx.moveTo(cursorX, cursorY + radius + 3);
                     ctx.lineTo(cursorX, cursorY + crossSize);
-                    ctx.strokeStyle = 'rgba(255, 107, 107, 0.6)';
+                    ctx.strokeStyle = 'rgba(77, 171, 247, 0.6)';
                     ctx.lineWidth = 1;
                     ctx.stroke();
                     
                     // 中心点
                     ctx.beginPath();
                     ctx.arc(cursorX, cursorY, 2, 0, Math.PI * 2);
-                    ctx.fillStyle = 'rgba(255, 107, 107, 0.9)';
+                    ctx.fillStyle = 'rgba(77, 171, 247, 0.9)';
                     ctx.fill();
                 } else {
                     // 普通圆环（白色）
@@ -4550,39 +4741,29 @@
             }
 
             gameOver(reason = 'eaten') {
-                this.isGameOver = true;
-                document.getElementById('finalLength').textContent = this.playerDeathLength || this.worms[0].length;
-                document.getElementById('finalScore').textContent = this.score;
-                document.getElementById('finalSplits').textContent = this.splitCount;
+                const player = this.worms.find(w => w.isPlayer);
                 
-                // 根据死亡原因显示不同的RP风格标题
-                const titleElement = document.querySelector('#gameOver h2');
-                const deathMessages = {
-                    wall: [
-                        '💀 越界了！边界外是深渊...',
-                        '💀 撞上了死亡之墙！',
-                        '💀 触碰了禁制之线！',
-                        '💀 被边界吞噬了！'
-                    ],
-                    eaten: [
-                        '💀 被猎杀了！',
-                        '💀 成为其他虫虫的美餐！',
-                        '💀 被吞噬了！',
-                        '💀 被咬死了！'
-                    ],
-                    hunger: [
-                        '💀 饿死了！身体消耗殆尽...',
-                        '💀 饥饿而亡！需要更多宝珠！',
-                        '💀 能量耗尽！身体消失了...',
-                        '💀 因饥饿而陨落！'
-                    ]
-                };
+                // 保存死亡长度
+                if (player) {
+                    this.playerDeathLength = player.segments.length;
+                }
                 
-                const messages = deathMessages[reason] || deathMessages.eaten;
-                const randomMessage = messages[Math.floor(Math.random() * messages.length)];
-                titleElement.textContent = randomMessage;
+                // 创建尸体下沉效果（所有死亡类型都有）
+                if (player && player.segments.length > 0) {
+                    const deadBody = new DeadBody(player.segments.map(s => new Vector(s.x, s.y)), player.color);
+                    this.deadBodies.push(deadBody);
+                    this.playerDeadWaitingForBodies = true;
+                    player.isAlive = false;
+                    player.segments = [];
+                }
                 
-                document.getElementById('gameOver').style.display = 'block';
+                // 保存死亡原因供后续弹框使用
+                this.pendingDeathReason = reason;
+                
+                // 如果没有尸体需要等待，直接弹框
+                if (!this.playerDeadWaitingForBodies) {
+                    this.showPlayerDeathDialog();
+                }
             }
         }
 

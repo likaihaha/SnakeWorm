@@ -3,12 +3,46 @@
 ## 版本管理流程
 - 完成功能修改后自动提交，不需要用户每次都提醒
 - 流程：git add → git commit → git push → 打标签
+- **每次提交必须同步更新页面标题和注释中的版本号**（index.html 第9行 `<title>` 和第624行注释）
 - GitHub 远程仓库：https://github.com/likaihaha/SnakeWorm
 - GitHub Pages 地址：https://likaihaha.github.io/SnakeWorm/
 - 配置文件：index.html（原 prototype_v0.12_pacman_with_eye.html）
 - Git Credential Manager 已配置，推送自动认证
 
 ## 当前版本
+- v0.94: 宝珠系统大改 - 修复水平速度失效+所有死亡都有尸体下沉+宝珠初生白点变形动画
+- v0.93: 尸体发射宝珠散射优化 - 角度扩大至5°~175°，速度4~8
+- v0.92: 静止时身体正弦波波动动画 + 头部抖动修复
+- v0.91: 静止时身体正弦波波动动画 - 体现生命感
+- v0.90: 尾巴缩小动画增强 - 虚线缩小+变灰+下沉+发射宝珠 + favicon修复
+- v0.89: 宝珠发射改为向上30°~150°扇形
+- v0.88: 消耗指数递减曲线+尾巴缩小动画+弹舱保持
+- v0.87: 身体小于10节时饥饿消耗减半
+- v0.86: 饥饿消耗系统 - 不动1秒/节，运动0.5秒/节，饿死判定
+- v0.85: 修复红色弹舱段吃黄宝珠不闪光 - 黄光效果优先级提升
+- v0.84: 移除头部标识、FPS锁定(60fps)、F键切换FPS显示
+- v0.83: 头部区域标识半径再调大 - radius+4比头部(radius+2)大2像素
+- v0.82: 头部区域标识半径调大 - radius-1改为radius+1
+- v0.81: 代码审查修复 - Vector.clone()缺失、Food/Particle颜色透明度失效、清理调试日志、修复CSS注释、初始化缺失属性、头部区域标识Screen混合模式修复
+- v0.80: 修复玩家死亡后卡死 - 添加player存在性和存活状态检查，防止死亡后访问空指针
+- v0.79: PC端隐藏全屏按钮 - 鼠标移入游戏区域隐藏，移出显示
+- v0.78: 修复全屏按钮emoji显示为白框 - 改用'全屏'文字
+- v0.77: 全屏布局优化 - 垂直居中布局，移除右侧图例，canvas自适应容器尺寸
+- v0.76: 全屏按钮样式优化 - 圆角方形、半透明背景、毛玻璃效果、悬停动画
+- v0.75: 修复分裂提示拦截鼠标事件 - 添加pointer-events: none
+- v0.74: RP风格死亡提示 - 碰框显示"越界了！边界外是深渊..."等，被咬显示"被猎杀了！"等
+- v0.73: 碰框死亡显示不同提示 - 碰框显示"碰框了！"，被咬显示"被吞噬了！"
+- v0.72: 腹部碰撞不触发死亡 - 任何虫虫咬到其他虫的腹部都不会死亡
+- v0.71: 修复玩家被咬死后最终长度显示为0 - 死亡前保存长度到playerDeathLength
+- v0.70: 修复红色弹舱段不显示颈部放射线 - 移除continue跳过逻辑，红色弹舱改用白色高对比度放射线
+- v0.69: 修复PC端误判为触摸设备 - 移除navigator.maxTouchPoints能力检测，改为实际触摸事件触发后才启用移动端UI
+- v0.68: 修复出场动画后卡在waitingForPlayer - 动画完成后自动开始游戏，不再要求用户手动移入白圈
+- v0.67: 修复canvas尺寸不稳定 - 改用documentElement.clientWidth/Height，添加最小缩放比例0.35，恢复CSS兜底保护
+- v0.66: 修复canvas尺寸过小 - 添加gameContainer ID，优先使用外层容器尺寸
+- v0.65: 修复开始框适配 - 添加max-width/min-width，调整padding和字体大小
+- v0.64: 修复浏览器缩放后canvas不更新 - 添加wheel/ResizeObserver/devicePixelRatio检测
+- v0.63: 修复iframe嵌入比例被压扁 - 移除CSS max-width/max-height限制，resizeCanvas改用父容器尺寸
+- v0.62: 修复innerHTML注入风险 - 改用DOM API安全创建元素
 - v0.61: 图例更新 - 去掉AI颈部/尾部标识，增加红色2/5扇形弹夹标识
 - v0.60: 红色宝珠频率翻倍(maxCount+respawnTime)，尸体爆宝珠概率70%绿15%红10%黄5%橙
 - v0.59: 图例颈部标识添加放射线效果 - 与游戏内drawNeckIndicator视觉一致
@@ -82,6 +116,12 @@
 - 四边界反弹：左右上下都有碰撞检测
 - 宝珠随机生成：x在死亡线内随机，y从-20到-120随机（避免排成直线）
 - 生成概率：30%概率生成，增加时间随机性
+
+## 安全规范（2026-04-27）
+- 禁止使用innerHTML/outerHTML插入动态内容，必须用DOM API（createElement + textContent）
+- 禁止使用eval()、document.write()、setTimeout(string)等危险函数
+- 用户输入/动态数据必须通过textContent设置，不能拼接到HTML字符串中
+- 已通过安全检查，v0.62版本可用
 
 ## 调试原则（2026-04-27）
 - **连续2次修不好同一问题时，必须让用户检查F12控制台输出**，不要继续猜测
