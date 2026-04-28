@@ -6,7 +6,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="format-detection" content="telephone=no">
-    <title>Melody Worm v0.84 - 旋律虫虫</title>
+    <title>Melody Worm v0.85 - 旋律虫虫</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -2142,7 +2142,10 @@
                         let color = this.color;
                         const isRedSegment = i > 0 && i <= this.redSegments;
                         
-                        if (isRedSegment) {
+                        // 黄光效果检查（优先级最高，覆盖所有类型）
+                        const isYellowGlow = this.yellowGlowTimer > 0 && i === this.yellowGlowIndex;
+                        
+                        if (isRedSegment && !isYellowGlow) {
                             // 红色腹部效果：头部以下的段变红，分成5个扇形
                             // 临时切换到正常混合模式，避免颜色叠加变白
                             ctx.globalCompositeOperation = 'source-over';
@@ -2172,7 +2175,7 @@
                             ctx.globalCompositeOperation = 'screen';
                         } else {
                             // 黄光效果：从嘴部到尾部逐个闪光（每个段只闪一次）
-                            if (this.yellowGlowTimer > 0 && i === this.yellowGlowIndex) {
+                            if (isYellowGlow) {
                                 // 当前段正在闪光
                                 const glowIntensity = 1.0;  // 全亮度闪光
                                 color = '#ffe66d';  // 黄色
