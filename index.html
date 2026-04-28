@@ -6,7 +6,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="format-detection" content="telephone=no">
-    <title>Melody Worm v0.88 - 旋律虫虫</title>
+    <title>Melody Worm v0.89 - 旋律虫虫</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -3629,9 +3629,11 @@
                     // 每一段碰底的尸体转化为宝珠，从该段位置向上发射
                     for (const emit of emitted) {
                         const food = new Food(emit.x, emit.y, emit.type);
-                        food.velocity.y = -(3.0 + Math.random() * 3.0);  // 向上速度
-                        // 水平散射：随机左右偏移，确保宝珠分散不挤在一起
-                        food.velocity.x = (Math.random() - 0.5) * 8.0;   // 左右偏移范围-4~+4
+                        // 扇形发射：向上30度到150度（以正上方为90度）
+                        const angle = (30 + Math.random() * 120) * Math.PI / 180;  // 30°~150°转弧度
+                        const speed = 3.0 + Math.random() * 3.0;  // 速度3~6
+                        food.velocity.x = speed * Math.cos(angle);
+                        food.velocity.y = -speed * Math.sin(angle);  // 负号因为y轴向下
                         food.inactiveTimer = 2.0;  // 初生冷却2秒，期间不能被吃、不能被磁力吸引
                         this.foods.push(food);
                         
