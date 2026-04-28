@@ -7,7 +7,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="format-detection" content="telephone=no">
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐛</text></svg>">
-    <title>Melody Worm v0.95 - 旋律虫虫</title>
+    <title>Melody Worm v0.96 - 旋律虫虫</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -567,7 +567,7 @@
     <div id="mouseIndicator"></div>
     
     <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 8px; box-sizing: border-box; width: 100%; height: 100vh;">
-        <h1 style="margin: 0; font-size: 20px; white-space: nowrap;">🎵 Melody Worm <span style="color:#888; font-size:14px;">v0.95</span> - 旋律虫虫</h1>
+        <h1 style="margin: 0; font-size: 20px; white-space: nowrap;">🎵 Melody Worm <span style="color:#888; font-size:14px;">v0.96</span> - 旋律虫虫</h1>
         <div style="display: flex; align-items: center; gap: 20px; font-size: 11px; color: #ccc;">
             <span>🎮 鼠标控制方向 | 按住左键连续射击 | 咬尾分裂 | 碰颈/框死</span>
         </div>
@@ -575,7 +575,7 @@
             <canvas id="gameCanvas" width="800" height="600"></canvas>
             <div class="split-notice" id="splitNotice">⚡ 咬尾分裂！新蚯蚓诞生！</div>
             <div id="startScreen">
-                <h2>🎵 Melody Worm<br>旋律虫虫 <span style="color:#888; font-size:14px;">v0.95</span></h2>
+                <h2>🎵 Melody Worm<br>旋律虫虫 <span style="color:#888; font-size:14px;">v0.96</span></h2>
                 <div class="start-instructions">
                     <div class="inst-row inst-main">
                         <span class="inst-icon">🖱️</span>
@@ -633,7 +633,7 @@
 
     <script>
         /**
-         * Melody Worm v0.95 - 旋律虫虫
+         * Melody Worm v0.96 - 旋律虫虫
          * 
          * 实验机制:
          * - 任何蚯蚓的头部咬到任何其他蚯蚓的尾巴（最后 1/3 段）→ 被咬者断尾分裂
@@ -889,7 +889,7 @@
             }
             
             // 播放钢琴音色（v2 - 带力度、踏板、rubato）
-            playNote(freq, duration = 120, velocity, usePedal) {
+            playNote(freq, duration = 120, velocity, usePedal, screenX) {
                 if (!this.audioContext) this.init();
                 if (this.audioContext.state === 'suspended') this.audioContext.resume();
                 
@@ -966,11 +966,30 @@
                 gainHarmonic.connect(filter);
                 gainLow.connect(filter);
                 
+                // 立体声声像定位（基于屏幕X坐标）
+                let panner = null;
+                if (screenX !== undefined && this.audioContext.createStereoPanner) {
+                    panner = this.audioContext.createStereoPanner();
+                    // 屏幕左(0)→pan=-1，屏幕右(CANVAS_WIDTH)→pan=+1
+                    const panValue = (screenX / (typeof CONFIG !== 'undefined' ? CONFIG.CANVAS_WIDTH : 800)) * 2 - 1;
+                    panner.pan.setValueAtTime(Math.max(-1, Math.min(1, panValue)), now);
+                }
+                
                 // 踏板模式：通过卷积混响输出；非踏板：直接输出
                 if (usePedal && this.convolver) {
-                    filter.connect(this.convolver);
+                    if (panner) {
+                        filter.connect(panner);
+                        panner.connect(this.convolver);
+                    } else {
+                        filter.connect(this.convolver);
+                    }
                 } else {
-                    filter.connect(this.audioContext.destination);
+                    if (panner) {
+                        filter.connect(panner);
+                        panner.connect(this.audioContext.destination);
+                    } else {
+                        filter.connect(this.audioContext.destination);
+                    }
                 }
                 
                 // 播放
@@ -1015,7 +1034,7 @@
             }
             
             // 吃宝珠时调用
-            onEatFood(food) {
+            onEatFood(food, screenX) {
                 const now = this.audioContext ? this.audioContext.currentTime : 0;
                 if (now - this.lastEatTime < 0.1) return; // 防止过于频繁
                 
@@ -1031,7 +1050,7 @@
                     // 应用Rubato到duration
                     const adjustedDuration = this._applyRubato(note.duration);
                     
-                    this.playNote(note.freq, adjustedDuration, note.velocity, note.pedal);
+                    this.playNote(note.freq, adjustedDuration, note.velocity, note.pedal, screenX);
                     this.noteIndex++;
                     
                     // 如果播放完一首歌，循环播放
@@ -1052,7 +1071,7 @@
             
             // 播放黄色宝珠的琶音（水晶序曲音符，数量等于段数）
             // 如果段数超过音符总数，循环播放
-            playYellowBeadArpeggio(segmentCount) {
+            playYellowBeadArpeggio(segmentCount, screenX) {
                 // 使用与普通宝珠相同的水晶序曲音符序列
                 const song = this.songs['水晶序曲'];
                 if (!song || song.length === 0) return;
@@ -1070,7 +1089,7 @@
                     // 应用Rubato
                     const adjustedDuration = this._applyRubato(note.duration);
                     
-                    this.playNote(note.freq, adjustedDuration, note.velocity, note.pedal);
+                    this.playNote(note.freq, adjustedDuration, note.velocity, note.pedal, screenX);
                     
                     // 安排下一个音符
                     setTimeout(() => {
@@ -1807,12 +1826,13 @@
                             this.grownCount++;
                             this.growStepTimer = 0.4;  // 下一节间隔 0.4 秒
                             
-                            // 播放一个音符（水晶序曲）
+                            // 播放一个音符（水晶序曲，立体声定位）
                             if (typeof musicSystem !== 'undefined') {
                                 const song = musicSystem.songs['水晶序曲'];
                                 if (song) {
                                     const noteIndex = (this.grownCount - 1) % song.length;
-                                    musicSystem.playNote(song[noteIndex].freq, song[noteIndex].duration);
+                                    const headX = this.segments[0] ? this.segments[0].x : 400;
+                                    musicSystem.playNote(song[noteIndex].freq, song[noteIndex].duration, undefined, undefined, headX);
                                 }
                             }
                             
@@ -2782,13 +2802,14 @@
             }
             
             drawEye(ctx, headPos, mouthAngle, drawRadius) {
-                // 侧面视角：眼睛在头部上方（固定向上，不跟随移动方向）
-                const eyeOffset = drawRadius * 0.4;  // 从中心向上的距离
+                // 眼睛始终在嘴巴反方向（避免嘴巴张开时眼睛掉进嘴里）
+                const eyeOffset = drawRadius * 0.5;  // 从中心到眼睛的距离
                 const eyeRadius = 1.5;  // 眼睛半径（小一点）
                 
-                // 眼睛始终在头顶上方（固定向上，不受移动方向影响）
-                const eyeX = headPos.x;
-                const eyeY = headPos.y - eyeOffset;
+                // 眼睛在嘴巴反方向：mouthAngle + PI
+                const eyeAngle = mouthAngle + Math.PI;
+                const eyeX = headPos.x + Math.cos(eyeAngle) * eyeOffset;
+                const eyeY = headPos.y + Math.sin(eyeAngle) * eyeOffset;
                 
                 // 恢复默认混合模式（不用 Screen，否则看不到黑色眼睛）
                 ctx.globalCompositeOperation = 'source-over';
@@ -2855,8 +2876,8 @@
                 // 壁虎断尾正弦波跳动
                 this.wavePhase = Math.random() * Math.PI * 2;  // 随机初始相位
                 this.waveAmplitude = 3.5;  // 跳动幅度（像素）
-                this.waveFrequency = 12;   // 跳动频率（快，模拟惊慌跳动）
-                this.waveDecay = 0.92;     // 衰减系数（每秒）
+                this.waveFrequency = 8;    // 跳动频率（适中，持续扭动）
+                this.waveDecay = 0.9995;   // 衰减系数（极慢，9秒后仍有~77%幅度）
                 this.originalPositions = segments.map(s => ({ x: s.x, y: s.y }));  // 保存原始位置
             }
 
@@ -2868,17 +2889,20 @@
                 this.totalTimer -= dt;
                 this.flashPhase += dt * 8;
                 
-                // 正弦波跳动：快速衰减的横向摆动
+                // 正弦波跳动：持续的横向扭动（壁虎断尾效果）
                 this.wavePhase += dt * this.waveFrequency;
                 this.waveAmplitude *= Math.pow(this.waveDecay, dt * 60);  // 按帧衰减
                 // 每段施加不同相位的正弦偏移（从头到尾波浪传递）
                 for (let i = 0; i < this.segments.length; i++) {
                     const t = i / Math.max(1, this.segments.length - 1);  // 0→1
-                    const phaseOffset = t * Math.PI * 1.5;  // 尾部相位延迟
-                    const offset = Math.sin(this.wavePhase + phaseOffset) * this.waveAmplitude * (0.3 + 0.7 * t);
+                    const phaseOffset = t * Math.PI * 2;  // 尾部相位延迟（完整波长传递）
+                    // 主波 + 次波叠加，模拟有机扭动
+                    const mainWave = Math.sin(this.wavePhase + phaseOffset) * this.waveAmplitude;
+                    const subWave = Math.sin(this.wavePhase * 1.7 + phaseOffset * 0.6) * this.waveAmplitude * 0.4;
+                    const offset = (mainWave + subWave) * (0.2 + 0.8 * t);  // 尾部幅度更大
                     // 垂直于原始连线方向偏移（简化：用x方向偏移模拟左右抖动）
                     this.segments[i].x = this.originalPositions[i].x + offset;
-                    this.segments[i].y = this.originalPositions[i].y + Math.sin(this.wavePhase * 0.7 + phaseOffset) * this.waveAmplitude * 0.3 * t;
+                    this.segments[i].y = this.originalPositions[i].y + Math.sin(this.wavePhase * 0.5 + phaseOffset) * this.waveAmplitude * 0.25 * t;
                 }
 
                 if (this.colorTimer <= 0) {
@@ -3885,13 +3909,13 @@
                         // 设置该类型宝珠的刷新计时器
                         this.foodRespawnTimers[food.type.score] = food.type.respawnTime;
                         
-                        // 触发音效
+                        // 触发音效（立体声：基于宝珠位置）
                         if (worm.isPlayer) {
                             // 黄色宝珠：播放水晶序曲音符，数量等于蚯蚓段数
                             if (food.type.score === 30) {
-                                musicSystem.playYellowBeadArpeggio(worm.segments.length);
+                                musicSystem.playYellowBeadArpeggio(worm.segments.length, foodPos.x);
                             } else {
-                                musicSystem.onEatFood(food);
+                                musicSystem.onEatFood(food, foodPos.x);
                             }
                         }
                     }
@@ -4050,11 +4074,12 @@
                 
                 // 磁力效果结束时结算连击
                 if (player && player.magnetTimer <= 0 && player.magnetCombo > 0) {
-                    // 播放叮叮声（每个被吸引的宝珠响一声）
+                    // 播放叮叮声（每个被吸引的宝珠响一声，立体声定位）
+                    const headX = player.segments[0] ? player.segments[0].x : 400;
                     for (let i = 0; i < Math.min(player.magnetCombo, 8); i++) {
                         setTimeout(() => {
                             if (typeof musicSystem !== 'undefined') {
-                                musicSystem.playNote(1200 + i * 100, 80);  // 递增音高
+                                musicSystem.playNote(1200 + i * 100, 80, undefined, undefined, headX);  // 递增音高
                             }
                         }, i * 100);
                     }
@@ -4310,9 +4335,10 @@
                     player.targetLength--;
                 }
                 
-                // 发射音效
+                // 发射音效（立体声定位）
                 if (typeof musicSystem !== 'undefined') {
-                    musicSystem.playNote(800, 50);
+                    const headX = this.segments[0] ? this.segments[0].x : 400;
+                    musicSystem.playNote(800, 50, undefined, undefined, headX);
                 }
             }
             
