@@ -6,7 +6,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="format-detection" content="telephone=no">
-    <title>Melody Worm v0.80 - 旋律虫虫</title>
+    <title>Melody Worm v0.81 - 旋律虫虫</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -27,8 +27,8 @@
         #gameCanvas {
             border: 1px solid rgba(255, 107, 107, 0.2);
             background: #2d2d3a;
-            touch-action: none;  // 禁止默认触摸行为
-            margin-top: 10px;  // Canvas 上移
+            touch-action: none;  /* 禁止默认触摸行为 */
+            margin-top: 10px;  /* Canvas 上移 */
             /* JS resizeCanvas() 控制等比缩放，CSS 只做兜底保护 */
             max-width: 100%;
             height: auto;
@@ -94,7 +94,7 @@
             border-radius: 50%;
             background: rgba(255, 255, 255, 0.1);
             border: 2px solid rgba(255, 255, 255, 0.3);
-            display: none;  // 默认隐藏，触摸设备显示
+            display: none;  /* 默认隐藏，触摸设备显示 */
             touch-action: none;
             z-index: 1000;
         }
@@ -122,7 +122,7 @@
             color: white;
             font-size: 16px;
             font-weight: bold;
-            display: none;  // 默认隐藏，触摸设备显示
+            display: none;  /* 默认隐藏，触摸设备显示 */
             align-items: center;
             justify-content: center;
             z-index: 1000;
@@ -144,7 +144,7 @@
             padding: 10px 15px;
             color: white;
             font-size: 14px;
-            display: none;  // 默认隐藏，触摸设备显示
+            display: none;  /* 默认隐藏，触摸设备显示 */
             z-index: 1000;
             text-align: center;
         }
@@ -162,7 +162,7 @@
             border: 2px solid rgba(255, 255, 255, 0.9);
             border-radius: 50%;
             pointer-events: none;
-            display: none;  // 默认隐藏，触摸设备显示
+            display: none;  /* 默认隐藏，触摸设备显示 */
             z-index: 999;
             transform: translate(-50%, -50%);
             transition: opacity 0.2s;
@@ -376,14 +376,14 @@
             
             /* 摇杆位置和大小 - 增大摇杆 */
             #joystick {
-                bottom: 70px !important;  // 摇杆下移
+                bottom: 70px !important;  /* 摇杆下移 */
                 left: 30px !important;
-                width: 130px !important;  // 增大摇杆
+                width: 130px !important;  /* 增大摇杆 */
                 height: 130px !important;
             }
             
             #joystickKnob {
-                width: 52px !important;  // 增大摇杆钮
+                width: 52px !important;  /* 增大摇杆钮 */
                 height: 52px !important;
             }
             
@@ -519,7 +519,7 @@
                 bottom: 10px !important;
                 left: auto !important;
                 right: 10px !important;
-                width: 100px !important;  // 横屏摇杆小一点
+                width: 100px !important;  /* 横屏摇杆小一点 */
                 height: 100px !important;
             }
             
@@ -632,7 +632,7 @@
 
     <script>
         /**
-         * Melody Worm v0.80 - 旋律虫虫
+         * Melody Worm v0.81 - 旋律虫虫
          * 
          * 实验机制:
          * - 任何蚯蚓的头部咬到任何其他蚯蚓的尾巴（最后 1/3 段）→ 被咬者断尾分裂
@@ -1140,6 +1140,7 @@
                 const angle = Math.random() * Math.PI * 2;
                 return new Vector(Math.cos(angle), Math.sin(angle));
             }
+            clone() { return new Vector(this.x, this.y); }
         }
 
         /* ========== 粒子类 ========== */
@@ -1160,11 +1161,21 @@
             draw(ctx) {
                 const alpha = this.life / this.maxLife;
                 ctx.globalCompositeOperation = 'screen';
-                ctx.fillStyle = this.color.replace(')', `, ${alpha})`).replace('rgb', 'rgba');
+                ctx.fillStyle = this.hexToRgba(this.color, alpha);
                 ctx.beginPath();
                 ctx.arc(this.pos.x, this.pos.y, this.size * alpha, 0, Math.PI * 2);
                 ctx.fill();
                 ctx.globalCompositeOperation = 'source-over';
+            }
+            
+            hexToRgba(hex, alpha) {
+                if (hex.startsWith('rgb')) {
+                    return hex.replace('rgb', 'rgba').replace(')', `, ${alpha})`);
+                }
+                const r = parseInt(hex.slice(1, 3), 16);
+                const g = parseInt(hex.slice(3, 5), 16);
+                const b = parseInt(hex.slice(5, 7), 16);
+                return `rgba(${r}, ${g}, ${b}, ${alpha})`;
             }
         }
 
@@ -1347,7 +1358,7 @@
                     for (let i = 1; i < this.trail.length; i++) {
                         ctx.lineTo(this.trail[i].x, this.trail[i].y);
                     }
-                    ctx.strokeStyle = this.type.color.replace(')', ', 0.3)').replace('rgb', 'rgba');
+                    ctx.strokeStyle = this.hexToRgba(this.type.color, 0.3);
                     ctx.lineWidth = 2;
                     ctx.stroke();
                 }
@@ -1362,7 +1373,7 @@
                     const ringRadius = r + 4 + i * 3;
                     ctx.beginPath();
                     ctx.arc(this.pos.x, this.pos.y, ringRadius, 0, Math.PI * 2);
-                    ctx.strokeStyle = this.type.color.replace(')', `, ${0.3 - i * 0.05})`).replace('rgb', 'rgba');
+                    ctx.strokeStyle = this.hexToRgba(this.type.color, 0.3 - i * 0.05);
                     ctx.lineWidth = 1;
                     ctx.stroke();
                 }
@@ -1374,7 +1385,7 @@
                 ctx.arc(this.pos.x, this.pos.y, r, 0, Math.PI * 2);
                 // 初生冷却中的宝珠半透明，提示玩家还不能互动
                 ctx.fillStyle = this.inactiveTimer > 0
-                    ? this.type.color.replace(')', ', 0.5)').replace('rgb', 'rgba')
+                    ? this.hexToRgba(this.type.color, 0.5)
                     : this.type.color;
                 ctx.fill();
                 
@@ -1386,6 +1397,16 @@
                 ctx.fill();
                 
                 ctx.globalCompositeOperation = 'source-over';
+            }
+            
+            hexToRgba(hex, alpha) {
+                if (hex.startsWith('rgb')) {
+                    return hex.replace('rgb', 'rgba').replace(')', `, ${alpha})`);
+                }
+                const r = parseInt(hex.slice(1, 3), 16);
+                const g = parseInt(hex.slice(3, 5), 16);
+                const b = parseInt(hex.slice(5, 7), 16);
+                return `rgba(${r}, ${g}, ${b}, ${alpha})`;
             }
         }
 
@@ -1448,6 +1469,9 @@
                 // 磁力效果（橙色宝珠触发）
                 this.magnetTimer = 0;  // 磁力计时器
                 this.magnetCombo = 0;  // 磁力连击数
+                
+                // 射击系统
+                this.bulletCount = 0;  // 弹舱子弹数
                 
                 // 红色腹部效果（红色宝珠触发）
                 this.redSegments = 0;  // 红色段的数量
@@ -1977,7 +2001,7 @@
                 if (this.isEntering && this.enterPhase === 0) {
                     this.enterPhase = 1;  // 开始动画第一阶段
                     this.enterStartTime = performance.now() / 1000;
-                    console.log('[出场动画] 切换到phase 1, enterStartTime=', this.enterStartTime);
+
                 }
                 
                 if (this.enterPhase === 1) {
@@ -1985,7 +2009,7 @@
                     const currentTime = performance.now() / 1000;
                     const elapsed = currentTime - this.enterStartTime;
                     const progress = Math.min(elapsed / this.enterDuration1, 1);
-                    console.log('[出场动画] phase 1: elapsed=', elapsed.toFixed(3), 'progress=', progress.toFixed(3), 'headX=', this.segments[0].x.toFixed(1));
+
                     
                     const startX = this.enterStartPos.x;
                     const endX = this.enterMidPos.x;
@@ -2717,6 +2741,8 @@
                 this.joystickDirection = new Vector(0, 0);  // 摇杆方向
                 this.playerDeadWaitingForBodies = false;  // 玩家死亡等待尸体处理
                 this.playerDeathLength = 0;  // 玩家死亡时的长度（用于显示）
+                this.waitingForPlayer = false;  // 等待玩家鼠标移入白圈
+                this.mouseInCanvas = false;  // 鼠标是否在Canvas内
                 // 初始化每种宝珠的计时器
                 CONFIG.FOOD_TYPES.forEach(type => {
                     this.foodRespawnTimers[type.score] = 0;
@@ -3423,7 +3449,7 @@
                         // 检测咬到自己尾巴
                         const selfTailBiteIndex = worm.checkSelfTailBite();
                         if (selfTailBiteIndex !== -1) {
-                            console.log(`[咬尾检测] ${worm.isPlayer ? '玩家' : 'AI'} 咬到自己尾巴！段索引=${selfTailBiteIndex}`);
+
                             this.handleSplit(worm, selfTailBiteIndex);
                             this.splitCooldown = 2.0;
                             break;  // 每次只处理一个蚯蚓的分裂
@@ -3444,7 +3470,7 @@
                     if (tailBite) {
                         const biteType = worm.isPlayer ? '玩家' : 'AI';
                         const biteeType = tailBite.worm.isPlayer ? '玩家' : 'AI';
-                        console.log(`[全咬实验] ${biteType} 咬到 ${biteeType} 尾巴！段索引=${tailBite.segmentIndex}`);
+
                         this.handleTailBiteSplit(tailBite.worm, tailBite.segmentIndex);
                         this.splitCooldown = 2.0;
                         break;  // 每次只处理一个蚯蚓的分裂
@@ -3459,7 +3485,7 @@
                     if (neckBite) {
                         const biter = worm.isPlayer ? '玩家' : 'AI';
                         const bitee = neckBite.worm.isPlayer ? '玩家' : 'AI';
-                        console.log(`[颈部被咬] ${biter}咬到${bitee}的颈部！${bitee}被咬死！段索引=${neckBite.segmentIndex}`);
+
                         this.handleNeckBiteDeath(neckBite.worm, neckBite.segmentIndex);
                         this.splitCooldown = 2.0;
                         break;
@@ -3968,7 +3994,7 @@
                 const tailSegments = worm.segments.slice(biteIndex);
 
                 if (tailSegments.length < 3) {
-                    console.log('[实验调试] 尾巴太短，不触发分裂');
+
                     return;
                 }
 
@@ -3978,7 +4004,7 @@
 
                 // 如果剩余段太少（< 3），蚯蚓死亡
                 if (worm.segments.length < 3) {
-                    console.log(`[实验调试] 蚯蚓被咬死后剩余长度=${worm.segments.length}，标记死亡`);
+
                     worm.isAlive = false;
                     worm.segments = [];
                     return;
@@ -3988,7 +4014,7 @@
                 const brokenTail = new BrokenTail(tailSegments, worm.color);
                 this.brokenTails.push(brokenTail);
 
-                console.log(`[实验调试] 咬尾分裂完成！被咬者剩余长度=${worm.segments.length}, 断尾长度=${tailSegments.length}`);
+
             }
 
             /**
@@ -4020,7 +4046,7 @@
                     this.deadBodies.push(deadBody2);
                 }
 
-                console.log(`[颈部被咬死亡] 头部段=${headSegments.length}, 尾巴段=${tailSegments.length}`);
+
 
                 // 如果是玩家死亡，等待尸体处理完后弹框
                 if (worm.isPlayer) {
