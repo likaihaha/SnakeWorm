@@ -1740,12 +1740,10 @@
                 const direction = moveTarget.sub(head).normalize();
                 const distanceToTarget = head.dist(moveTarget);
                 
-                // 如果已经到达目标附近，停止移动（添加随机小幅度波形让蚯蚓更鲜活）
+                // 如果已经到达目标附近，停止移动（身体正弦波波动已提供生命感）
                 if (distanceToTarget < 15) {
-                    // 随机小幅度波形：让蚯蚓在静止时也有轻微摆动
-                    const waveX = (Math.random() - 0.5) * 2;  // -1 ~ 1
-                    const waveY = (Math.random() - 0.5) * 2;
-                    this.segments[0] = new Vector(moveTarget.x + waveX, moveTarget.y + waveY);
+                    // 头部稳定在目标位置，不再随机抖动
+                    this.segments[0] = new Vector(moveTarget.x, moveTarget.y);
                     this.isMoving = false;  // 停止状态
                     // 不更新 velocity，保持静止
                 } else {
