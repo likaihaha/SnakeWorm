@@ -6,7 +6,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="format-detection" content="telephone=no">
-    <title>Melody Worm v0.81 - 旋律虫虫</title>
+    <title>Melody Worm v0.82 - 旋律虫虫</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -2284,7 +2284,7 @@
                 // 内部半透明填充
                 ctx.fillStyle = fillColor;
                 ctx.beginPath();
-                ctx.arc(seg.x, seg.y, radius - 1, 0, Math.PI * 2);
+                ctx.arc(seg.x, seg.y, radius + 1, 0, Math.PI * 2);
                 ctx.fill();
                 ctx.restore();
             }
