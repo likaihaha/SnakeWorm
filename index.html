@@ -7,7 +7,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="format-detection" content="telephone=no">
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐛</text></svg>">
-    <title>Melody Worm v1.02 - 旋律虫虫</title>
+    <title>Melody Worm v1.03 - 旋律虫虫</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -567,7 +567,7 @@
     <div id="mouseIndicator"></div>
     
     <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 8px; box-sizing: border-box; width: 100%; height: 100vh;">
-        <h1 style="margin: 0; font-size: 20px; white-space: nowrap;">🎵 Melody Worm <span style="color:#888; font-size:14px;">v1.02</span> - 旋律虫虫</h1>
+        <h1 style="margin: 0; font-size: 20px; white-space: nowrap;">🎵 Melody Worm <span style="color:#888; font-size:14px;">v1.03</span> - 旋律虫虫</h1>
         <div style="display: flex; align-items: center; gap: 20px; font-size: 11px; color: #ccc;">
             <span>🎮 鼠标控制方向 | 按住左键连续射击 | 咬尾分裂 | 碰颈/框死</span>
         </div>
@@ -576,7 +576,7 @@
             <div class="split-notice" id="splitNotice">⚡ 咬尾分裂！新蚯蚓诞生！</div>
             <div class="split-notice" id="familyNotice" style="color: #FFD700; font-size: 16px;">👶 你就要有一个孩子了！保护好他！</div>
             <div id="startScreen">
-                <h2>🎵 Melody Worm<br>旋律虫虫 <span style="color:#888; font-size:14px;">v1.02</span></h2>
+                <h2>🎵 Melody Worm<br>旋律虫虫 <span style="color:#888; font-size:14px;">v1.03</span></h2>
                 <div class="start-instructions">
                     <div class="inst-row inst-main">
                         <span class="inst-icon">🖱️</span>
@@ -634,7 +634,7 @@
 
     <script>
         /**
-         * Melody Worm v1.02 - 旋律虫虫
+         * Melody Worm v1.03 - 旋律虫虫
          * 
          * 实验机制:
          * - 任何蚯蚓的头部咬到任何其他蚯蚓的尾巴（最后 1/3 段）→ 被咬者断尾分裂
@@ -2272,6 +2272,7 @@
 
             checkFoodCollision(foods) {
                 if (this.segments.length === 0) return -1;
+                if (this.isJuvenile) return -1;  // 幼年体不能吃宝珠
                 const head = this.segments[0];
                 for (let i = 0; i < foods.length; i++) {
                     const food = foods[i];
@@ -3094,6 +3095,13 @@
                 this.wanderTimer = 0;
                 this.wanderDir = Vector.randomDir();
                 
+                // 死亡下沉相关
+                this.isDying = false;  // 是否正在死亡下沉
+                this.deathTimer = 0;  // 死亡动画计时器
+                this.deathDuration = 1.5;  // 死亡动画持续时间
+                this.sinkSpeed = 0;  // 下沉速度
+                this.bounceVelocity = null;  // 弹开速度
+                
                 // 初始化身体节段
                 for (let i = 0; i < this.segmentCount; i++) {
                     this.segments.push(new Vector(x - i * 8, y));
@@ -3102,6 +3110,38 @@
             
             update(dt, juveniles, player) {
                 if (!this.isAlive) return;
+                
+                // 死亡下沉动画
+                if (this.isDying) {
+                    this.deathTimer -= dt;
+                    this.sinkSpeed += 120 * dt;  // 加速下沉
+                    
+                    // 弹开效果（逐渐减速）
+                    if (this.bounceVelocity) {
+                        this.pos = this.pos.add(this.bounceVelocity.mult(dt * 60));
+                        this.bounceVelocity = this.bounceVelocity.mult(0.95);  // 阻尼
+                    }
+                    
+                    // 下沉
+                    this.pos.y += this.sinkSpeed * dt;
+                    
+                    // 更新身体节段位置
+                    if (this.segments.length > 0) {
+                        this.segments[0] = this.pos;
+                        for (let i = 1; i < this.segments.length; i++) {
+                            const prev = this.segments[i - 1];
+                            const curr = this.segments[i];
+                            const dir = prev.sub(curr).normalize();
+                            this.segments[i] = prev.sub(dir.mult(8));
+                        }
+                    }
+                    
+                    // 动画结束，标记为死亡
+                    if (this.deathTimer <= 0) {
+                        this.isAlive = false;
+                    }
+                    return;
+                }
                 
                 this.phase += dt * 3;
                 this.hitTimer -= dt;
@@ -3167,6 +3207,23 @@
             draw(ctx) {
                 if (!this.isAlive) return;
                 
+                // 死亡下沉动画效果
+                if (this.isDying) {
+                    const progress = 1 - (this.deathTimer / this.deathDuration);
+                    const alpha = 1 - progress;  // 逐渐透明
+                    ctx.globalAlpha = alpha;
+                    
+                    // 绘制下沉的敌人
+                    this.drawBody(ctx, true);
+                    
+                    ctx.globalAlpha = 1;
+                    return;
+                }
+                
+                this.drawBody(ctx, false);
+            }
+            
+            drawBody(ctx, isSinking) {
                 const flash = this.hitTimer > 0 && Math.floor(this.hitTimer * 10) % 2 === 0;
                 
                 // 绘制身体节段（从尾到头）
@@ -3280,8 +3337,16 @@
                 this.hitTimer = 0.5;
             }
             
-            die() {
-                this.isAlive = false;
+            die(bounceDir) {
+                this.isDying = true;
+                this.deathTimer = this.deathDuration;
+                this.sinkSpeed = 30;  // 初始下沉速度
+                // 弹开方向（从玩家方向弹开）
+                if (bounceDir) {
+                    this.bounceVelocity = bounceDir.mult(5);
+                } else {
+                    this.bounceVelocity = this.velocity.mult(-2);
+                }
             }
         }
 
@@ -3585,6 +3650,7 @@
                 this.playerDeathLength = 0;  // 玩家死亡时的长度（用于显示）
                 this.waitingForPlayer = false;  // 等待玩家鼠标移入白圈
                 this.mouseInCanvas = false;  // 鼠标是否在Canvas内
+                this.familyNoticeShown = false;  // 亲子提示是否已显示
                 // FPS相关
                 this.showFPS = CONFIG.SHOW_FPS;
                 this.targetFPS = CONFIG.TARGET_FPS;
@@ -4006,6 +4072,7 @@
                 this.splitCooldown = 0;
                 this.yellowCooldown = 0;
                 this.gameTime = 0;
+                this.familyNoticeShown = false;
                 this.frameCount = 0;
                 this.rhythmNotified = {};  // 重置节奏通知
                 this.showCrosshairHint = false;  // 重置瞄准镜提示
@@ -5024,6 +5091,12 @@
 
                 const brokenTail = new BrokenTail(tailSegments, worm.color, worm);
                 this.brokenTails.push(brokenTail);
+                
+                // 第一次分裂时显示亲子提示
+                if (!this.familyNoticeShown) {
+                    this.familyNoticeShown = true;
+                    this.showFamilyNotice();
+                }
             }
 
             showSplitNotice() {
@@ -5143,7 +5216,7 @@
                 if (player && player.isAlive) {
                     for (let i = this.enemies.length - 1; i >= 0; i--) {
                         const enemy = this.enemies[i];
-                        if (!enemy.isAlive) continue;
+                        if (!enemy.isAlive || enemy.isDying) continue;
                         
                         // 检查玩家是否在幼体附近
                         const nearJuvenile = this.worms.some(w => 
@@ -5151,7 +5224,9 @@
                         );
                         
                         if (nearJuvenile && enemy.checkCollisionWithPlayer(player)) {
-                            enemy.die();
+                            // 计算弹开方向（从玩家指向敌人）
+                            const bounceDir = enemy.pos.sub(player.pos).normalize();
+                            enemy.die(bounceDir);
                             // 玩家撞死敌人也掉1节尾巴
                             if (player.segments.length > 3) {
                                 player.segments.pop();
