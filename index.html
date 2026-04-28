@@ -6,7 +6,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="format-detection" content="telephone=no">
-    <title>Melody Worm v0.89 - 旋律虫虫</title>
+    <title>Melody Worm v0.90 - 旋律虫虫</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -1769,12 +1769,18 @@
                     this.hungerTimer -= hungerRate;
                     // 消耗一节身体
                     if (this.segments.length > 2) {
-                        // 添加尾巴缩小动画
+                        // 添加尾巴缩小动画（带虚线、变灰、下沉、发射宝珠）
                         const tailPos = this.segments[this.segments.length - 1];
                         this.shrinkingSegments.push({
                             pos: new Vector(tailPos.x, tailPos.y),
                             progress: 0,
-                            duration: 0.3
+                            duration: 0.3,
+                            color: this.color,  // 原始颜色
+                            showDash: true,     // 是否显示虚线
+                            dashProgress: 0,    // 虚线缩小进度
+                            sinking: false,     // 是否开始下沉
+                            velocity: new Vector(0, 0),  // 下沉速度
+                            emitted: false      // 是否已发射宝珠
                         });
                         
                         // 计算普通段数量（总段数 - 头部 - 弹舱段）
@@ -1877,13 +1883,73 @@
                     }
                 }
                 
-                // 更新尾巴缩小动画
+                // 更新尾巴缩小动画（多阶段：缩小→变灰→下沉→发射宝珠）
                 for (let i = this.shrinkingSegments.length - 1; i >= 0; i--) {
                     const shrinking = this.shrinkingSegments[i];
-                    shrinking.progress += dt / shrinking.duration;
                     
-                    if (shrinking.progress >= 1) {
-                        this.shrinkingSegments.splice(i, 1);
+                    // 第一阶段：缩小到1/3（0-0.3秒）
+                    if (shrinking.progress < 1) {
+                        shrinking.progress += dt / shrinking.duration;
+                        shrinking.dashProgress = shrinking.progress;  // 虚线同步缩小
+                        
+                        // 缩小到1/3时，虚线消失
+                        if (shrinking.progress >= 1) {
+                            shrinking.showDash = false;
+                            shrinking.sinking = true;  // 开始下沉
+                            shrinking.velocity = new Vector(0, 30 + Math.random() * 30);  // 初始下沉速度
+                        }
+                    }
+                    
+                    // 第二阶段：下沉（0.3秒后）
+                    if (shrinking.sinking) {
+                        // 应用重力
+                        shrinking.velocity.y += 120 * dt;  // 重力加速度
+                        
+                        // 左右摆动
+                        shrinking.velocity.x += (Math.random() - 0.5) * 20 * dt;
+                        shrinking.velocity.x *= 0.99;  // 阻尼
+                        
+                        // 更新位置
+                        shrinking.pos.x += shrinking.velocity.x * dt;
+                        shrinking.pos.y += shrinking.velocity.y * dt;
+                        
+                        // 碰底检测：发射宝珠
+                        if (shrinking.pos.y >= CONFIG.CANVAS_HEIGHT - CONFIG.WALL_MARGIN && !shrinking.emitted) {
+                            shrinking.emitted = true;
+                            
+                            // 发射宝珠（概率与尸体相同：70%绿、15%红、10%黄、5%橙）
+                            const roll = Math.random();
+                            let type;
+                            if (roll < 0.70) {
+                                type = CONFIG.FOOD_TYPES[0];  // 绿色
+                            } else if (roll < 0.85) {
+                                type = CONFIG.FOOD_TYPES[1];  // 红色
+                            } else if (roll < 0.95) {
+                                type = CONFIG.FOOD_TYPES[2];  // 黄色
+                            } else {
+                                type = CONFIG.FOOD_TYPES[3];  // 橙色
+                            }
+                            
+                            const food = new Food(shrinking.pos.x, shrinking.pos.y, type);
+                            // 扇形发射：向上30°~150°
+                            const angle = (30 + Math.random() * 120) * Math.PI / 180;
+                            const speed = 3.0 + Math.random() * 3.0;
+                            food.velocity.x = speed * Math.cos(angle);
+                            food.velocity.y = -speed * Math.sin(angle);
+                            food.inactiveTimer = 2.0;  // 初生冷却2秒
+                            this.foods.push(food);
+                            
+                            // 添加粒子特效
+                            for (let j = 0; j < 6; j++) {
+                                this.particles.push(new Particle(shrinking.pos.x, shrinking.pos.y, type.color));
+                            }
+                        }
+                        
+                        // 出界检测：移除动画
+                        if (shrinking.pos.y > CONFIG.CANVAS_HEIGHT + 50 || 
+                            shrinking.pos.x < -50 || shrinking.pos.x > CONFIG.CANVAS_WIDTH + 50) {
+                            this.shrinkingSegments.splice(i, 1);
+                        }
                     }
                 }
             }
@@ -2297,21 +2363,54 @@
                     ctx.shadowBlur = 0;
                 }
                 
-                // 绘制尾巴缩小动画
+                // 绘制尾巴缩小动画（带虚线、变灰、下沉）
                 for (const shrinking of this.shrinkingSegments) {
                     const progress = Math.min(1, shrinking.progress);
-                    // 从大到小
-                    const sizeRatio = 1 - progress * 0.7;
-                    const radius = CONFIG.SEGMENT_RADIUS * sizeRatio;
-                    const alpha = 1 - progress;
                     
-                    ctx.beginPath();
-                    ctx.arc(shrinking.pos.x, shrinking.pos.y, radius, 0, Math.PI * 2);
-                    ctx.fillStyle = this.hexToRgba(this.color, alpha);
-                    ctx.shadowBlur = 10 * (1 - progress);
-                    ctx.shadowColor = this.color;
-                    ctx.fill();
-                    ctx.shadowBlur = 0;
+                    // 第一阶段：缩小到1/3（带虚线）
+                    if (progress < 1) {
+                        // 从大到小，缩小到1/3
+                        const sizeRatio = 1 - progress * (2/3);  // 1 → 1/3
+                        const radius = CONFIG.SEGMENT_RADIUS * sizeRatio;
+                        const alpha = 1 - progress * 0.5;  // 透明度略微降低
+                        
+                        // 绘制虚线边框（同步缩小）
+                        if (shrinking.showDash) {
+                            ctx.save();
+                            ctx.strokeStyle = this.hexToRgba(this.color, alpha);
+                            ctx.lineWidth = 2;
+                            ctx.setLineDash([3, 3]);
+                            ctx.beginPath();
+                            ctx.arc(shrinking.pos.x, shrinking.pos.y, radius + 2, 0, Math.PI * 2);
+                            ctx.stroke();
+                            ctx.setLineDash([]);
+                            ctx.restore();
+                        }
+                        
+                        // 绘制填充（颜色逐渐变灰）
+                        const grayProgress = progress * 0.5;  // 变灰程度
+                        const r = parseInt(this.color.slice(1, 3), 16);
+                        const g = parseInt(this.color.slice(3, 5), 16);
+                        const b = parseInt(this.color.slice(5, 7), 16);
+                        const gray = Math.round(r * 0.299 + g * 0.587 + b * 0.114);
+                        const grayColor = `rgb(${gray}, ${gray}, ${gray})`;
+                        
+                        ctx.beginPath();
+                        ctx.arc(shrinking.pos.x, shrinking.pos.y, radius, 0, Math.PI * 2);
+                        ctx.fillStyle = this.hexToRgba(grayColor, alpha);
+                        ctx.fill();
+                    }
+                    
+                    // 第二阶段：下沉（灰色，无虚线）
+                    if (shrinking.sinking) {
+                        const radius = CONFIG.SEGMENT_RADIUS / 3;  // 保持1/3大小
+                        
+                        // 绘制灰色填充
+                        ctx.beginPath();
+                        ctx.arc(shrinking.pos.x, shrinking.pos.y, radius, 0, Math.PI * 2);
+                        ctx.fillStyle = 'rgba(128, 128, 128, 0.6)';  // 灰色半透明
+                        ctx.fill();
+                    }
                 }
                 
                 // 绘制磁力脉冲光环（橙色宝珠效果）
