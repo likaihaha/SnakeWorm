@@ -1938,11 +1938,12 @@
                             food.velocity.x = speed * Math.cos(angle);
                             food.velocity.y = -speed * Math.sin(angle);
                             food.inactiveTimer = 2.0;  // 初生冷却2秒
-                            this.foods.push(food);
+                            allFoods.push(food);
                             
-                            // 添加粒子特效
+                            // 添加粒子特效（存入worm属性，由Game统一收集）
+                            if (!this.pendingParticles) this.pendingParticles = [];
                             for (let j = 0; j < 6; j++) {
-                                this.particles.push(new Particle(shrinking.pos.x, shrinking.pos.y, type.color));
+                                this.pendingParticles.push(new Particle(shrinking.pos.x, shrinking.pos.y, type.color));
                             }
                         }
                         
@@ -3536,6 +3537,14 @@
                                 worm.aiShootInterval = 2.0 + Math.random() * 2;  // 新的随机间隔（2-4秒）
                             }
                         }
+                    }
+                    
+                    // 收集worm产生的待处理粒子
+                    if (worm.pendingParticles && worm.pendingParticles.length > 0) {
+                        for (const p of worm.pendingParticles) {
+                            this.particles.push(p);
+                        }
+                        worm.pendingParticles = [];
                     }
                 }
                 
