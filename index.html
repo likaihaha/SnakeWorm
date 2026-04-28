@@ -2204,11 +2204,27 @@
                 
                 // 0. 如果正在被咬，在原地挣扎游走
                 if (this.bittenSegments && this.bittenSegments.size > 0) {
-                    this.isStruggling = true;
-                    this.strugglePhase += dt * 10;
-                    const wriggleX = Math.sin(this.strugglePhase) * 15;
-                    const wriggleY = Math.cos(this.strugglePhase * 1.3) * 15;
-                    return new Vector(this.head.x + wriggleX, this.head.y + wriggleY);
+                    // 安全检查：确认确实有敌人咬住这个幼体
+                    let actuallyBitten = false;
+                    if (enemies) {
+                        for (const enemy of enemies) {
+                            if (enemy.latchedJuvenile === this && enemy.isAlive && !enemy.isDying) {
+                                actuallyBitten = true;
+                                break;
+                            }
+                        }
+                    }
+                    if (!actuallyBitten) {
+                        // 没有敌人实际咬住，清除挣扎状态
+                        this.bittenSegments.clear();
+                        this.isStruggling = false;
+                    } else {
+                        this.isStruggling = true;
+                        this.strugglePhase += dt * 10;
+                        const wriggleX = Math.sin(this.strugglePhase) * 15;
+                        const wriggleY = Math.cos(this.strugglePhase * 1.3) * 15;
+                        return new Vector(this.head.x + wriggleX, this.head.y + wriggleY);
+                    }
                 } else {
                     this.isStruggling = false;
                 }
@@ -3230,6 +3246,12 @@
                                         this.release();
                                         juv.segments.pop();
                                         juv.targetLength = juv.segments.length;
+                                    } else {
+                                        // 幼体长度 <= 3，被咬死
+                                        const juv = this.latchedJuvenile;
+                                        this.release();
+                                        juv.isAlive = false;
+                                        juv.segments = [];
                                     }
                                 }
                             }
