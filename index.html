@@ -1742,9 +1742,18 @@
                 
                 // 如果已经到达目标附近，停止移动（身体正弦波波动已提供生命感）
                 if (distanceToTarget < 15) {
-                    // 头部稳定在目标位置，不再随机抖动
-                    this.segments[0] = new Vector(moveTarget.x, moveTarget.y);
-                    this.isMoving = false;  // 停止状态
+                    if (distanceToTarget < 1) {
+                        // 非常接近时完全固定，不受鼠标微小抖动影响
+                        this.isMoving = false;
+                    } else {
+                        // 接近时使用平滑插值，避免跳变
+                        const lerpFactor = 0.15;
+                        this.segments[0] = new Vector(
+                            head.x + (moveTarget.x - head.x) * lerpFactor,
+                            head.y + (moveTarget.y - head.y) * lerpFactor
+                        );
+                        this.isMoving = false;
+                    }
                     // 不更新 velocity，保持静止
                 } else {
                     // 更新 velocity
