@@ -7,7 +7,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="format-detection" content="telephone=no">
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐛</text></svg>">
-    <title>Melody Worm v1.04 - 旋律虫虫</title>
+    <title>Melody Worm v1.05 - 旋律虫虫</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -567,7 +567,7 @@
     <div id="mouseIndicator"></div>
     
     <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 8px; box-sizing: border-box; width: 100%; height: 100vh;">
-        <h1 style="margin: 0; font-size: 20px; white-space: nowrap;">🎵 Melody Worm <span style="color:#888; font-size:14px;">v1.04</span> - 旋律虫虫</h1>
+        <h1 style="margin: 0; font-size: 20px; white-space: nowrap;">🎵 Melody Worm <span style="color:#888; font-size:14px;">v1.05</span> - 旋律虫虫</h1>
         <div style="display: flex; align-items: center; gap: 20px; font-size: 11px; color: #ccc;">
             <span>🎮 鼠标控制方向 | 按住左键连续射击 | 咬尾分裂 | 碰颈/框死</span>
         </div>
@@ -576,7 +576,7 @@
             <div class="split-notice" id="splitNotice">⚡ 咬尾分裂！新蚯蚓诞生！</div>
             <div class="split-notice" id="familyNotice" style="color: #FFD700; font-size: 16px;">👶 你就要有一个孩子了！保护好他！</div>
             <div id="startScreen">
-                <h2>🎵 Melody Worm<br>旋律虫虫 <span style="color:#888; font-size:14px;">v1.04</span></h2>
+                <h2>🎵 Melody Worm<br>旋律虫虫 <span style="color:#888; font-size:14px;">v1.05</span></h2>
                 <div class="start-instructions">
                     <div class="inst-row inst-main">
                         <span class="inst-icon">🖱️</span>
@@ -634,7 +634,7 @@
 
     <script>
         /**
-         * Melody Worm v1.04 - 旋律虫虫
+         * Melody Worm v1.05 - 旋律虫虫
          * 
          * 实验机制:
          * - 任何蚯蚓的头部咬到任何其他蚯蚓的尾巴（最后 1/3 段）→ 被咬者断尾分裂
@@ -1157,6 +1157,7 @@
                 JUVENILE_FOLLOW_RADIUS: 250, // 幼体跟随父代范围
                 JUVENILE_FEAR_RADIUS: 150,   // 幼体害怕敌人范围
                 JUVENILE_EAT_RADIUS: 30,     // 幼体吃尾巴范围
+                JUVENILE_SPEED_RATIO: 0.7,   // 幼体速度是成年体的70%
             }
         };
 
@@ -1651,6 +1652,11 @@
                 const speedReduction = (this.length - CONFIG.WORM_INITIAL_LENGTH) * CONFIG.SPEED_DECAY;
                 const base = this.isPlayer ? CONFIG.BASE_SPEED : CONFIG.AI_BASE_SPEED;
                 let newSpeed = Math.max(CONFIG.MIN_SPEED, base - speedReduction);
+                
+                // 幼体速度打折
+                if (this.isJuvenile) {
+                    newSpeed *= CONFIG.FAMILY.JUVENILE_SPEED_RATIO;
+                }
                 
                 // 如果有减速叠加，应用减速效果
                 if (this.slowStacks > 0) {
@@ -2231,7 +2237,7 @@
                     return this.head;
                 }
                 
-                // 2. 寻找成年体掉下的尾巴（优先吃）
+                // 2. 寻找成年体掉下的断尾（优先吃）
                 if (brokenTails) {
                     let nearestTail = null;
                     let tailDist = Infinity;
@@ -2243,17 +2249,36 @@
                             nearestTail = tail;
                         }
                     }
-                    if (nearestTail && tailDist < CONFIG.FAMILY.JUVENILE_EAT_RADIUS * 3) {
+                    if (nearestTail && tailDist < CONFIG.FAMILY.JUVENILE_EAT_RADIUS * 5) {
                         return nearestTail.segments[0];
                     }
                 }
                 
-                // 3. 跟随父代
+                // 2.5 追逐父代正在消耗沉下的尾部（shrinkingSegments）
+                if (this.parentWorm && this.parentWorm.isAlive && this.parentWorm.shrinkingSegments) {
+                    let nearestShrink = null;
+                    let shrinkDist = Infinity;
+                    for (const shrink of this.parentWorm.shrinkingSegments) {
+                        if (!shrink.pos) continue;
+                        const d = this.head.dist(shrink.pos);
+                        if (d < shrinkDist) {
+                            shrinkDist = d;
+                            nearestShrink = shrink;
+                        }
+                    }
+                    if (nearestShrink && shrinkDist < CONFIG.FAMILY.JUVENILE_EAT_RADIUS * 5) {
+                        return nearestShrink.pos;
+                    }
+                }
+                
+                // 3. 跟随父代（平滑跟随，目标点在父代头部后方偏移）
                 if (this.parentWorm && this.parentWorm.isAlive && this.parentWorm.segments.length > 0) {
                     const parentHead = this.parentWorm.segments[0];
                     const distToParent = this.head.dist(parentHead);
-                    if (distToParent > CONFIG.FAMILY.JUVENILE_FOLLOW_RADIUS * 0.5) {
-                        return parentHead;
+                    if (distToParent > CONFIG.FAMILY.JUVENILE_FOLLOW_RADIUS * 0.3) {
+                        // 使用父代身体第3段作为跟随目标，更平滑
+                        const followIdx = Math.min(2, this.parentWorm.segments.length - 1);
+                        return this.parentWorm.segments[followIdx];
                     }
                 }
                 
@@ -3226,7 +3251,7 @@
                 let minDist = CONFIG.FAMILY.ENEMY_CHASE_RADIUS;
                 
                 for (const worm of juveniles) {
-                    if (!worm.isAlive || !worm.isJuvenile) continue;
+                    if (!worm.isAlive || !worm.isJuvenile || !worm.head) continue;
                     const d = this.pos.dist(worm.head);
                     if (d < minDist) {
                         minDist = d;
@@ -5284,7 +5309,7 @@
                     
                     // 检测幼体吃成年体掉下的尾巴
                     for (const worm of this.worms) {
-                        if (!worm.isAlive || !worm.isJuvenile) continue;
+                        if (!worm.isAlive || !worm.isJuvenile || !worm.head) continue;
                         for (let j = this.brokenTails.length - 1; j >= 0; j--) {
                             const tail = this.brokenTails[j];
                             if (!tail.segments || tail.segments.length === 0) continue;
@@ -5298,6 +5323,22 @@
                                     // 检查是否成年
                                     if (worm.segments.length > CONFIG.FAMILY.JUVENILE_MAX_LENGTH) {
                                         worm.isJuvenile = false;
+                                        // 成年动画：释放咬住的敌人
+                                        for (const e of this.enemies) {
+                                            if (e.latchedJuvenile === worm) {
+                                                e.release();
+                                            }
+                                        }
+                                        worm.bittenSegments.clear();
+                                        worm.isStruggling = false;
+                                        // 成年粒子特效
+                                        const headPos = worm.head;
+                                        if (headPos) {
+                                            for (let k = 0; k < 12; k++) {
+                                                this.particles.push(new Particle(headPos.x, headPos.y, '#ffd700'));
+                                            }
+                                            this.floatingTexts.push(new FloatingText(headPos.x, headPos.y - 30, '🦋 成年了！', '#ffd700'));
+                                        }
                                     }
                                 }
                                 // 移除一节尾巴
@@ -5324,7 +5365,7 @@
                         
                         // 检查玩家是否在幼体附近
                         const nearJuvenile = this.worms.some(w => 
-                            w.isAlive && w.isJuvenile && player.head.dist(w.head) < 100
+                            w.isAlive && w.isJuvenile && w.head && player.head && player.head.dist(w.head) < 100
                         );
                         
                         if (nearJuvenile && enemy.checkCollisionWithPlayer(player)) {
