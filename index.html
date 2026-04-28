@@ -2102,15 +2102,15 @@
                             const initialVy = shrinking.initialVelocity ? shrinking.initialVelocity.y : 0;
                             shrinking.velocity = new Vector(
                                 initialVx * 0.1 + (Math.random() - 0.5) * 5,  // 水平：初始速度10% + 随机偏移
-                                30 + Math.random() * 30 + initialVy * 0.05      // 垂直：下沉速度 + 初始垂直速度5%
+                                15 + Math.random() * 15 + initialVy * 0.05      // 垂直：下沉速度减半（原来是30+random*30）
                             );
                         }
                     }
                     
                     // 第二阶段：下沉（0.3秒后）
                     if (shrinking.sinking) {
-                        // 应用重力
-                        shrinking.velocity.y += 120 * dt;  // 重力加速度
+                        // 应用重力（减半，让幼体有更多时间吃到）
+                        shrinking.velocity.y += 60 * dt;  // 重力加速度（原来是120）
                         
                         // 左右摆动
                         shrinking.velocity.x += (Math.random() - 0.5) * 20 * dt;
@@ -2724,10 +2724,10 @@
                 for (const shrinking of this.shrinkingSegments) {
                     const progress = Math.min(1, shrinking.progress);
                     
-                    // 第一阶段：缩小到1/3（带虚线）
+                    // 第一阶段：缩小到2/3（带虚线）- 加大尺寸方便幼体吃到
                     if (progress < 1) {
-                        // 从大到小，缩小到1/3
-                        const sizeRatio = 1 - progress * (2/3);  // 1 → 1/3
+                        // 从大到小，缩小到2/3（原来是1/3）
+                        const sizeRatio = 1 - progress * (1/3);  // 1 → 2/3
                         const radius = CONFIG.SEGMENT_RADIUS * sizeRatio;
                         const alpha = 1 - progress * 0.5;  // 透明度略微降低
                         
@@ -2760,7 +2760,7 @@
                     
                     // 第二阶段：下沉（灰色，无虚线）
                     if (shrinking.sinking) {
-                        const radius = CONFIG.SEGMENT_RADIUS / 3;  // 保持1/3大小
+                        const radius = CONFIG.SEGMENT_RADIUS * 2 / 3;  // 保持2/3大小（原来是1/3）
                         
                         // 绘制灰色填充
                         ctx.beginPath();
