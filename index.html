@@ -6,7 +6,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="format-detection" content="telephone=no">
-    <title>Melody Worm v0.87 - 旋律虫虫</title>
+    <title>Melody Worm v0.88 - 旋律虫虫</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -1465,6 +1465,7 @@
                 
                 // 尾部生长动画
                 this.growingSegments = [];  // 正在生长的新节 [{targetPos, progress, direction}]
+                this.shrinkingSegments = [];  // 尾巴缩小动画 [{pos, progress, duration}]
                 
                 // 预警闪烁
                 this.warningFlashTimer = 0;  // 预警闪烁计时器
@@ -1753,26 +1754,47 @@
                     this.isMoving = true;  // 移动状态
                 }
                 
-                // 饥饿消耗系统
+                // 饥饿消耗系统（指数递减曲线）
                 this.hungerTimer += dt;
-                let hungerRate = this.isMoving ? this.hungerRateMoving : this.hungerRateIdle;
-                // 身体小于10节时消耗减半
-                if (this.segments.length < 10) {
-                    hungerRate *= 2;  // 时间翻倍 = 消耗减半
+                const baseRate = this.isMoving ? this.hungerRateMoving : this.hungerRateIdle;
+                // 指数递减公式：40节=1秒/节，5节=32秒/节
+                const length = this.segments.length;
+                let hungerRate = baseRate * 52.6 * Math.exp(-0.099 * length);
+                // 5节以下再减少32倍
+                if (length < 5) {
+                    hungerRate *= 32;
                 }
+                
                 if (this.hungerTimer >= hungerRate) {
                     this.hungerTimer -= hungerRate;
                     // 消耗一节身体
                     if (this.segments.length > 2) {
-                        this.segments.pop();
-                        this.targetLength--;
-                        // 如果有红色段，也减少
-                        if (this.redSegments > 0) {
-                            this.redSegments--;
-                            if (this.redStrengths.length > 0) {
-                                this.redStrengths.pop();
+                        // 添加尾巴缩小动画
+                        const tailPos = this.segments[this.segments.length - 1];
+                        this.shrinkingSegments.push({
+                            pos: new Vector(tailPos.x, tailPos.y),
+                            progress: 0,
+                            duration: 0.3
+                        });
+                        
+                        // 计算普通段数量（总段数 - 头部 - 弹舱段）
+                        const normalSegments = this.segments.length - 1 - this.redSegments;
+                        
+                        if (normalSegments > 0) {
+                            // 还有普通段，只移除普通段
+                            this.segments.pop();
+                            this.targetLength--;
+                        } else {
+                            // 普通段已耗尽，开始移除弹舱段
+                            this.segments.pop();
+                            this.targetLength--;
+                            if (this.redSegments > 0) {
+                                this.redSegments--;
+                                if (this.redStrengths.length > 0) {
+                                    this.redStrengths.pop();
+                                }
+                                this.bulletCount = this.redSegments * 5;
                             }
-                            this.bulletCount = this.redSegments * 5;
                         }
                     } else if (this.segments.length <= 2) {
                         // 饿死判定
@@ -1852,6 +1874,16 @@
                         // 生长完成，添加到 segments
                         this.segments.push(growing.targetPos);
                         this.growingSegments.splice(i, 1);
+                    }
+                }
+                
+                // 更新尾巴缩小动画
+                for (let i = this.shrinkingSegments.length - 1; i >= 0; i--) {
+                    const shrinking = this.shrinkingSegments[i];
+                    shrinking.progress += dt / shrinking.duration;
+                    
+                    if (shrinking.progress >= 1) {
+                        this.shrinkingSegments.splice(i, 1);
                     }
                 }
             }
@@ -2260,6 +2292,23 @@
                     ctx.arc(currentPos.x, currentPos.y, radius, 0, Math.PI * 2);
                     ctx.fillStyle = this.hexToRgba(this.color, 0.3 + 0.5 * progress);
                     ctx.shadowBlur = 5 * progress;
+                    ctx.shadowColor = this.color;
+                    ctx.fill();
+                    ctx.shadowBlur = 0;
+                }
+                
+                // 绘制尾巴缩小动画
+                for (const shrinking of this.shrinkingSegments) {
+                    const progress = Math.min(1, shrinking.progress);
+                    // 从大到小
+                    const sizeRatio = 1 - progress * 0.7;
+                    const radius = CONFIG.SEGMENT_RADIUS * sizeRatio;
+                    const alpha = 1 - progress;
+                    
+                    ctx.beginPath();
+                    ctx.arc(shrinking.pos.x, shrinking.pos.y, radius, 0, Math.PI * 2);
+                    ctx.fillStyle = this.hexToRgba(this.color, alpha);
+                    ctx.shadowBlur = 10 * (1 - progress);
                     ctx.shadowColor = this.color;
                     ctx.fill();
                     ctx.shadowBlur = 0;
