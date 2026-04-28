@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="format-detection" content="telephone=no">
@@ -3212,7 +3213,7 @@
                         } else {
                             // 移向被咬的身体段
                             const dir = targetSeg.sub(this.pos);
-                            if (dir.length() > this.size) {
+                            if (dir.mag() > this.size) {
                                 this.velocity = dir.normalize().mult(CONFIG.FAMILY.ENEMY_CHASE_SPEED);
                                 this.pos = this.pos.add(this.velocity.mult(dt * 60));
                             }
