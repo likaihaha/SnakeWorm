@@ -7,7 +7,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="format-detection" content="telephone=no">
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐛</text></svg>">
-    <title>Melody Worm v0.90 - 旋律虫虫</title>
+    <title>Melody Worm v0.91 - 旋律虫虫</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -1456,6 +1456,9 @@
                 this.mouthCloseTimer = 0;  // 闭嘴计时器（吃宝珠时触发）
                 this.isMoving = false;  // 是否在移动
                 
+                // 空闲波动动画（静止时的生命感）
+                this.idleWavePhase = Math.random() * Math.PI * 2;  // 波动相位
+                
                 // 黄光效果状态（吃到黄色宝珠时触发）
                 this.yellowGlowTimer = 0;  // 黄光计时器
                 this.yellowGlowIndex = 0;  // 当前闪光的段索引（从嘴部开始）
@@ -1628,6 +1631,9 @@
                 if (this.warningFlashTimer > 0) this.warningFlashTimer -= dt;
                 if (this.magnetTimer > 0) this.magnetTimer -= dt;
                 if (this.purpleParticleTimer > 0) this.purpleParticleTimer -= dt;
+                
+                // 更新空闲波动相位（始终保持生命感波动）
+                this.idleWavePhase += dt * 4;  // 波动速度
                 if (this.headEnlargedTimer > 0) {
                     this.headEnlargedTimer -= dt;
                     if (this.headEnlargedTimer <= 0) {
@@ -2134,6 +2140,9 @@
             }
 
             updateEntering(dt) {
+                // 更新空闲波动相位（始终保持生命感波动）
+                this.idleWavePhase += dt * 4;
+                
                 // 处理出场动画
                 if (this.isEntering && this.enterPhase === 0) {
                     this.enterPhase = 1;  // 开始动画第一阶段
@@ -2256,8 +2265,28 @@
                 // 启用 Screen 混合模式：颜色叠加变亮，红 + 绿 + 蓝 = 白
                 ctx.globalCompositeOperation = 'screen';
 
+                // 计算空闲波动：未移动时从头到尾的正弦波波动（生命感）
+                let waveOffsets = [];
+                const waveAmplitude = this.isMoving ? 0.3 : 2.5;  // 移动时几乎无波动，静止时明显波动
+                if (waveAmplitude > 0.1) {
+                    // 垂直于 velocity 的方向（归一化）
+                    let v = this.velocity.mag() > 0 ? this.velocity : new Vector(1, 0);
+                    v = v.normalize();
+                    const perpX = -v.y;
+                    const perpY = v.x;
+                    for (let i = 0; i < this.segments.length; i++) {
+                        // 从头到尾的正弦波，段索引越大相位越滞后（像波浪传递）
+                        const wave = Math.sin(this.idleWavePhase - i * 0.6) * waveAmplitude;
+                        waveOffsets.push({ x: perpX * wave, y: perpY * wave });
+                    }
+                }
+
                 for (let i = this.segments.length - 1; i >= 0; i--) {
-                    const seg = this.segments[i];
+                    const segRaw = this.segments[i];
+                    // 应用空闲波动偏移
+                    const seg = waveAmplitude > 0.1 && waveOffsets[i] 
+                        ? new Vector(segRaw.x + waveOffsets[i].x, segRaw.y + waveOffsets[i].y)
+                        : segRaw;
                     const isHead = i === 0;
                     // 嘴部（索引 0）永远不属于尾巴区域，避免双重标识
                     const isTail = i > 0 && tailIndices.has(i);
@@ -3443,6 +3472,11 @@
                     // 更新蚯蚓出场动画
                     if (player && player.isEntering) {
                         player.updateEntering(dt);
+                    }
+                    // 出场动画完成后，继续更新空闲波动（保持生命感）
+                    if (player && !player.isEntering) {
+                        player.idleWavePhase += dt * 4;
+                        player.isMoving = false;  // 确保静止状态波动明显
                     }
                     return;
                 }
