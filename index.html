@@ -7,7 +7,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="format-detection" content="telephone=no">
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐛</text></svg>">
-    <title>Melody Worm v0.92 - 旋律虫虫</title>
+    <title>Melody Worm v0.93 - 旋律虫虫</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -1945,9 +1945,9 @@
                             }
                             
                             const food = new Food(shrinking.pos.x, shrinking.pos.y, type);
-                            // 扇形发射：向上30°~150°
-                            const angle = (30 + Math.random() * 120) * Math.PI / 180;
-                            const speed = 3.0 + Math.random() * 3.0;
+                            // 扇形发射：更广角度 5°~175°，更充分向两边散开
+                            const angle = (5 + Math.random() * 170) * Math.PI / 180;
+                            const speed = 4.0 + Math.random() * 4.0;  // 速度4~8
                             food.velocity.x = speed * Math.cos(angle);
                             food.velocity.y = -speed * Math.sin(angle);
                             food.inactiveTimer = 2.0;  // 初生冷却2秒
@@ -3779,9 +3779,9 @@
                     // 每一段碰底的尸体转化为宝珠，从该段位置向上发射
                     for (const emit of emitted) {
                         const food = new Food(emit.x, emit.y, emit.type);
-                        // 扇形发射：向上30度到150度（以正上方为90度）
-                        const angle = (30 + Math.random() * 120) * Math.PI / 180;  // 30°~150°转弧度
-                        const speed = 3.0 + Math.random() * 3.0;  // 速度3~6
+                        // 扇形发射：更广角度 5°~175°，更充分向两边散开
+                        const angle = (5 + Math.random() * 170) * Math.PI / 180;
+                        const speed = 4.0 + Math.random() * 4.0;  // 速度4~8
                         food.velocity.x = speed * Math.cos(angle);
                         food.velocity.y = -speed * Math.sin(angle);  // 负号因为y轴向下
                         food.inactiveTimer = 2.0;  // 初生冷却2秒，期间不能被吃、不能被磁力吸引
