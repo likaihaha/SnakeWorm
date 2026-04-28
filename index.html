@@ -2283,11 +2283,11 @@
 
                 for (let i = this.segments.length - 1; i >= 0; i--) {
                     const segRaw = this.segments[i];
-                    // 应用空闲波动偏移
-                    const seg = waveAmplitude > 0.1 && waveOffsets[i] 
+                    // 应用空闲波动偏移（头部不波动，保持稳定）
+                    const isHead = i === 0;
+                    const seg = !isHead && waveAmplitude > 0.1 && waveOffsets[i] 
                         ? new Vector(segRaw.x + waveOffsets[i].x, segRaw.y + waveOffsets[i].y)
                         : segRaw;
-                    const isHead = i === 0;
                     // 嘴部（索引 0）永远不属于尾巴区域，避免双重标识
                     const isTail = i > 0 && tailIndices.has(i);
                     const sizeRatio = isHead ? 1.0 : (0.7 + 0.3 * (1 - i / this.segments.length));
