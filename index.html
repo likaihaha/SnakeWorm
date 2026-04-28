@@ -3226,9 +3226,10 @@
                                 if (this.latchedJuvenile.juvenileHitCount >= CONFIG.FAMILY.JUVENILE_HITS_TO_LOSE) {
                                     this.latchedJuvenile.juvenileHitCount = 0;
                                     if (this.latchedJuvenile.segments.length > 3) {
+                                        const juv = this.latchedJuvenile;
                                         this.release();
-                                        this.latchedJuvenile.segments.pop();
-                                        this.latchedJuvenile.targetLength = this.latchedJuvenile.segments.length;
+                                        juv.segments.pop();
+                                        juv.targetLength = juv.segments.length;
                                     }
                                 }
                             }
