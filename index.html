@@ -5372,7 +5372,7 @@
                         
                         if (nearJuvenile && enemy.checkCollisionWithPlayer(player)) {
                             // 计算弹开方向（从玩家指向敌人）
-                            const bounceDir = enemy.pos.sub(player.pos).normalize();
+                            const bounceDir = enemy.pos.sub(player.head).normalize();
                             enemy.die(bounceDir);
                             // 玩家撞死敌人也掉1节尾巴
                             if (player.segments.length > 3) {
