@@ -2278,6 +2278,8 @@
                 const fillColor = isPlayer ? 'rgba(100, 180, 255, 0.15)' : 'rgba(100, 220, 220, 0.12)';
 
                 ctx.save();
+                // 切换到source-over混合模式，避免Screen模式下颜色叠加异常
+                ctx.globalCompositeOperation = 'source-over';
                 // 去掉外层虚线圆圈，只保留内部半透明填充
                 // 内部半透明填充
                 ctx.fillStyle = fillColor;
