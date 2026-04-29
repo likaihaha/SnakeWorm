@@ -10,6 +10,22 @@
 - Git Credential Manager 已配置，推送自动认证
 
 ## 当前版本
+- v1.35: FloatingText对象池+热路径临时Vector消除+Food颜色缓存
+- v1.34: 断尾幼体去掉光圈缩放+成年给无敌防碰死
+- v1.32: 渲染热路径优化 - forEach→for+Float32Array+颜色缓存+消除临时对象
+- v1.31: 五项体验修复 - 文字模糊+幼体发光柔和+敌人卡顿+橙色光效+灰色尾巴放开
+- v1.30: 全局错误边界 - loop()try-catch+window.onerror
+- v1.29: 消除魔法数字 - Enemy/Particle/Bullet常量提取到CONFIG
+- v1.28: 游戏结束逻辑集中管理 - gameOver()统一入口
+- v1.27: 统一状态字段 - isRunning/isPaused/isGameOver→GAME_STATE枚举
+- v1.26: splice改紧凑过滤模式 - particles/floatingTexts/foods/bullets等热路径从O(n²)降至O(n)
+- v1.25: shadowBlur全面替换为径向渐变 - 新增drawGlow()/drawTextGlow()工具函数，9处shadowBlur全部替换
+- v1.24: Particle对象池 - 静态_pool/acquire/release/_reset，消除粒子new/GC压力
+- v1.23: SpatialGrid.query()复用_queryResults数组
+- v1.22: DOM引用缓存 - this.ui缓存17个DOM元素
+- v1.21: 碰撞区域Set缓存 - _rebuildRegionCache() + _regionSets getter
+- v1.20: Vector就地修改方法 - addSelf/subSelf/multSelf/normalizeSelf/set
+- v1.19: SpatialGrid接入碰撞检测+Magic Number收敛+restart清理+死亡对话框修复
 - v1.18: 宝珠光圈闪烁效果 - 三层光圈+核心光点呼吸变化
 - v1.17: 三叶虫攻击幼体改进+觅食系统 - 咬中一次撤离+幼体挣扎+吃灰色尾巴和白色宝珠
 - v1.16: 三叶虫生命系统+击中位移效果 - 3点生命、掉身体部件、击退效果
