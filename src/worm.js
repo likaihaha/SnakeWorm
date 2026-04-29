@@ -1,0 +1,1160 @@
+import { Vector } from './vector.js';
+import { CONFIG } from './config.js';
+import { hexToRgba, drawGlow } from './utils.js';
+import { SpatialGrid } from './spatial-grid.js';
+
+export class Worm {
+    constructor(x, y, length, color = '#4ecca3', isPlayer = true) {
+        this.segments = [];
+        this.color = color;
+        // 缓存颜色 RGB 分量（避免每帧 parseInt 解析）
+        if (color.startsWith('#') && color.length >= 7) {
+            this._colorR = parseInt(color.slice(1, 3), 16);
+            this._colorG = parseInt(color.slice(3, 5), 16);
+            this._colorB = parseInt(color.slice(5, 7), 16);
+            this._grayColor = `rgb(${Math.round(this._colorR * 0.299 + this._colorG * 0.587 + this._colorB * 0.114)}, ${Math.round(this._colorR * 0.299 + this._colorG * 0.587 + this._colorB * 0.114)}, ${Math.round(this._colorR * 0.299 + this._colorG * 0.587 + this._colorB * 0.114)})`;
+        } else {
+            this._colorR = this._colorG = this._colorB = 128;
+            this._grayColor = 'rgb(128, 128, 128)';
+        }
+        this.targetLength = length;
+        this.isPlayer = isPlayer;
+        this.isAlive = true;
+        this.velocity = new Vector(1, 0);
+        this.speed = isPlayer ? CONFIG.BASE_SPEED : CONFIG.AI_BASE_SPEED;
+        this.invincibleTimer = 0;
+        this.activationTimer = 0;
+        this.headEnlarged = false;  // 头部是否变大
+        this.headEnlargedTimer = 0;  // 头部变大计时器
+        this.headScale = 1.0;  // 头部缩放比例（1.0正常，2.0变大）
+        this.headScaleTarget = 1.0;  // 头部缩放目标值
+        this.purpleParticleTimer = 0;  // 紫色粒子特效计时器
+        this.tailYellowDash = true;  // 尾部黄色虚线是否显示
+        this.tailYellowDashTimer = 0;  // 尾部虚线消失计时器
+
+        // 出场动画相关
+        this.isEntering = isPlayer;  // 玩家蚯蚓需要出场动画
+        this.enterPhase = 0;  // 动画阶段：0= 等待，1= 正弦波移动入框，2= 游向鼠标，3= 完成
+        this.enterStartTime = 0;
+        this.enterDuration1 = 2.0;  // 动画第一阶段：从框外游到中央（2 秒）
+        this.enterDuration2 = 1.5;  // 动画第二阶段：从中央游向鼠标（1.5 秒）
+        this.enterStartPos = new Vector(-50, y);  // 从框外左边开始
+        this.enterMidPos = new Vector(x, y);  // 画面中央
+        this.enterTargetPos = new Vector(x, y);  // 最终目标位置
+
+        for (let i = 0; i < length; i++) {
+            this.segments.push(new Vector(x - i * CONFIG.SEGMENT_SPACING, y));
+        }
+
+        this.aiTarget = null;
+        this.aiWanderTimer = 0;
+        this.aiWanderDir = Vector.randomDir();
+
+        // 嘴巴动画状态
+        this.mouthCloseTimer = 0;  // 闭嘴计时器（吃宝珠时触发）
+        this.isMoving = false;  // 是否在移动
+
+        // 空闲波动动画（静止时的生命感）
+        this.idleWavePhase = Math.random() * Math.PI * 2;  // 波动相位
+
+        // 碰撞区域 Set 缓存（仅在 segments.length 变化时重建）
+        this._cachedSegCount = -1;
+        this._cachedTailSet = new Set();
+        this._cachedNeckSet = new Set();
+        this._cachedAbdomenSet = new Set();
+        this._cachedHeadSet = new Set([0]);
+
+        // 黄光效果状态（吃到黄色宝珠时触发）
+        this.yellowGlowTimer = 0;  // 黄光计时器
+        this.yellowGlowIndex = 0;  // 当前闪光的段索引（从嘴部开始）
+        this.yellowGlowStepTimer = 0;  // 步进计时器（控制每个段闪光的间隔）
+        this.pendingGrowCount = 0;  // 等待黄光结束后生长的节数
+        this.growStepTimer = 0;  // 逐节生长的计时器
+
+        // 击退效果
+        this.knockbackVelocity = null;  // 击退速度
+        this.knockbackTimer = 0;  // 击退计时器
+        this.grownCount = 0;  // 已生长的节数
+
+        // 尾部生长动画
+        this.growingSegments = [];  // 正在生长的新节 [{targetPos, progress, direction}]
+        this.shrinkingSegments = [];  // 尾巴缩小动画 [{pos, progress, duration}]
+
+        // 预警闪烁
+        this.warningFlashTimer = 0;  // 预警闪烁计时器
+
+        // 磁力效果（橙色宝珠触发）
+        this.magnetTimer = 0;  // 磁力计时器
+        this.magnetCombo = 0;  // 磁力连击数
+
+        // 射击系统
+        this.bulletCount = 0;  // 弹舱子弹数
+
+        // 蓝色腹部效果（蓝色宝珠触发）
+        this.blueSegments = 0;  // 蓝色段的数量
+        this.blueStrengths = [];  // 每个蓝色段的强度数组（每个元素0-5）
+        this.bulletFiredCount = 0;  // 已发射的子弹计数
+
+        // AI射击相关
+        this.aiShootTimer = 0;  // AI射击冷却计时器
+        this.aiShootInterval = 2.0 + Math.random() * 2;  // AI射击间隔（2-4秒随机）
+
+        // 减速叠加系统
+        this.slowStacks = 0;  // 减速层数（可叠加）
+        this.slowTimer = 0;   // 减速计时器
+
+        // 亲子关系系统
+        this.isJuvenile = false;  // 是否是幼体
+        this.parentWorm = null;  // 父代引用
+        this.juvenileHitCount = 0;  // 幼体被击中次数
+        this.adultHitCount = 0;  // 成年体被击中次数
+        this.juvenileFearTimer = 0;  // 幼体害怕状态计时器
+        this.juvenileFollowTarget = null;  // 幼体跟随目标
+        this.bittenSegments = new Set();  // 被敌人咬住的段索引集合
+        this.isStruggling = false;  // 是否在挣扎
+        this.strugglePhase = 0;  // 挣扎动画相位
+
+        // 冰晶覆盖效果
+        this.iceOverlays = [];  // [{segmentIndex, timer, maxTimer}]
+
+        // 饥饿消耗系统
+        this.hungerTimer = 0;  // 饥饿计时器
+        this.hungerRateIdle = 1.0;  // 不动时消耗速率（1秒/节）
+        this.hungerRateMoving = 0.5;  // 运动时消耗速率（0.5秒/节，即1秒2节）
+    }
+
+    get head() { return this.segments[0]; }
+    get length() { return this.segments.length; }
+
+    updateSpeed() {
+        const speedReduction = (this.length - CONFIG.WORM_INITIAL_LENGTH) * CONFIG.SPEED_DECAY;
+        const base = this.isPlayer ? CONFIG.BASE_SPEED : CONFIG.AI_BASE_SPEED;
+        let newSpeed = Math.max(CONFIG.MIN_SPEED, base - speedReduction);
+
+        // 幼体速度打折
+        if (this.isJuvenile) {
+            newSpeed *= CONFIG.FAMILY.JUVENILE_SPEED_RATIO;
+        }
+
+        // 如果有减速叠加，应用减速效果
+        if (this.slowStacks > 0) {
+            const slowRatio = Math.pow(0.6, this.slowStacks);  // 每层减速到60%
+            newSpeed = Math.max(CONFIG.MIN_SPEED * 0.5, newSpeed * slowRatio);
+        }
+
+        this.speed = newSpeed;
+    }
+
+    grow(amount) {
+        // 检查是否达到最大长度
+        if (this.segments.length >= CONFIG.MAX_SEGMENT_LENGTH) {
+            return;  // 已达到最大长度，不再生长
+        }
+
+        // 限制生长数量，不超过最大长度
+        const canGrow = Math.min(amount, CONFIG.MAX_SEGMENT_LENGTH - this.segments.length);
+
+        // 添加生长动画，而不是直接增加长度
+        for (let i = 0; i < canGrow; i++) {
+            // 计算尾部方向（参考旧身体曲率）
+            let direction = new Vector(0, 0);
+            if (this.segments.length >= 3) {
+                // 用最后3节计算曲率：当前方向 + 曲率偏移
+                const tail = this.segments[this.segments.length - 1];
+                const beforeTail = this.segments[this.segments.length - 2];
+                const beforeBeforeTail = this.segments[this.segments.length - 3];
+
+                // 当前方向：从倒数第二节到倒数第一节
+                const currentDir = tail.sub(beforeTail).normalize();
+                // 之前方向：从倒数第三节到倒数第二节
+                const prevDir = beforeTail.sub(beforeBeforeTail).normalize();
+
+                // 计算曲率角度（当前方向相对于之前方向的偏转）
+                const currentAngle = Math.atan2(currentDir.y, currentDir.x);
+                const prevAngle = Math.atan2(prevDir.y, prevDir.x);
+                let curvature = currentAngle - prevAngle;
+
+                // 限制曲率范围，避免过度弯曲
+                curvature = Math.max(-0.5, Math.min(0.5, curvature));
+
+                // 应用曲率到新方向
+                const newAngle = currentAngle + curvature;
+                direction = new Vector(Math.cos(newAngle), Math.sin(newAngle));
+            } else if (this.segments.length === 2) {
+                const tail = this.segments[this.segments.length - 1];
+                const beforeTail = this.segments[this.segments.length - 2];
+                direction = tail.sub(beforeTail).normalize();
+            } else if (this.segments.length === 1) {
+                direction = this.velocity.clone();
+            }
+
+            // 考虑已在生长队列中的节，找到真正的"末端"位置
+            let basePos;
+            if (this.growingSegments.length > 0) {
+                // 从最后一个正在生长的节的目标位置继续
+                basePos = this.growingSegments[this.growingSegments.length - 1].targetPos;
+            } else {
+                // 从当前尾部位置开始
+                basePos = this.segments.length > 0
+                    ? this.segments[this.segments.length - 1]
+                    : new Vector(0, 0);
+            }
+
+            // 目标位置：在基础位置后方一个间距的位置
+            const targetPos = basePos.add(direction.mult(CONFIG.SEGMENT_SPACING));
+
+            // 添加到生长队列（startPos 设为 null，会在开始绘制时动态获取当前位置）
+            this.growingSegments.push({
+                targetPos: targetPos,
+                progress: 0,
+                direction: direction,
+                startPos: null,  // 动态获取
+                basePos: new Vector(basePos.x, basePos.y)  // 用于计算目标位置
+            });
+        }
+        this.targetLength += amount;
+    }
+
+    /**
+     * 获取头部段索引（仅第0节 = 嘴部）
+     */
+    get headSegmentIndices() {
+        return [0];
+    }
+
+    /**
+     * 获取颈部段索引范围（第1节到身体1/3）
+     */
+    get neckSegmentIndices() {
+        this._rebuildRegionCache();
+        return this._cachedNeckIndices;
+    }
+
+    /**
+     * 获取腹部段索引范围（身体1/3到2/3）
+     */
+    get abdomenSegmentIndices() {
+        this._rebuildRegionCache();
+        return this._cachedAbdomenIndices;
+    }
+
+    /**
+     * 获取尾巴段索引范围（最后 1/3 段，从2/3到末尾）
+     */
+    get tailSegmentIndices() {
+        this._rebuildRegionCache();
+        return this._cachedTailIndices;
+    }
+
+    /**
+     * 重建碰撞区域缓存（仅在 segments.length 变化时执行）
+     */
+    _rebuildRegionCache() {
+        const len = this.segments.length;
+        if (len === this._cachedSegCount) return;
+        this._cachedSegCount = len;
+
+        const neckEnd = Math.max(1, Math.floor(len / 3));
+        const abdStart = Math.max(1, Math.floor(len / 3));
+        const abdEnd = Math.floor(len * 2 / 3);
+        const tailStart = Math.floor(len * 2 / 3);
+
+        this._cachedNeckIndices = [];
+        this._cachedAbdomenIndices = [];
+        this._cachedTailIndices = [];
+        this._cachedHeadIndices = [0];
+        this._cachedNeckSet.clear();
+        this._cachedAbdomenSet.clear();
+        this._cachedTailSet.clear();
+        this._cachedHeadSet.clear();
+        this._cachedHeadSet.add(0);
+
+        for (let i = 1; i <= neckEnd && i < len; i++) {
+            this._cachedNeckIndices.push(i);
+            this._cachedNeckSet.add(i);
+        }
+        for (let i = abdStart; i <= abdEnd && i < len; i++) {
+            this._cachedAbdomenIndices.push(i);
+            this._cachedAbdomenSet.add(i);
+        }
+        for (let i = tailStart; i < len; i++) {
+            this._cachedTailIndices.push(i);
+            this._cachedTailSet.add(i);
+        }
+    }
+
+    /**
+     * 获取碰撞区域的缓存 Set（避免每帧重复创建）
+     */
+    get _regionSets() {
+        this._rebuildRegionCache();
+        return { head: this._cachedHeadSet, tail: this._cachedTailSet, neck: this._cachedNeckSet, abdomen: this._cachedAbdomenSet };
+    }
+
+    update(targetPos, dt, allFoods = [], allWorms = []) {
+        // 空指针保护：如果segments为空，直接返回
+        if (this.segments.length === 0) return;
+
+        // 更新计时器
+        this.updateTimers(dt);
+
+        // 击退效果处理
+        if (this.knockbackVelocity && this.knockbackTimer > 0) {
+            this.knockbackTimer -= dt;
+            // 热路径：就地修改，不创建临时Vector
+            this.segments[0].x += this.knockbackVelocity.x * dt * 60;
+            this.segments[0].y += this.knockbackVelocity.y * dt * 60;
+            this.knockbackVelocity.x *= 0.85;
+            this.knockbackVelocity.y *= 0.85;
+            // 更新身体跟随
+            const spacing = CONFIG.SEGMENT_SPACING;
+            for (let i = 1; i < this.segments.length; i++) {
+                const prev = this.segments[i - 1];
+                const curr = this.segments[i];
+                const dx = prev.x - curr.x, dy = prev.y - curr.y;
+                const d = Math.sqrt(dx * dx + dy * dy);
+                if (d > 0) { curr.x = prev.x - dx / d * spacing; curr.y = prev.y - dy / d * spacing; }
+            }
+            return;  // 击退期间不进行其他移动
+        }
+        this.knockbackVelocity = null;
+
+        // 更新黄光效果和生长逻辑
+        this.updateGrowth(dt, allFoods);
+
+       this.updateSpeed();
+
+        let moveTarget = targetPos;
+
+        if (!this.isPlayer && this.isAlive) {
+            moveTarget = this.aiThink(allFoods, allWorms, dt, this._enemies, this._brokenTails);
+        }
+
+        const head = this.segments[0];
+
+        if (!moveTarget) {
+            return;
+        }
+
+        const dx = moveTarget.x - head.x;
+        const dy = moveTarget.y - head.y;
+        const distanceToTarget = Math.sqrt(dx * dx + dy * dy);
+
+        // 如果已经到达目标附近，停止移动（身体正弦波波动已提供生命感）
+        if (distanceToTarget < CONFIG.STOP_DISTANCE) {
+            if (distanceToTarget < CONFIG.LERP_STOP_THRESHOLD) {
+                this.isMoving = false;
+            } else {
+                const lerpFactor = CONFIG.LERP_MOVE_FACTOR;
+                head.x += (moveTarget.x - head.x) * lerpFactor;
+                head.y += (moveTarget.y - head.y) * lerpFactor;
+                this.isMoving = false;
+            }
+        } else {
+            if (distanceToTarget > 0) {
+                this.velocity.x = dx / distanceToTarget;
+                this.velocity.y = dy / distanceToTarget;
+            }
+
+            const speedDt = this.speed * dt * 60;
+            head.x += this.velocity.x * speedDt;
+            head.y += this.velocity.y * speedDt;
+            this.isMoving = true;
+        }
+
+        // 更新饥饿系统
+        this.updateHunger(dt);
+        if (!this.isAlive) return;
+
+        // 更新减速和冰晶效果
+        this.updateEffects(dt);
+
+        // 更新身体段跟随
+        this.updateBodyFollowing();
+
+        // 更新生长动画
+        this.updateGrowingSegments(dt);
+
+        // 更新缩小动画
+        this.updateShrinkingSegments(dt, allFoods);
+    }
+
+    // 更新各种计时器
+    updateTimers(dt) {
+        if (this.invincibleTimer > 0) this.invincibleTimer -= dt;
+        if (this.activationTimer > 0) this.activationTimer -= dt;
+        if (this.mouthCloseTimer > 0) this.mouthCloseTimer -= dt;
+        if (this.warningFlashTimer > 0) this.warningFlashTimer -= dt;
+        if (this.magnetTimer > 0) this.magnetTimer -= dt;
+        if (this.purpleParticleTimer > 0) this.purpleParticleTimer -= dt;
+
+        // 更新空闲波动相位（始终保持生命感波动）
+        this.idleWavePhase += dt * 4;
+        if (this.headEnlargedTimer > 0) {
+            this.headEnlargedTimer -= dt;
+            if (this.headEnlargedTimer <= 0) {
+                this.headEnlarged = false;
+                this.headScaleTarget = 1.0;
+            }
+        }
+        if (this.tailYellowDashTimer > 0) {
+            this.tailYellowDashTimer -= dt;
+            if (this.tailYellowDashTimer <= 0) {
+                this.tailYellowDash = true;
+            }
+        }
+
+        // 头部缩放平滑过渡
+        const scaleSpeed = 5.0;
+        if (Math.abs(this.headScale - this.headScaleTarget) > 0.01) {
+            this.headScale += (this.headScaleTarget - this.headScale) * scaleSpeed * dt;
+        } else {
+            this.headScale = this.headScaleTarget;
+        }
+    }
+
+    // 更新黄光效果和生长逻辑
+    updateGrowth(dt, allFoods) {
+        // 更新黄光效果：从嘴部到尾部逐个闪光
+        if (this.yellowGlowTimer > 0) {
+            this.yellowGlowTimer -= dt;
+            this.yellowGlowStepTimer -= dt;
+
+            if (this.yellowGlowStepTimer <= 0) {
+                this.yellowGlowIndex++;
+                this.yellowGlowStepTimer = 0.1;
+            }
+
+            if (this.yellowGlowTimer <= 0 && this.pendingGrowCount > 0) {
+                this.growStepTimer = 0;
+            }
+        }
+
+        // 逐节生长逻辑：每隔 0.4 秒长一节
+        if (this.pendingGrowCount > 0 && this.grownCount < this.pendingGrowCount) {
+            this.growStepTimer -= dt;
+            if (this.growStepTimer <= 0) {
+                if (this.segments.length >= CONFIG.MAX_SEGMENT_LENGTH) {
+                    this.pendingGrowCount = 0;
+                    this.grownCount = 0;
+                } else {
+                    let direction = new Vector(0, 0);
+                    if (this.segments.length >= 2) {
+                        const tail = this.segments[this.segments.length - 1];
+                        const beforeTail = this.segments[this.segments.length - 2];
+                        direction = tail.sub(beforeTail).normalize();
+                    } else if (this.segments.length === 1) {
+                        direction = this.velocity.clone();
+                    }
+
+                    this.growingSegments.push({
+                        targetPos: new Vector(0, 0),
+                        progress: 0,
+                        direction: direction,
+                        startPos: null,
+                        basePos: null
+                    });
+
+                    this.targetLength++;
+                    this.grownCount++;
+                    this.growStepTimer = 0.4;
+
+                    if (typeof musicSystem !== 'undefined') {
+                        const song = musicSystem.songs['水晶序曲'];
+                        if (song) {
+                            const noteIndex = (this.grownCount - 1) % song.length;
+                            const headX = this.segments[0] ? this.segments[0].x : 400;
+                            musicSystem.playNote(song[noteIndex].freq, song[noteIndex].duration, undefined, undefined, headX);
+                        }
+                    }
+
+                    if (this.grownCount >= this.pendingGrowCount) {
+                        this.pendingGrowCount = 0;
+                        this.grownCount = 0;
+                    }
+                }
+            }
+        }
+    }
+
+    // 更新饥饿系统
+    updateHunger(dt) {
+        this.hungerTimer += dt;
+        const baseRate = this.isMoving ? this.hungerRateMoving : this.hungerRateIdle;
+        const length = this.segments.length;
+        let hungerRate = baseRate * CONFIG.HUNGER.BASE_MULTIPLIER * Math.exp(CONFIG.HUNGER.DECAY_RATE * length);
+        if (length < CONFIG.HUNGER.LOW_BODY_THRESHOLD) {
+            hungerRate *= CONFIG.HUNGER.LOW_BODY_MULTIPLIER;
+        }
+
+        if (this.hungerTimer >= hungerRate) {
+            this.hungerTimer -= hungerRate;
+            if (this.segments.length > 2) {
+                const tailPos = this.segments[this.segments.length - 1];
+                const actualVelocity = this.velocity.mult(this.speed * 60);
+                this.shrinkingSegments.push({
+                    pos: new Vector(tailPos.x, tailPos.y),
+                    progress: 0,
+                    duration: 0.3,
+                    color: this.color,
+                    showDash: true,
+                    dashProgress: 0,
+                    sinking: false,
+                    velocity: new Vector(0, 0),
+                    initialVelocity: actualVelocity.clone(),
+                    emitted: false
+                });
+
+                const normalSegments = this.segments.length - 1 - this.blueSegments;
+
+                if (normalSegments > 0) {
+                    this.segments.pop();
+                    this.targetLength--;
+                } else {
+                    this.segments.pop();
+                    this.targetLength--;
+                    if (this.blueSegments > 0) {
+                        this.blueSegments--;
+                        if (this.blueStrengths.length > 0) {
+                            this.blueStrengths.pop();
+                        }
+                        this.bulletCount = this.blueSegments * 5;
+                    }
+                }
+            } else if (this.segments.length <= 2) {
+                this.isAlive = false;
+                return;
+            }
+        }
+    }
+
+    // 更新减速和冰晶效果
+    updateEffects(dt) {
+        if (this.slowTimer > 0) {
+            this.slowTimer -= dt;
+            if (this.slowTimer <= 0) {
+                this.slowStacks = Math.max(0, this.slowStacks - 1);
+                this.updateSpeed();
+                if (this.slowStacks > 0) {
+                    this.slowTimer = 3.0;
+                }
+            }
+        }
+
+        {
+            let w = 0;
+            for (let i = 0; i < this.iceOverlays.length; i++) {
+                this.iceOverlays[i].timer -= dt;
+                if (this.iceOverlays[i].timer > 0) {
+                    this.iceOverlays[w++] = this.iceOverlays[i];
+                }
+            }
+            this.iceOverlays.length = w;
+        }
+    }
+
+    // 更新身体段跟随
+    updateBodyFollowing() {
+        const spacing = CONFIG.SEGMENT_SPACING;
+        const lerpFactor = CONFIG.LERP_BODY_FACTOR;
+        for (let i = 1; i < this.segments.length; i++) {
+            const prev = this.segments[i - 1];
+            const curr = this.segments[i];
+            const dx = prev.x - curr.x;
+            const dy = prev.y - curr.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+
+            if (dist > spacing) {
+                const invDist = 1 / dist;
+                const nx = dx * invDist;
+                const ny = dy * invDist;
+                const targetX = prev.x - nx * spacing;
+                const targetY = prev.y - ny * spacing;
+                curr.x += (targetX - curr.x) * lerpFactor;
+                curr.y += (targetY - curr.y) * lerpFactor;
+            }
+        }
+    }
+
+    // 更新生长动画
+    updateGrowingSegments(dt) {
+        for (let i = this.growingSegments.length - 1; i >= 0; i--) {
+            const growing = this.growingSegments[i];
+
+            if (growing.startPos === null) {
+                let currentTailPos;
+                if (this.growingSegments.length > 1 && i > 0) {
+                    currentTailPos = this.growingSegments[i - 1].targetPos;
+                } else {
+                    currentTailPos = this.segments.length > 0
+                        ? this.segments[this.segments.length - 1]
+                        : new Vector(0, 0);
+                }
+
+                growing.startPos = new Vector(currentTailPos.x, currentTailPos.y);
+
+                let direction = growing.direction;
+                if (direction.mag() === 0) {
+                    if (this.segments.length >= 3) {
+                        const tail = this.segments[this.segments.length - 1];
+                        const beforeTail = this.segments[this.segments.length - 2];
+                        const beforeBeforeTail = this.segments[this.segments.length - 3];
+
+                        const currentDir = tail.sub(beforeTail).normalize();
+                        const prevDir = beforeTail.sub(beforeBeforeTail).normalize();
+
+                        const currentAngle = Math.atan2(currentDir.y, currentDir.x);
+                        const prevAngle = Math.atan2(prevDir.y, prevDir.x);
+                        let curvature = currentAngle - prevAngle;
+                        curvature = Math.max(-0.5, Math.min(0.5, curvature));
+
+                        const newAngle = currentAngle + curvature;
+                        direction = new Vector(Math.cos(newAngle), Math.sin(newAngle));
+                    } else if (this.segments.length >= 2) {
+                        const tail = this.segments[this.segments.length - 1];
+                        const beforeTail = this.segments[this.segments.length - 2];
+                        direction = tail.sub(beforeTail).normalize();
+                    }
+                }
+                growing.targetPos = currentTailPos.add(direction.mult(CONFIG.SEGMENT_SPACING));
+            }
+
+            growing.progress += dt * 4;
+
+            if (growing.progress >= 1) {
+                this.segments.push(growing.targetPos);
+                this.growingSegments.splice(i, 1);
+            }
+        }
+    }
+
+    // 更新缩小动画
+    updateShrinkingSegments(dt, allFoods) {
+        for (let i = this.shrinkingSegments.length - 1; i >= 0; i--) {
+            const shrinking = this.shrinkingSegments[i];
+
+            if (shrinking.progress < 1) {
+                shrinking.progress += dt / shrinking.duration;
+                shrinking.dashProgress = shrinking.progress;
+
+                if (shrinking.progress >= 1) {
+                    shrinking.showDash = false;
+                    shrinking.sinking = true;
+                    const initialVx = shrinking.initialVelocity ? shrinking.initialVelocity.x : 0;
+                    const initialVy = shrinking.initialVelocity ? shrinking.initialVelocity.y : 0;
+                    shrinking.velocity = new Vector(
+                        initialVx * 0.1 + (Math.random() - 0.5) * 5,
+                        15 + Math.random() * 15 + initialVy * 0.05
+                    );
+                }
+            }
+
+            if (shrinking.sinking) {
+                shrinking.velocity.y += 60 * dt;
+                shrinking.velocity.x += (Math.random() - 0.5) * 20 * dt;
+                shrinking.velocity.x *= 0.99;
+
+                shrinking.pos.x += shrinking.velocity.x * dt;
+                shrinking.pos.y += shrinking.velocity.y * dt;
+
+                if (shrinking.pos.y >= CONFIG.CANVAS_HEIGHT - CONFIG.WALL_MARGIN && !shrinking.emitted) {
+                    shrinking.emitted = true;
+
+                    const roll = Math.random();
+                    let type;
+                    if (roll < 0.70) {
+                        type = CONFIG.FOOD_TYPES[0];
+                    } else if (roll < 0.85) {
+                        type = CONFIG.FOOD_TYPES[3];
+                    } else if (roll < 0.95) {
+                        type = CONFIG.FOOD_TYPES[1];
+                    } else {
+                        type = CONFIG.FOOD_TYPES[2];
+                    }
+
+                    const food = new Food(shrinking.pos.x, shrinking.pos.y, type);
+                    const angle = (5 + Math.random() * 170) * Math.PI / 180;
+                    const speed = 4.0 + Math.random() * 4.0;
+                    food.velocity.x = speed * Math.cos(angle);
+                    food.velocity.y = -speed * Math.sin(angle);
+                    food.inactiveTimer = 2.0;
+                    food.birthPhase = 'white';
+                    food.birthTimer = 1.2;
+                    allFoods.push(food);
+
+                    if (!this.pendingParticles) this.pendingParticles = [];
+                    for (let j = 0; j < 6; j++) {
+                        this.pendingParticles.push(Particle.acquire(shrinking.pos.x, shrinking.pos.y, type.color));
+                    }
+                }
+
+                if (shrinking.pos.y > CONFIG.CANVAS_HEIGHT + 50 ||
+                    shrinking.pos.x < -50 || shrinking.pos.x > CONFIG.CANVAS_WIDTH + 50) {
+                    this.shrinkingSegments.splice(i, 1);
+                }
+            }
+        }
+    }
+
+    aiThink(foods, allWorms, dt, enemies, brokenTails) {
+        // 空指针保护：如果segments为空，直接返回
+        if (!this.head) return null;
+
+        // 幼体AI行为
+        if (this.isJuvenile) {
+            return this.juvenileThink(foods, allWorms, dt, enemies, brokenTails);
+        }
+
+        this.aiWanderTimer -= dt;
+        if (this.aiWanderTimer <= 0) {
+            this.aiWanderTimer = CONFIG.AI_WANDER_CHANGE + Math.random() * 2;
+            this.aiWanderDir = Vector.randomDir();
+        }
+
+        let nearestFood = null;
+        let minDist = Infinity;
+        for (const food of foods) {
+            if (!food || !food.pos) continue;  // 跳过无效食物
+            const d = this.head.dist(food.pos);
+            if (d < minDist) {
+                minDist = d;
+                nearestFood = food;
+            }
+        }
+
+        if (nearestFood && minDist < 300) {
+            return nearestFood.pos;
+        }
+
+        return this.head.add(this.aiWanderDir.mult(100));
+    }
+
+    // 幼体AI思考
+    juvenileThink(foods, allWorms, dt, enemies, brokenTails) {
+        this._allWorms = allWorms;  // 保存引用供findFoodTarget使用
+        this.juvenileFearTimer -= dt;
+
+        // 0. 如果正在被咬，在原地挣扎游走
+        if (this.bittenSegments && this.bittenSegments.size > 0) {
+            // 安全检查：确认确实有敌人咬住这个幼体
+            let actuallyBitten = false;
+            if (enemies) {
+                for (const enemy of enemies) {
+                    if (enemy.latchedJuvenile === this && enemy.isAlive && !enemy.isDying) {
+                        actuallyBitten = true;
+                        break;
+                    }
+                }
+            }
+            if (!actuallyBitten) {
+                // 没有敌人实际咬住，清除挣扎状态
+                this.bittenSegments.clear();
+                this.isStruggling = false;
+            } else {
+                this.isStruggling = true;
+                this.strugglePhase += dt * 10;
+                const wriggleX = Math.sin(this.strugglePhase) * 15;
+                const wriggleY = Math.cos(this.strugglePhase * 1.3) * 15;
+                return new Vector(this.head.x + wriggleX, this.head.y + wriggleY);
+            }
+        } else {
+            this.isStruggling = false;
+        }
+
+        // 1. 检查附近是否有敌人（害怕）
+        let nearestEnemy = null;
+        let enemyDist = Infinity;
+        if (enemies) {
+            for (const enemy of enemies) {
+                if (!enemy.isAlive) continue;
+                const d = this.head.dist(enemy.pos);
+                if (d < enemyDist) {
+                    enemyDist = d;
+                    nearestEnemy = enemy;
+                }
+            }
+        }
+
+        // 如果敌人在害怕范围内，停止不动
+        if (nearestEnemy && enemyDist < CONFIG.FAMILY.JUVENILE_FEAR_RADIUS) {
+            this.juvenileFearTimer = 1.0;  // 害怕1秒
+            return this.head;  // 返回自己的位置（不动）
+        }
+
+        // 如果还在害怕状态，继续不动
+        if (this.juvenileFearTimer > 0) {
+            return this.head;
+        }
+
+        // 2. 寻找成年体掉下的断尾（优先吃）
+        if (brokenTails) {
+            let nearestTail = null;
+            let tailDist = Infinity;
+            for (const tail of brokenTails) {
+                if (!tail.segments || tail.segments.length === 0) continue;
+                const d = this.head.dist(tail.segments[0]);
+                if (d < tailDist) {
+                    tailDist = d;
+                    nearestTail = tail;
+                }
+            }
+            if (nearestTail && tailDist < CONFIG.FAMILY.JUVENILE_EAT_RADIUS * 5) {
+                return nearestTail.segments[0];
+            }
+        }
+
+        // 2.5 追逐任何蚯蚓正在消耗沉下的尾部（shrinkingSegments）
+        {
+            let nearestShrink = null;
+            let shrinkDist = Infinity;
+            for (const w of this._allWorms || []) {
+                if (!w.isAlive || !w.shrinkingSegments) continue;
+                for (const shrink of w.shrinkingSegments) {
+                    if (!shrink.pos) continue;
+                    const d = this.head.dist(shrink.pos);
+                    if (d < shrinkDist) {
+                        shrinkDist = d;
+                        nearestShrink = shrink;
+                    }
+                }
+            }
+            if (nearestShrink && shrinkDist < CONFIG.FAMILY.JUVENILE_EAT_RADIUS * 5) {
+                return nearestShrink.pos;
+            }
+        }
+
+        // 3. 跟随父代（平滑跟随，目标点在父代头部后方偏移）
+        if (this.parentWorm && this.parentWorm.isAlive && this.parentWorm.segments.length > 0) {
+            const parentHead = this.parentWorm.segments[0];
+            const distToParent = this.head.dist(parentHead);
+            if (distToParent > CONFIG.FAMILY.JUVENILE_FOLLOW_RADIUS * 0.3) {
+                // 使用父代身体第3段作为跟随目标，更平滑
+                const followIdx = Math.min(2, this.parentWorm.segments.length - 1);
+                return this.parentWorm.segments[followIdx];
+            }
+        }
+
+        // 4. 默认：随机游荡
+        this.aiWanderTimer -= dt;
+        if (this.aiWanderTimer <= 0) {
+            this.aiWanderTimer = CONFIG.AI_WANDER_CHANGE + Math.random() * 2;
+            this.aiWanderDir = Vector.randomDir();
+        }
+        return this.head.add(this.aiWanderDir.mult(50));
+    }
+
+    // 死亡线检测（外框，最外面）
+    checkWallCollision() {
+        if (this.segments.length === 0) return false;
+        const head = this.segments[0];
+        const margin = CONFIG.WALL_MARGIN * 2 + CONFIG.SEGMENT_RADIUS * 2;  // 死亡线：最外框
+        return head.x < margin || head.x > CONFIG.CANVAS_WIDTH - margin ||
+               head.y < margin || head.y > CONFIG.CANVAS_HEIGHT - margin;
+    }
+
+    // 预警线检测（内框，最里面）
+    checkWarningLine() {
+        if (this.segments.length === 0) return false;
+        const head = this.segments[0];
+        const margin = CONFIG.WALL_MARGIN;  // 预警线：最内框
+        return head.x < margin || head.x > CONFIG.CANVAS_WIDTH - margin ||
+               head.y < margin || head.y > CONFIG.CANVAS_HEIGHT - margin;
+    }
+
+    checkFoodCollision(foods) {
+        if (this.segments.length === 0) return -1;
+        if (this.isJuvenile) return -1;  // 幼年体不能吃宝珠
+        const head = this.segments[0];
+        for (let i = 0; i < foods.length; i++) {
+            const food = foods[i];
+            if (food.inactiveTimer > 0) continue;  // 初生冷却中的宝珠不能被吃
+            const eatDist = CONFIG.SEGMENT_RADIUS + food.type.radius;
+            if (head.dist(food.pos) < eatDist) return i;
+        }
+        return -1;
+    }
+
+    checkSelfCollision() {
+        if (this.segments.length < 11) return -1;  // 至少需要11段才可能自噬
+        const head = this.segments[0];
+        const collisionDist = CONFIG.SEGMENT_RADIUS * 1.5;
+
+        for (let i = 10; i < this.segments.length; i++) {
+            if (head.dist(this.segments[i]) < collisionDist) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    /**
+     * 检测头部是否咬到自己的尾巴段
+     * 返回：被咬的段索引，或 -1
+     * 注意：返回所有咬尾段，由调用方判断无敌状态
+     */
+    checkSelfTailBite() {
+        if (this.segments.length === 0) return -1;
+        const head = this.segments[0];
+        const collisionDist = CONFIG.SEGMENT_RADIUS * 1.2;
+
+        const tailIndices = this.tailSegmentIndices;
+        for (const segIndex of tailIndices) {
+            if (head.dist(this.segments[segIndex]) < collisionDist) {
+                return segIndex;
+            }
+        }
+        return -1;
+    }
+
+    /**
+     * 检测头部是否碰到其他蚯蚓的尾巴段
+     * 返回: { worm: 被咬的蚯蚓，segmentIndex: 被咬的段索引 } 或 null
+     */
+    checkTailBite(otherWorms, spatialGrid) {
+        if (this.segments.length === 0) return null;
+        const head = this.segments[0];
+        const collisionDist = CONFIG.SEGMENT_RADIUS * 1.2;
+
+        if (spatialGrid) {
+            // 空间网格加速：只检测头部附近的段
+            const candidates = spatialGrid.query(head.x, head.y, collisionDist);
+            for (const { worm: other, segIndex } of candidates) {
+                if (other === this || !other.isAlive) continue;
+                if (other.invincibleTimer > 0) continue;
+                if (other.activationTimer > 0) continue;
+                if (other.isJuvenile) continue;
+                // 检查是否为尾巴段
+                const tailIndices = other.tailSegmentIndices;
+                if (!tailIndices.includes(segIndex)) continue;
+                if (head.dist(other.segments[segIndex]) < collisionDist) {
+                    return { worm: other, segmentIndex: segIndex };
+                }
+            }
+            return null;
+        }
+
+        for (const other of otherWorms) {
+            if (other === this || !other.isAlive) continue;
+            if (other.invincibleTimer > 0) continue;
+            if (other.activationTimer > 0) continue;
+            if (other.isJuvenile) continue;
+
+            const tailIndices = other.tailSegmentIndices;
+            for (const segIndex of tailIndices) {
+                if (head.dist(other.segments[segIndex]) < collisionDist) {
+                    return { worm: other, segmentIndex: segIndex };
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * 检测头部是否碰到其他蚯蚓的颈部段（索引 1 ~ len/3）
+     * 返回：{ worm: 被咬的蚯蚓，segmentIndex: 被咬的段索引 } 或 null
+     */
+    checkNeckBite(otherWorms, spatialGrid) {
+        if (this.segments.length === 0) return null;
+        const head = this.segments[0];
+        const collisionDist = CONFIG.SEGMENT_RADIUS * 1.2;
+
+        if (spatialGrid) {
+            const candidates = spatialGrid.query(head.x, head.y, collisionDist);
+            for (const { worm: other, segIndex } of candidates) {
+                if (other === this || !other.isAlive) continue;
+                if (other.invincibleTimer > 0) continue;
+                if (other.activationTimer > 0) continue;
+                if (other.isJuvenile) continue;
+                const neckIndices = other.neckSegmentIndices;
+                if (!neckIndices.includes(segIndex)) continue;
+                if (head.dist(other.segments[segIndex]) < collisionDist) {
+                    return { worm: other, segmentIndex: segIndex };
+                }
+            }
+            return null;
+        }
+
+        for (const other of otherWorms) {
+            if (other === this || !other.isAlive) continue;
+            if (other.invincibleTimer > 0) continue;
+            if (other.activationTimer > 0) continue;
+            if (other.isJuvenile) continue;
+
+            const neckIndices = other.neckSegmentIndices;
+            for (const segIndex of neckIndices) {
+                if (head.dist(other.segments[segIndex]) < collisionDist) {
+                    return { worm: other, segmentIndex: segIndex };
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * 检测头部是否碰到其他蚯蚓的身体段（非尾巴、非颈部、非腹部）
+     * 跳过无敌状态的蚯蚓
+     * 腹部碰撞不触发死亡
+     */
+    checkOtherWormCollision(otherWorms, spatialGrid) {
+        if (this.segments.length === 0) return null;
+        const head = this.segments[0];
+        const collisionDist = CONFIG.SEGMENT_RADIUS * 1.2;
+
+        if (spatialGrid) {
+            const candidates = spatialGrid.query(head.x, head.y, collisionDist);
+            for (const { worm: other, segIndex } of candidates) {
+                if (other === this || !other.isAlive) continue;
+                if (other.invincibleTimer > 0) continue;
+                if (other.activationTimer > 0) continue;
+                if (other.isJuvenile) continue;  // 跳过幼体，防止玩家碰幼体死亡
+                const rs = other._regionSets;
+                if (rs.tail.has(segIndex) || rs.neck.has(segIndex) || rs.abdomen.has(segIndex)) continue;
+                if (head.dist(other.segments[segIndex]) < collisionDist) {
+                    return { worm: other, segmentIndex: segIndex };
+                }
+            }
+            return null;
+        }
+
+        for (const other of otherWorms) {
+            if (other === this || !other.isAlive) continue;
+            if (other.invincibleTimer > 0) continue;
+            if (other.activationTimer > 0) continue;
+            if (other.isJuvenile) continue;  // 跳过幼体，防止玩家碰幼体死亡
+
+            const rs = other._regionSets;
+
+            for (let i = 0; i < other.segments.length; i++) {
+                // 跳过尾巴段（尾巴 bite 有单独处理）
+                if (rs.tail.has(i)) continue;
+                // 跳过颈部段（颈部 bite 有单独处理，直接死亡）
+                if (rs.neck.has(i)) continue;
+                // 跳过腹部段（腹部碰撞不触发死亡）
+                if (rs.abdomen.has(i)) continue;
+                if (head.dist(other.segments[i]) < collisionDist) {
+                    return { worm: other, segmentIndex: i };
+                }
+            }
+        }
+        return null;
+    }
+
+    updateEntering(dt) {
+        // 更新空闲波动相位（始终保持生命感波动）
+        this.idleWavePhase += dt * 4;
+
+        // 处理出场动画
+        if (this.isEntering && this.enterPhase === 0) {
+            this.enterPhase = 1;  // 开始动画第一阶段
+            this.enterStartTime = performance.now() / 1000;
+
+        }
+
+        if (this.enterPhase === 1) {
+            // 第一阶段：从框外正弦波游到画面中央
+            const currentTime = performance.now() / 1000;
+            const elapsed = currentTime - this.enterStartTime;
+            const progress = Math.min(elapsed / this.enterDuration1, 1);
+
+
+            const startX = this.enterStartPos.x;
+            const endX = this.enterMidPos.x;
+            const startY = this.enterStartPos.y;
+            const endY = this.enterMidPos.y;
+
+            // 水平方向：线性移动
+            const currentX = startX + (endX - startX) * progress;
+
+            // 垂直方向：正弦波摆动
+            const amplitude = 16;  // 一个身体直径
+            const frequency = 2;
+            const currentY = startY + (endY - startY) * progress + Math.sin(progress * Math.PI * frequency) * amplitude;
+
+            const head = this.segments[0];
+            const newHead = new Vector(currentX, currentY);
+            this.velocity = newHead.sub(head).normalize();
+            this.segments[0] = newHead;
+
+            // 身体跟随
+            for (let i = 1; i < this.segments.length; i++) {
+                const prev = this.segments[i - 1];
+                const curr = this.segments[i];
+                const dir = prev.sub(curr);
+                const dist = dir.mag();
+
+                if (dist > CONFIG.SEGMENT_SPACING) {
+                    const targetPos = prev.sub(dir.normalize().mult(CONFIG.SEGMENT_SPACING));
+                    this.segments[i] = new Vector(
+                        curr.x + (targetPos.x - curr.x) * 0.3,
+                        curr.y + (targetPos.y - curr.y) * 0.3
+                    );
+                }
+            }
+
+            if (progress >= 1) {
+                this.enterPhase = 2;  // 进入第二阶段
+                this.enterStartTime = performance.now() / 1000;  // 重置时间
+            }
+
+            return;
+        }
+
+        if (this.enterPhase === 2) {
+            // 第二阶段：从当前位置游到鼠标位置
+            const currentTime = performance.now() / 1000;
+            const elapsed = currentTime - this.enterStartTime;
+            const progress = Math.min(elapsed / this.enterDuration2, 1);
+
+            const head = this.segments[0];
+
+            // 使用enterTargetPos作为鼠标位置（在mouse事件中设置）
+            const mousePos = this.enterTargetPos || head;
+            const distanceToMouse = head.dist(mousePos);
+
+            if (distanceToMouse < 5) {
+                // 鼠标没动，直接完成动画
+                this.enterPhase = 3;
+                this.isEntering = false;
+                return;
+            }
+
+            // 计算目标位置（从当前位置向鼠标位置移动）
+            const direction = mousePos.sub(head).normalize();
+            const moveDistance = distanceToMouse * progress;
+            const currentX = head.x + direction.x * moveDistance;
+            const currentY = head.y + direction.y * moveDistance;
+
+            const newHead = new Vector(currentX, currentY);
+            this.velocity = newHead.sub(head).normalize();
+            this.segments[0] = newHead;
+
+            // 身体跟随
+            for (let i = 1; i < this.segments.length; i++) {
+                const prev = this.segments[i - 1];
+                const curr = this.segments[i];
+                const dir = prev.sub(curr);
+                const dist = dir.mag();
+
+                if (dist > CONFIG.SEGMENT_SPACING) {
+                    const targetPos = prev.sub(dir.normalize().mult(CONFIG.SEGMENT_SPACING));
+                    this.segments[i] = new Vector(
+                        curr.x + (targetPos.x - curr.x) * 0.3,
+                        curr.y + (targetPos.y - curr.y) * 0.3
+                    );
+                }
+            }
+
+            if (progress >= 1) {
+                this.enterPhase = 3;  // 完成
+                this.isEntering = false;
+            }
+
+            return;
+        }
+    }
+
+}
+
+// 混入绘制方法
+import { WormDrawMixin } from './worm-draw.js';
+Object.assign(Worm.prototype, WormDrawMixin);
