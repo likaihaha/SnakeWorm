@@ -8,7 +8,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="format-detection" content="telephone=no">
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐛</text></svg>">
-    <title>Melody Worm v1.28 - 旋律虫虫</title>
+    <title>Melody Worm v1.29 - 旋律虫虫</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -568,7 +568,7 @@
     <div id="mouseIndicator"></div>
     
     <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 8px; box-sizing: border-box; width: 100%; height: 100vh;">
-        <h1 style="margin: 0; font-size: 20px; white-space: nowrap;">🎵 Melody Worm <span style="color:#888; font-size:14px;">v1.28</span> - 旋律虫虫</h1>
+        <h1 style="margin: 0; font-size: 20px; white-space: nowrap;">🎵 Melody Worm <span style="color:#888; font-size:14px;">v1.29</span> - 旋律虫虫</h1>
         <div style="display: flex; align-items: center; gap: 20px; font-size: 11px; color: #ccc;">
             <span>🎮 鼠标控制方向 | 按住左键连续射击 | 咬尾分裂 | 碰颈/框死</span>
         </div>
@@ -577,7 +577,7 @@
             <div class="split-notice" id="splitNotice">⚡ 咬尾分裂！新蚯蚓诞生！</div>
             <div class="split-notice" id="familyNotice" style="color: #FFD700; font-size: 16px;">👶 你就要有一个孩子了！保护好他！</div>
             <div id="startScreen">
-                <h2>🎵 Melody Worm<br>旋律虫虫 <span style="color:#888; font-size:14px;">v1.28</span></h2>
+                <h2>🎵 Melody Worm<br>旋律虫虫 <span style="color:#888; font-size:14px;">v1.29</span></h2>
                 <div class="start-instructions">
                     <div class="inst-row inst-main">
                         <span class="inst-icon">🖱️</span>
@@ -635,7 +635,7 @@
 
     <script>
         /**
-         * Melody Worm v1.28 - 旋律虫虫（游戏结束逻辑集中管理 — 所有玩家死亡路径统一走gameOver()入口）
+         * Melody Worm v1.29 - 旋律虫虫（消除魔法数字 — Enemy/Particle/Bullet常量提取到CONFIG）
          * 
          * 实验机制:
          * - 任何蚯蚓的头部咬到任何其他蚯蚓的尾巴（最后 1/3 段）→ 被咬者断尾分裂
@@ -1184,11 +1184,40 @@
                 ENEMY_CHASE_SPEED: 3.0,      // 敌人追击速度
                 ENEMY_CHASE_RADIUS: 200,     // 敌人追击范围
                 ENEMY_SIZE: 12,              // 敌人大小
+                ENEMY_SEGMENTS: 5,           // 敌人身体节数
+                ENEMY_HEALTH: 3,             // 敌人生命值
+                ENEMY_DEATH_DURATION: 1.5,   // 敌人死亡动画时长（秒）
+                ENEMY_CIRCLE_RADIUS: 60,     // 敌人绕圈半径
+                ENEMY_CIRCLE_SPEED: 2.5,     // 敌人绕圈速度（弧度/秒）
+                ENEMY_CIRCLES_BEFORE_ATTACK: 2, // 攻击前绕圈数（基础值，实际+rand）
+                ENEMY_SINK_GRAVITY: 120,     // 敌人死亡下沉重力加速度
+                ENEMY_KNOCKBACK_DECAY: 0.9,  // 击退速度衰减系数
+                ENEMY_KNOCKBACK_DURATION: 0.3, // 击退持续时间（秒）
+                ENEMY_HIT_FLASH_DURATION: 0.3, // 被击中闪烁时长（秒）
+                ENEMY_BITE_DAMAGE_DELAY: 0.5,  // 咬中幼体后伤害延迟（秒）
+                ENEMY_BOB_SPEED: 3,          // 敌人身体摆动速度（相位倍率）
+                ENEMY_SEG_SPACING: 8,        // 敌人身体段间距
+                ENEMY_TAIL_TAPER: 0.3,       // 敌人尾部锥度（0=不缩, 1=缩到0）
+                ENEMY_KNOCKBACK_SPEED: 8,    // 敌人击退初始速度
+                ENEMY_BOUNCE_DECAY: 0.95,    // 死亡下沉弹开衰减系数
+                ENEMY_HIT_FLASH_BULLET: 0.5, // 子弹击中闪烁时长（秒）
+                ENEMY_HIT_FLASH_DAMAGE: 0.3, // 受伤闪烁时长（秒）
+                ENEMY_KNOCKBACK_TAKE: 0.2,   // takeDamage击退持续时间（秒）
                 JUVENILE_FOLLOW_RADIUS: 250, // 幼体跟随父代范围
                 JUVENILE_FEAR_RADIUS: 150,   // 幼体害怕敌人范围
                 JUVENILE_EAT_RADIUS: 30,     // 幼体吃尾巴范围
                 JUVENILE_SPEED_RATIO: 0.7,   // 幼体速度是成年体的70%
-            }
+            },
+            // 粒子系统配置
+            PARTICLE: {
+                SPEED_MIN: 2,              // 粒子最小速度
+                SPEED_SPREAD: 3,           // 粒子速度随机范围
+                LIFE: 0.4,                 // 粒子存活时间（秒）
+                SIZE_MIN: 2,               // 粒子最小尺寸
+                SIZE_SPREAD: 2,            // 粒子尺寸随机范围
+            },
+            // 子弹外观配置
+            BULLET_RADIUS: 5,              // 子弹半径
         };
 
         /* ========== 空间网格分区类 ========== */
@@ -1350,24 +1379,24 @@
 
             constructor(x, y, color) {
                 this.pos = new Vector(x, y);
-                this.velocity = Vector.randomDir().mult(2 + Math.random() * 3);
+                this.velocity = Vector.randomDir().mult(CONFIG.PARTICLE.SPEED_MIN + Math.random() * CONFIG.PARTICLE.SPEED_SPREAD);
                 this.color = color;
-                this.life = 0.4;  // 粒子存活 0.4 秒
-                this.maxLife = 0.4;
-                this.size = 2 + Math.random() * 2;
+                this.life = CONFIG.PARTICLE.LIFE;
+                this.maxLife = CONFIG.PARTICLE.LIFE;
+                this.size = CONFIG.PARTICLE.SIZE_MIN + Math.random() * CONFIG.PARTICLE.SIZE_SPREAD;
             }
             // 对象池重置
             _reset(x, y, color) {
                 this.pos.x = x;
                 this.pos.y = y;
                 const angle = Math.random() * Math.PI * 2;
-                const speed = 2 + Math.random() * 3;
+                const speed = CONFIG.PARTICLE.SPEED_MIN + Math.random() * CONFIG.PARTICLE.SPEED_SPREAD;
                 this.velocity.x = Math.cos(angle) * speed;
                 this.velocity.y = Math.sin(angle) * speed;
                 this.color = color;
-                this.life = 0.4;
-                this.maxLife = 0.4;
-                this.size = 2 + Math.random() * 2;
+                this.life = CONFIG.PARTICLE.LIFE;
+                this.maxLife = CONFIG.PARTICLE.LIFE;
+                this.size = CONFIG.PARTICLE.SIZE_MIN + Math.random() * CONFIG.PARTICLE.SIZE_SPREAD;
             }
             update(dt) {
                 this.pos.addSelf(this.velocity.clone().multSelf(dt * 60));
@@ -1390,7 +1419,7 @@
             constructor(x, y, direction) {
                 this.pos = new Vector(x, y);
                 this.velocity = direction.normalize().mult(CONFIG.FIRE.BULLET_SPEED);
-                this.radius = 5;
+                this.radius = CONFIG.BULLET_RADIUS;
                 this.life = CONFIG.FIRE.BULLET_LIFE;
                 this.hitTargets = [];  // 已击中的目标（避免重复击中）
             }
@@ -3418,13 +3447,13 @@
                 this.color = '#8B4513';  // 棕色
                 this.eyeColor = '#FF4444';  // 红色眼睛
                 this.segments = [];  // 身体节段
-                this.segmentCount = 5;  // 5节身体
+                this.segmentCount = CONFIG.FAMILY.ENEMY_SEGMENTS;
                 this.phase = Math.random() * Math.PI * 2;  // 动画相位
                 this.isAlive = true;
                 this.state = ENEMY_STATE.WANDERING;  // 当前状态
                 this.hitTimer = 0;  // 被击中闪烁计时器
-                this.health = 3;  // 生命值（3点生命）
-                this.maxHealth = 3;  // 最大生命值
+                this.health = CONFIG.FAMILY.ENEMY_HEALTH;  // 生命值
+                this.maxHealth = CONFIG.FAMILY.ENEMY_HEALTH;  // 最大生命值
                 this.knockbackVelocity = null;  // 击退速度
                 this.knockbackTimer = 0;  // 击退计时器
                 this.chaseTarget = null;  // 追击目标
@@ -3434,7 +3463,7 @@
                 // 死亡下沉相关
                 this.isDying = false;  // 是否正在死亡下沉
                 this.deathTimer = 0;  // 死亡动画计时器
-                this.deathDuration = 1.5;  // 死亡动画持续时间
+                this.deathDuration = CONFIG.FAMILY.ENEMY_DEATH_DURATION;  // 死亡动画持续时间
                 this.sinkSpeed = 0;  // 下沉速度
                 this.bounceVelocity = null;  // 弹开速度
                 
@@ -3447,10 +3476,10 @@
                 this.isCircling = false;  // 是否正在绕圈
                 this.circleTarget = null;  // 绕圈目标（幼体）
                 this.circleAngle = 0;  // 当前绕圈角度
-                this.circleRadius = 60;  // 绕圈半径
-                this.circleSpeed = 2.5;  // 绕圈速度（弧度/秒）
+                this.circleRadius = CONFIG.FAMILY.ENEMY_CIRCLE_RADIUS;  // 绕圈半径
+                this.circleSpeed = CONFIG.FAMILY.ENEMY_CIRCLE_SPEED;  // 绕圈速度（弧度/秒）
                 this.circleCount = 0;  // 已绕圈数
-                this.circlesBeforeAttack = 2 + Math.random();  // 攻击前绕2-3圈
+                this.circlesBeforeAttack = CONFIG.FAMILY.ENEMY_CIRCLES_BEFORE_ATTACK + Math.random();  // 攻击前绕2-3圈
                 
                 // 觅食相关
                 this.feedingTarget = null;  // 觅食目标（shrinkingSegment或白色宝珠）
@@ -3459,7 +3488,7 @@
                 
                 // 初始化身体节段
                 for (let i = 0; i < this.segmentCount; i++) {
-                    this.segments.push(new Vector(x - i * 8, y));
+                    this.segments.push(new Vector(x - i * CONFIG.FAMILY.ENEMY_SEG_SPACING, y));
                 }
             }
             
@@ -3473,7 +3502,7 @@
                     return;
                 }
                 
-                this.phase += dt * 3;
+                this.phase += dt * CONFIG.FAMILY.ENEMY_BOB_SPEED;
                 this.hitTimer -= dt;
                 this.wanderTimer -= dt;
                 this.knockbackTimer -= dt;
@@ -3481,7 +3510,7 @@
                 // 击退效果
                 if (this.knockbackVelocity && this.knockbackTimer > 0) {
                     this.pos = this.pos.add(this.knockbackVelocity.mult(dt * 60));
-                    this.knockbackVelocity = this.knockbackVelocity.mult(0.9);
+                    this.knockbackVelocity = this.knockbackVelocity.mult(CONFIG.FAMILY.ENEMY_KNOCKBACK_DECAY);
                     this.updateBodySegments();
                     return;  // 击退期间不进行其他行为
                 }
@@ -3558,11 +3587,11 @@
             // 更新死亡下沉动画
             updateDying(dt) {
                 this.deathTimer -= dt;
-                this.sinkSpeed += 120 * dt;
+                this.sinkSpeed += CONFIG.FAMILY.ENEMY_SINK_GRAVITY * dt;
                 
                 if (this.bounceVelocity) {
                     this.pos = this.pos.add(this.bounceVelocity.mult(dt * 60));
-                    this.bounceVelocity = this.bounceVelocity.mult(0.95);
+                    this.bounceVelocity = this.bounceVelocity.mult(CONFIG.FAMILY.ENEMY_KNOCKBACK_DECAY);
                 }
                 
                 this.pos.y += this.sinkSpeed * dt;
@@ -3573,7 +3602,7 @@
                         const prev = this.segments[i - 1];
                         const curr = this.segments[i];
                         const dir = prev.sub(curr).normalize();
-                        this.segments[i] = prev.sub(dir.mult(8));
+                        this.segments[i] = prev.sub(dir.mult(CONFIG.FAMILY.ENEMY_SEG_SPACING));
                     }
                 }
                 
@@ -3606,7 +3635,7 @@
                 // 咬中一次就造成伤害并撤离
                 this.biteDamageTimer -= dt;
                 if (this.biteDamageTimer <= 0) {
-                    this.biteDamageTimer = 0.5;  // 0.5秒后撤离
+                    this.biteDamageTimer = CONFIG.FAMILY.ENEMY_BITE_DAMAGE_DELAY;  // 咬中后撤离延迟
                     
                     const juv = this.latchedJuvenile;
                     
@@ -3642,7 +3671,7 @@
                     // 三叶虫击退撤离（从幼体方向弹开）
                     const bounceDir = this.pos.sub(juv.head).normalize();
                     this.knockbackVelocity = bounceDir.mult(6);
-                    this.knockbackTimer = 0.3;
+                    this.knockbackTimer = CONFIG.FAMILY.ENEMY_KNOCKBACK_DURATION;
                     
                     // 释放幼体并切换到漫游状态
                     this.release();
@@ -3839,7 +3868,7 @@
                         const curr = this.segments[i];
                         const dx = prev.x - curr.x, dy = prev.y - curr.y;
                         const d = Math.sqrt(dx * dx + dy * dy);
-                        if (d > 0) { curr.x = prev.x - dx / d * 8; curr.y = prev.y - dy / d * 8; }
+                        if (d > 0) { curr.x = prev.x - dx / d * CONFIG.FAMILY.ENEMY_SEG_SPACING; curr.y = prev.y - dy / d * CONFIG.FAMILY.ENEMY_SEG_SPACING; }
                     }
                 }
             }
@@ -3870,7 +3899,7 @@
                 for (let i = this.segments.length - 1; i >= 0; i--) {
                     const seg = this.segments[i];
                     const t = i / this.segments.length;
-                    const radius = this.size * (1 - t * 0.3);  // 越往后越小
+                    const radius = this.size * (1 - t * CONFIG.FAMILY.ENEMY_TAIL_TAPER);  // 越往后越小
                     
                     // 身体颜色（被击中时闪烁）
                     ctx.fillStyle = flash ? '#FF0000' : this.color;
@@ -3983,7 +4012,7 @@
             }
             
             hit() {
-                this.hitTimer = 0.5;
+                this.hitTimer = CONFIG.FAMILY.ENEMY_HIT_FLASH_BULLET;
             }
             
             /**
@@ -3993,13 +4022,13 @@
              */
             takeDamage(hitDir) {
                 this.health--;
-                this.hitTimer = 0.3;
+                this.hitTimer = CONFIG.FAMILY.ENEMY_HIT_FLASH_DAMAGE;
                 
                 // 击退效果
                 if (hitDir) {
                     const hd = Math.sqrt(hitDir.x * hitDir.x + hitDir.y * hitDir.y);
-                    this.knockbackVelocity = new Vector(hd > 0 ? hitDir.x / hd * 8 : 0, hd > 0 ? hitDir.y / hd * 8 : 0);
-                    this.knockbackTimer = 0.2;
+                    this.knockbackVelocity = new Vector(hd > 0 ? hitDir.x / hd * CONFIG.FAMILY.ENEMY_KNOCKBACK_SPEED : 0, hd > 0 ? hitDir.y / hd * CONFIG.FAMILY.ENEMY_KNOCKBACK_SPEED : 0);
+                    this.knockbackTimer = CONFIG.FAMILY.ENEMY_KNOCKBACK_TAKE;
                 }
                 
                 // 掉落最后一节身体
