@@ -8,7 +8,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="format-detection" content="telephone=no">
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐛</text></svg>">
-    <title>Melody Worm v1.08 - 旋律虫虫</title>
+    <title>Melody Worm v1.09 - 旋律虫虫</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -568,7 +568,7 @@
     <div id="mouseIndicator"></div>
     
     <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 8px; box-sizing: border-box; width: 100%; height: 100vh;">
-        <h1 style="margin: 0; font-size: 20px; white-space: nowrap;">🎵 Melody Worm <span style="color:#888; font-size:14px;">v1.08</span> - 旋律虫虫</h1>
+        <h1 style="margin: 0; font-size: 20px; white-space: nowrap;">🎵 Melody Worm <span style="color:#888; font-size:14px;">v1.09</span> - 旋律虫虫</h1>
         <div style="display: flex; align-items: center; gap: 20px; font-size: 11px; color: #ccc;">
             <span>🎮 鼠标控制方向 | 按住左键连续射击 | 咬尾分裂 | 碰颈/框死</span>
         </div>
@@ -577,7 +577,7 @@
             <div class="split-notice" id="splitNotice">⚡ 咬尾分裂！新蚯蚓诞生！</div>
             <div class="split-notice" id="familyNotice" style="color: #FFD700; font-size: 16px;">👶 你就要有一个孩子了！保护好他！</div>
             <div id="startScreen">
-                <h2>🎵 Melody Worm<br>旋律虫虫 <span style="color:#888; font-size:14px;">v1.08</span></h2>
+                <h2>🎵 Melody Worm<br>旋律虫虫 <span style="color:#888; font-size:14px;">v1.09</span></h2>
                 <div class="start-instructions">
                     <div class="inst-row inst-main">
                         <span class="inst-icon">🖱️</span>
@@ -635,7 +635,7 @@
 
     <script>
         /**
-         * Melody Worm v1.08 - 旋律虫虫
+         * Melody Worm v1.09 - 旋律虫虫
          * 
          * 实验机制:
          * - 任何蚯蚓的头部咬到任何其他蚯蚓的尾巴（最后 1/3 段）→ 被咬者断尾分裂
@@ -1144,6 +1144,20 @@
                 ORANGE_UNLOCK_TIME: 90,      // 90秒后解锁橙色宝珠
                 YELLOW_COOLDOWN: 15.0,       // 吃黄宝珠后冷却15秒（旋律播完后等待）
             },
+            // 射击系统配置
+            FIRE: {
+                FIRST_DELAY: 0.15,         // 首发后延迟开始连续射击（秒）
+                COOLDOWN: 0.12,            // 连续射击间隔（秒，约8发/秒）
+                BULLET_SPEED: 12,          // 子弹速度
+                BULLET_LIFE: 2.0,          // 子弹存活时间（秒）
+            },
+            // 饥饿系统配置
+            HUNGER: {
+                BASE_MULTIPLIER: 52.6,     // 消耗曲线基础倍率
+                DECAY_RATE: -0.099,        // 消耗曲线衰减系数
+                LOW_BODY_MULTIPLIER: 32,   // 身体<5节时的额外倍率
+                LOW_BODY_THRESHOLD: 5,     // 低身体阈值
+            },
             // 亲子关系系统配置
             FAMILY: {
                 JUVENILE_MAX_LENGTH: 11,     // 幼体最大长度（12节成年）
@@ -1279,9 +1293,9 @@
         class Bullet {
             constructor(x, y, direction) {
                 this.pos = new Vector(x, y);
-                this.velocity = direction.normalize().mult(12);  // 子弹速度
+                this.velocity = direction.normalize().mult(CONFIG.FIRE.BULLET_SPEED);
                 this.radius = 5;
-                this.life = 2.0;  // 子弹存活 2 秒
+                this.life = CONFIG.FIRE.BULLET_LIFE;
                 this.hitTargets = [];  // 已击中的目标（避免重复击中）
             }
             
@@ -2019,9 +2033,9 @@
                 this.hungerTimer += dt;
                 const baseRate = this.isMoving ? this.hungerRateMoving : this.hungerRateIdle;
                 const length = this.segments.length;
-                let hungerRate = baseRate * 52.6 * Math.exp(-0.099 * length);
-                if (length < 5) {
-                    hungerRate *= 32;
+                let hungerRate = baseRate * CONFIG.HUNGER.BASE_MULTIPLIER * Math.exp(CONFIG.HUNGER.DECAY_RATE * length);
+                if (length < CONFIG.HUNGER.LOW_BODY_THRESHOLD) {
+                    hungerRate *= CONFIG.HUNGER.LOW_BODY_MULTIPLIER;
                 }
                 
                 if (this.hungerTimer >= hungerRate) {
@@ -4111,7 +4125,7 @@
                     if (!this.isRunning || this.isPaused || this.isGameOver) return;
                     this.isMouseDown = true;
                     this.fireBullet();
-                    this.fireCooldown = 0.15;  // 首发后0.15秒开始连续射击
+                    this.fireCooldown = CONFIG.FIRE.FIRST_DELAY;
                 });
                 canvas.addEventListener('mouseup', (e) => {
                     this.isMouseDown = false;
@@ -4144,7 +4158,7 @@
                                 e2.stopPropagation();
                                 this.isMouseDown = true;
                                 this.fireBullet();
-                                this.fireCooldown = 0.15;
+                                this.fireCooldown = CONFIG.FIRE.FIRST_DELAY;
                             }, { passive: false });
                             fireBtn.addEventListener('touchend', (e2) => {
                                 e2.preventDefault();
@@ -4155,7 +4169,7 @@
                                 e2.stopPropagation();
                                 this.isMouseDown = true;
                                 this.fireBullet();
-                                this.fireCooldown = 0.15;
+                                this.fireCooldown = CONFIG.FIRE.FIRST_DELAY;
                             });
                             fireBtn.addEventListener('mouseup', (e2) => {
                                 this.isMouseDown = false;
@@ -4513,7 +4527,7 @@
                 // 按住鼠标连续射击
                 if (this.isMouseDown && this.fireCooldown <= 0) {
                     this.fireBullet();
-                    this.fireCooldown = 0.12;  // 每0.12秒射一发（约8发/秒）
+                    this.fireCooldown = CONFIG.FIRE.COOLDOWN;
                 }
                 if (this.fireCooldown > 0) {
                     this.fireCooldown -= dt;
