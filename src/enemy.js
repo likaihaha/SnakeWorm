@@ -1,6 +1,6 @@
 import { Vector } from './vector.js';
 import { CONFIG, ENEMY_STATE } from './config.js';
-import { FloatingText } from './entities.js';
+import { FloatingText, Particle } from './entities.js';
 
 export { ENEMY_STATE };
 
