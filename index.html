@@ -8,7 +8,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="format-detection" content="telephone=no">
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐛</text></svg>">
-    <title>Melody Worm v1.20 - 旋律虫虫</title>
+    <title>Melody Worm v1.21 - 旋律虫虫</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -568,7 +568,7 @@
     <div id="mouseIndicator"></div>
     
     <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 8px; box-sizing: border-box; width: 100%; height: 100vh;">
-        <h1 style="margin: 0; font-size: 20px; white-space: nowrap;">🎵 Melody Worm <span style="color:#888; font-size:14px;">v1.20</span> - 旋律虫虫</h1>
+        <h1 style="margin: 0; font-size: 20px; white-space: nowrap;">🎵 Melody Worm <span style="color:#888; font-size:14px;">v1.21</span> - 旋律虫虫</h1>
         <div style="display: flex; align-items: center; gap: 20px; font-size: 11px; color: #ccc;">
             <span>🎮 鼠标控制方向 | 按住左键连续射击 | 咬尾分裂 | 碰颈/框死</span>
         </div>
@@ -577,7 +577,7 @@
             <div class="split-notice" id="splitNotice">⚡ 咬尾分裂！新蚯蚓诞生！</div>
             <div class="split-notice" id="familyNotice" style="color: #FFD700; font-size: 16px;">👶 你就要有一个孩子了！保护好他！</div>
             <div id="startScreen">
-                <h2>🎵 Melody Worm<br>旋律虫虫 <span style="color:#888; font-size:14px;">v1.20</span></h2>
+                <h2>🎵 Melody Worm<br>旋律虫虫 <span style="color:#888; font-size:14px;">v1.21</span></h2>
                 <div class="start-instructions">
                     <div class="inst-row inst-main">
                         <span class="inst-icon">🖱️</span>
@@ -635,7 +635,7 @@
 
     <script>
         /**
-         * Melody Worm v1.20 - 旋律虫虫
+         * Melody Worm v1.21 - 旋律虫虫
          * 
          * 实验机制:
          * - 任何蚯蚓的头部咬到任何其他蚯蚓的尾巴（最后 1/3 段）→ 被咬者断尾分裂
@@ -1700,6 +1700,13 @@
                 // 空闲波动动画（静止时的生命感）
                 this.idleWavePhase = Math.random() * Math.PI * 2;  // 波动相位
                 
+                // 碰撞区域 Set 缓存（仅在 segments.length 变化时重建）
+                this._cachedSegCount = -1;
+                this._cachedTailSet = new Set();
+                this._cachedNeckSet = new Set();
+                this._cachedAbdomenSet = new Set();
+                this._cachedHeadSet = new Set([0]);
+                
                 // 黄光效果状态（吃到黄色宝珠时触发）
                 this.yellowGlowTimer = 0;  // 黄光计时器
                 this.yellowGlowIndex = 0;  // 当前闪光的段索引（从嘴部开始）
@@ -1862,43 +1869,72 @@
              * 获取颈部段索引范围（第1节到身体1/3）
              */
             get neckSegmentIndices() {
-                const len = this.segments.length;
-                const neckEnd = Math.max(1, Math.floor(len / 3));
-                const indices = [];
-                for (let i = 1; i <= neckEnd && i < len; i++) {
-                    indices.push(i);
-                }
-                return indices;
+                this._rebuildRegionCache();
+                return this._cachedNeckIndices;
             }
 
             /**
              * 获取腹部段索引范围（身体1/3到2/3）
              */
             get abdomenSegmentIndices() {
-                const len = this.segments.length;
-                const abdStart = Math.max(1, Math.floor(len / 3));
-                const abdEnd = Math.floor(len * 2 / 3);
-                const indices = [];
-                for (let i = abdStart; i <= abdEnd && i < len; i++) {
-                    indices.push(i);
-                }
-                return indices;
+                this._rebuildRegionCache();
+                return this._cachedAbdomenIndices;
             }
 
             /**
              * 获取尾巴段索引范围（最后 1/3 段，从2/3到末尾）
              */
             get tailSegmentIndices() {
-                const len = this.segments.length;
-                const tailStart = Math.floor(len * 2 / 3);
-                const indices = [];
-                for (let i = tailStart; i < len; i++) {
-                    indices.push(i);
-                }
-                return indices;
+                this._rebuildRegionCache();
+                return this._cachedTailIndices;
             }
 
-    update(targetPos, dt, allFoods = [], allWorms = []) {
+            /**
+             * 重建碰撞区域缓存（仅在 segments.length 变化时执行）
+             */
+            _rebuildRegionCache() {
+                const len = this.segments.length;
+                if (len === this._cachedSegCount) return;
+                this._cachedSegCount = len;
+
+                const neckEnd = Math.max(1, Math.floor(len / 3));
+                const abdStart = Math.max(1, Math.floor(len / 3));
+                const abdEnd = Math.floor(len * 2 / 3);
+                const tailStart = Math.floor(len * 2 / 3);
+
+                this._cachedNeckIndices = [];
+                this._cachedAbdomenIndices = [];
+                this._cachedTailIndices = [];
+                this._cachedHeadIndices = [0];
+                this._cachedNeckSet.clear();
+                this._cachedAbdomenSet.clear();
+                this._cachedTailSet.clear();
+                this._cachedHeadSet.clear();
+                this._cachedHeadSet.add(0);
+
+                for (let i = 1; i <= neckEnd && i < len; i++) {
+                    this._cachedNeckIndices.push(i);
+                    this._cachedNeckSet.add(i);
+                }
+                for (let i = abdStart; i <= abdEnd && i < len; i++) {
+                    this._cachedAbdomenIndices.push(i);
+                    this._cachedAbdomenSet.add(i);
+                }
+                for (let i = tailStart; i < len; i++) {
+                    this._cachedTailIndices.push(i);
+                    this._cachedTailSet.add(i);
+                }
+            }
+
+            /**
+             * 获取碰撞区域的缓存 Set（避免每帧重复创建）
+             */
+            get _regionSets() {
+                this._rebuildRegionCache();
+                return { head: this._cachedHeadSet, tail: this._cachedTailSet, neck: this._cachedNeckSet, abdomen: this._cachedAbdomenSet };
+            }
+
+            update(targetPos, dt, allFoods = [], allWorms = []) {
                 // 空指针保护：如果segments为空，直接返回
                 if (this.segments.length === 0) return;
                 
@@ -2602,10 +2638,8 @@
                         if (other === this || !other.isAlive) continue;
                         if (other.invincibleTimer > 0) continue;
                         if (other.activationTimer > 0) continue;
-                        const tailSet = new Set(other.tailSegmentIndices);
-                        const neckSet = new Set(other.neckSegmentIndices);
-                        const abdomenSet = new Set(other.abdomenSegmentIndices);
-                        if (tailSet.has(segIndex) || neckSet.has(segIndex) || abdomenSet.has(segIndex)) continue;
+                        const rs = other._regionSets;
+                        if (rs.tail.has(segIndex) || rs.neck.has(segIndex) || rs.abdomen.has(segIndex)) continue;
                         if (head.dist(other.segments[segIndex]) < collisionDist) {
                             return { worm: other, segmentIndex: segIndex };
                         }
@@ -2618,20 +2652,15 @@
                     if (other.invincibleTimer > 0) continue;
                     if (other.activationTimer > 0) continue;
 
-                    const tailIndices = other.tailSegmentIndices;
-                    const tailSet = new Set(tailIndices);
-                    const neckIndices = other.neckSegmentIndices;
-                    const neckSet = new Set(neckIndices);
-                    const abdomenIndices = other.abdomenSegmentIndices;
-                    const abdomenSet = new Set(abdomenIndices);
+                    const rs = other._regionSets;
 
                     for (let i = 0; i < other.segments.length; i++) {
                         // 跳过尾巴段（尾巴 bite 有单独处理）
-                        if (tailSet.has(i)) continue;
+                        if (rs.tail.has(i)) continue;
                         // 跳过颈部段（颈部 bite 有单独处理，直接死亡）
-                        if (neckSet.has(i)) continue;
+                        if (rs.neck.has(i)) continue;
                         // 跳过腹部段（腹部碰撞不触发死亡）
-                        if (abdomenSet.has(i)) continue;
+                        if (rs.abdomen.has(i)) continue;
                         if (head.dist(other.segments[i]) < collisionDist) {
                             return { worm: other, segmentIndex: i };
                         }
@@ -2757,11 +2786,12 @@
             draw(ctx) {
                 if (!this.isAlive || this.segments.length === 0) return;
 
-                // 获取各区域段索引集合 (用于视觉标识)
-                const tailIndices = new Set(this.tailSegmentIndices);
-                const headIndices = new Set(this.headSegmentIndices);
-                const neckIndices = new Set(this.neckSegmentIndices);
-                const abdomenIndices = new Set(this.abdomenSegmentIndices);
+                // 获取各区域段索引集合 (用于视觉标识，使用缓存)
+                const rs = this._regionSets;
+                const tailIndices = rs.tail;
+                const headIndices = rs.head;
+                const neckIndices = rs.neck;
+                const abdomenIndices = rs.abdomen;
 
                 // 计算空闲波动：未移动时从头到尾的正弦波波动（生命感）
                 let waveOffsets = [];
