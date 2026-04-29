@@ -8,7 +8,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="format-detection" content="telephone=no">
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐛</text></svg>">
-    <title>Melody Worm v1.26 - 旋律虫虫</title>
+    <title>Melody Worm v1.27 - 旋律虫虫</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -568,7 +568,7 @@
     <div id="mouseIndicator"></div>
     
     <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 8px; box-sizing: border-box; width: 100%; height: 100vh;">
-        <h1 style="margin: 0; font-size: 20px; white-space: nowrap;">🎵 Melody Worm <span style="color:#888; font-size:14px;">v1.26</span> - 旋律虫虫</h1>
+        <h1 style="margin: 0; font-size: 20px; white-space: nowrap;">🎵 Melody Worm <span style="color:#888; font-size:14px;">v1.27</span> - 旋律虫虫</h1>
         <div style="display: flex; align-items: center; gap: 20px; font-size: 11px; color: #ccc;">
             <span>🎮 鼠标控制方向 | 按住左键连续射击 | 咬尾分裂 | 碰颈/框死</span>
         </div>
@@ -577,7 +577,7 @@
             <div class="split-notice" id="splitNotice">⚡ 咬尾分裂！新蚯蚓诞生！</div>
             <div class="split-notice" id="familyNotice" style="color: #FFD700; font-size: 16px;">👶 你就要有一个孩子了！保护好他！</div>
             <div id="startScreen">
-                <h2>🎵 Melody Worm<br>旋律虫虫 <span style="color:#888; font-size:14px;">v1.26</span></h2>
+                <h2>🎵 Melody Worm<br>旋律虫虫 <span style="color:#888; font-size:14px;">v1.27</span></h2>
                 <div class="start-instructions">
                     <div class="inst-row inst-main">
                         <span class="inst-icon">🖱️</span>
@@ -635,7 +635,7 @@
 
     <script>
         /**
-         * Melody Worm v1.26 - 旋律虫虫
+         * Melody Worm v1.27 - 旋律虫虫（统一游戏状态字段，消除isRunning/isPaused/isGameOver冗余）
          * 
          * 实验机制:
          * - 任何蚯蚓的头部咬到任何其他蚯蚓的尾巴（最后 1/3 段）→ 被咬者断尾分裂
@@ -4330,10 +4330,7 @@
                 this.isMouseDown = false;  // 鼠标按下状态（连续射击）
                 this.fireCooldown = 0;  // 射击冷却计时器
                 this.score = 0;
-                this.isRunning = false;
-                this.isPaused = false;
-                this.isGameOver = false;
-                this.state = GAME_STATE.IDLE;  // 统一状态字段
+                this.state = GAME_STATE.IDLE;
                 this.lastTime = 0;
                 this.splitCount = 0;
                 this.splitCooldown = 0;
@@ -4532,7 +4529,7 @@
                 canvas.addEventListener('mousemove', (e) => {
                     if (this.isTouchDevice) return;  // 触摸设备不处理鼠标事件
                     // 出场动画期间忽略鼠标位置更新
-                    if (this.isRunning && this.worms[0] && this.worms[0].isEntering) return;
+                    if (this.state === GAME_STATE.PLAYING && this.worms[0] && this.worms[0].isEntering) return;
                     const rect = canvas.getBoundingClientRect();
                     const scaleX = CONFIG.CANVAS_WIDTH / rect.width;
                     const scaleY = CONFIG.CANVAS_HEIGHT / rect.height;
@@ -4581,7 +4578,7 @@
                 canvas.addEventListener('mousedown', (e) => {
                     if (this.isTouchDevice) return;  // 触摸设备用按钮
                     if (e.button !== 0) return;  // 只响应左键（0=左键，1=中键，2=右键）
-                    if (!this.isRunning || this.isPaused || this.isGameOver) return;
+                    if (this.state !== GAME_STATE.PLAYING) return;
                     this.isMouseDown = true;
                     this.fireBullet();
                     this.fireCooldown = CONFIG.FIRE.FIRST_DELAY;
@@ -4671,9 +4668,9 @@
                 // 键盘事件
                 document.addEventListener('keydown', (e) => {
                     if (e.key === 'Escape') {
-                        if (this.isRunning && !this.isGameOver) {
+                        if (this.state === GAME_STATE.PLAYING) {
                             this.pauseGame();
-                        } else if (this.isPaused) {
+                        } else if (this.state === GAME_STATE.PAUSED) {
                             this.resumeGame();
                         }
                     }
@@ -4689,7 +4686,7 @@
              */
             handleTouch(e) {
                 // 出场动画期间忽略触摸位置更新
-                if (this.isRunning && this.worms[0] && this.worms[0].isEntering) return;
+                if (this.state === GAME_STATE.PLAYING && this.worms[0] && this.worms[0].isEntering) return;
                 const touch = e.touches[0];
                 const rect = canvas.getBoundingClientRect();
                 const scaleX = CONFIG.CANVAS_WIDTH / rect.width;
@@ -4784,14 +4781,12 @@
             }
 
             pauseGame() {
-                this.isPaused = true;
-                this.state = GAME_STATE.PAUSED;  // 统一状态字段
+                this.state = GAME_STATE.PAUSED;
                 document.getElementById('pauseScreen').style.display = 'block';
             }
 
             resumeGame() {
-                this.isPaused = false;
-                this.state = GAME_STATE.PLAYING;  // 统一状态字段
+                this.state = GAME_STATE.PLAYING;
                 document.getElementById('pauseScreen').style.display = 'none';
                 this.lastTime = 0;
             }
@@ -4820,10 +4815,7 @@
                 this.rhythmNotified = {};  // 重置节奏通知
                 this.showCrosshairHint = false;  // 重置瞄准镜提示
                 this.crosshairHintTimer = 0;
-                this.isRunning = true;
-                this.isPaused = false;
-                this.isGameOver = false;
-                this.state = GAME_STATE.PLAYING;  // 统一状态字段
+                this.state = GAME_STATE.PLAYING;
                 this.waitingForPlayer = true;  // 等待玩家鼠标移入白圈
                 this.playerDeadWaitingForBodies = false;  // 重置玩家死亡等待标志
                 this.playerDeathLength = 0;  // 重置玩家死亡长度
@@ -4927,9 +4919,9 @@
 
                 // 按目标帧率执行更新
                 while (this.fpsAccumulator >= targetInterval) {
-                    if (this.isRunning && !this.isPaused) {
+                    if (this.state === GAME_STATE.PLAYING || this.state === GAME_STATE.GAME_OVER) {
                         // 游戏结束但还有尸体需要处理时，继续更新
-                        if (!this.isGameOver || this.deadBodies.length > 0 || this.playerDeadWaitingForBodies) {
+                        if (this.state === GAME_STATE.PLAYING || this.deadBodies.length > 0 || this.playerDeadWaitingForBodies) {
                             this.update(targetInterval);
                         }
                     }
@@ -5594,7 +5586,7 @@
              * 发射子弹（桌面端和移动端共用）
              */
             fireBullet() {
-                if (!this.isRunning || this.isPaused || this.isGameOver) return;
+                if (this.state !== GAME_STATE.PLAYING) return;
                 
                 const player = this.worms[0];
                 if (!player || !player.isAlive || player.segments.length === 0) return;
@@ -6360,8 +6352,7 @@
 
             gameOver(reason = 'eaten') {
                 this.isMouseDown = false;  // 停止连续射击
-                this.isGameOver = true;
-                this.state = GAME_STATE.GAME_OVER;  // 统一状态字段
+                this.state = GAME_STATE.GAME_OVER;
                 const player = this.worms.find(w => w.isPlayer);
                 
                 // 保存死亡长度
