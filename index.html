@@ -8,7 +8,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="format-detection" content="telephone=no">
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐛</text></svg>">
-    <title>Melody Worm v1.21 - 旋律虫虫</title>
+    <title>Melody Worm v1.22 - 旋律虫虫</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -568,7 +568,7 @@
     <div id="mouseIndicator"></div>
     
     <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 8px; box-sizing: border-box; width: 100%; height: 100vh;">
-        <h1 style="margin: 0; font-size: 20px; white-space: nowrap;">🎵 Melody Worm <span style="color:#888; font-size:14px;">v1.21</span> - 旋律虫虫</h1>
+        <h1 style="margin: 0; font-size: 20px; white-space: nowrap;">🎵 Melody Worm <span style="color:#888; font-size:14px;">v1.22</span> - 旋律虫虫</h1>
         <div style="display: flex; align-items: center; gap: 20px; font-size: 11px; color: #ccc;">
             <span>🎮 鼠标控制方向 | 按住左键连续射击 | 咬尾分裂 | 碰颈/框死</span>
         </div>
@@ -577,7 +577,7 @@
             <div class="split-notice" id="splitNotice">⚡ 咬尾分裂！新蚯蚓诞生！</div>
             <div class="split-notice" id="familyNotice" style="color: #FFD700; font-size: 16px;">👶 你就要有一个孩子了！保护好他！</div>
             <div id="startScreen">
-                <h2>🎵 Melody Worm<br>旋律虫虫 <span style="color:#888; font-size:14px;">v1.21</span></h2>
+                <h2>🎵 Melody Worm<br>旋律虫虫 <span style="color:#888; font-size:14px;">v1.22</span></h2>
                 <div class="start-instructions">
                     <div class="inst-row inst-main">
                         <span class="inst-icon">🖱️</span>
@@ -635,7 +635,7 @@
 
     <script>
         /**
-         * Melody Worm v1.21 - 旋律虫虫
+         * Melody Worm v1.22 - 旋律虫虫
          * 
          * 实验机制:
          * - 任何蚯蚓的头部咬到任何其他蚯蚓的尾巴（最后 1/3 段）→ 被咬者断尾分裂
@@ -4312,6 +4312,27 @@
                 this.targetFPS = CONFIG.TARGET_FPS;
                 this.fpsAccumulator = 0;
                 this.fpsDisplay = 0;
+                
+                // DOM 引用缓存（避免每帧 getElementById）
+                this.ui = {
+                    timer: document.getElementById('timerDisplay'),
+                    length: document.getElementById('lengthDisplay'),
+                    score: document.getElementById('scoreDisplay'),
+                    speed: document.getElementById('speedDisplay'),
+                    bullet: document.getElementById('bulletDisplay'),
+                    splitCount: document.getElementById('splitCount'),
+                    wormCount: document.getElementById('wormCount'),
+                    ammoCount: document.getElementById('ammoCount'),
+                    rhythmHint: document.getElementById('rhythmHint'),
+                    pauseScreen: document.getElementById('pauseScreen'),
+                    gameOver: document.getElementById('gameOver'),
+                    startScreen: document.getElementById('startScreen'),
+                    startBtn: document.getElementById('startBtn'),
+                    audioLoading: document.getElementById('audioLoading'),
+                    gameContainer: document.getElementById('gameContainer'),
+                    fullscreenBtn: document.getElementById('fullscreenBtn'),
+                    mouseIndicator: document.getElementById('mouseIndicator'),
+                };
                 this.fpsUpdateTimer = 0;
                 // 初始化每种宝珠的计时器
                 CONFIG.FOOD_TYPES.forEach(type => {
@@ -4792,24 +4813,22 @@
                 const totalSeconds = Math.floor(this.gameTime);
                 const minutes = Math.floor(totalSeconds / 60);
                 const seconds = totalSeconds % 60;
-                document.getElementById('timerDisplay').textContent = 
+                this.ui.timer.textContent = 
                     String(minutes).padStart(2, '0') + ':' + String(seconds).padStart(2, '0');
-                document.getElementById('lengthDisplay').textContent = player.length;
-                document.getElementById('scoreDisplay').textContent = this.score;
-                document.getElementById('speedDisplay').textContent = player.speed.toFixed(1);
-                document.getElementById('bulletDisplay').textContent = player.bulletCount || 0;
-                document.getElementById('splitCount').textContent = this.splitCount;
-                document.getElementById('wormCount').textContent = this.worms.filter(w => w.isAlive).length;
+                this.ui.length.textContent = player.length;
+                this.ui.score.textContent = this.score;
+                this.ui.speed.textContent = player.speed.toFixed(1);
+                this.ui.bullet.textContent = player.bulletCount || 0;
+                this.ui.splitCount.textContent = this.splitCount;
+                this.ui.wormCount.textContent = this.worms.filter(w => w.isAlive).length;
                 
                 // 移动端弹仓显示
-                const ammoCount = document.getElementById('ammoCount');
-                if (ammoCount && this.isTouchDevice) {
-                    ammoCount.textContent = player.bulletCount || 0;
+                if (this.ui.ammoCount && this.isTouchDevice) {
+                    this.ui.ammoCount.textContent = player.bulletCount || 0;
                 }
                 
                 // 游戏节奏提示
-                const rhythmHint = document.getElementById('rhythmHint');
-                if (rhythmHint) {
+                if (this.ui.rhythmHint) {
                     const hints = [];
                     // 绿色始终可用
                     hints.push('🟢');
@@ -4831,7 +4850,7 @@
                     if (this.gameTime >= CONFIG.RHYTHM.RED_UNLOCK_TIME && player.length >= CONFIG.RHYTHM.RED_UNLOCK_LENGTH) {
                         hints.push('🔵');
                     }
-                    rhythmHint.textContent = hints.join(' ');
+                    this.ui.rhythmHint.textContent = hints.join(' ');
                 }
             }
 
@@ -5630,7 +5649,7 @@
             updateMouseIndicator() {
                 if (!this.isTouchDevice) return;
                 
-                const indicator = document.getElementById('mouseIndicator');
+                const indicator = this.ui.mouseIndicator;
                 if (!indicator) return;
                 
                 // 获取玩家头部位置
