@@ -2,6 +2,7 @@ import { Vector } from './vector.js';
 import { CONFIG } from './config.js';
 import { hexToRgba, drawGlow } from './utils.js';
 import { SpatialGrid } from './spatial-grid.js';
+import { Food, Particle } from './entities.js';
 
 export class Worm {
     constructor(x, y, length, color = '#4ecca3', isPlayer = true) {
