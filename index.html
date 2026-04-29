@@ -8,7 +8,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="format-detection" content="telephone=no">
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐛</text></svg>">
-    <title>Melody Worm v1.19 - 旋律虫虫</title>
+    <title>Melody Worm v1.20 - 旋律虫虫</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -568,7 +568,7 @@
     <div id="mouseIndicator"></div>
     
     <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 8px; box-sizing: border-box; width: 100%; height: 100vh;">
-        <h1 style="margin: 0; font-size: 20px; white-space: nowrap;">🎵 Melody Worm <span style="color:#888; font-size:14px;">v1.19</span> - 旋律虫虫</h1>
+        <h1 style="margin: 0; font-size: 20px; white-space: nowrap;">🎵 Melody Worm <span style="color:#888; font-size:14px;">v1.20</span> - 旋律虫虫</h1>
         <div style="display: flex; align-items: center; gap: 20px; font-size: 11px; color: #ccc;">
             <span>🎮 鼠标控制方向 | 按住左键连续射击 | 咬尾分裂 | 碰颈/框死</span>
         </div>
@@ -577,7 +577,7 @@
             <div class="split-notice" id="splitNotice">⚡ 咬尾分裂！新蚯蚓诞生！</div>
             <div class="split-notice" id="familyNotice" style="color: #FFD700; font-size: 16px;">👶 你就要有一个孩子了！保护好他！</div>
             <div id="startScreen">
-                <h2>🎵 Melody Worm<br>旋律虫虫 <span style="color:#888; font-size:14px;">v1.19</span></h2>
+                <h2>🎵 Melody Worm<br>旋律虫虫 <span style="color:#888; font-size:14px;">v1.20</span></h2>
                 <div class="start-instructions">
                     <div class="inst-row inst-main">
                         <span class="inst-icon">🖱️</span>
@@ -635,7 +635,7 @@
 
     <script>
         /**
-         * Melody Worm v1.19 - 旋律虫虫
+         * Melody Worm v1.20 - 旋律虫虫
          * 
          * 实验机制:
          * - 任何蚯蚓的头部咬到任何其他蚯蚓的尾巴（最后 1/3 段）→ 被咬者断尾分裂
@@ -1252,14 +1252,25 @@
         /* ========== 向量工具类 ========== */
         class Vector {
             constructor(x, y) { this.x = x; this.y = y; }
+            // 不可变方法（返回新对象，保持向后兼容）
             add(v) { return new Vector(this.x + v.x, this.y + v.y); }
             sub(v) { return new Vector(this.x - v.x, this.y - v.y); }
             mult(n) { return new Vector(this.x * n, this.y * n); }
-            mag() { return Math.sqrt(this.x * this.x + this.y * this.y); }
             normalize() {
                 const m = this.mag();
                 return m === 0 ? new Vector(0, 0) : new Vector(this.x / m, this.y / m);
             }
+            // 就地修改方法（修改自身，返回 this，支持链式调用）
+            addSelf(v) { this.x += v.x; this.y += v.y; return this; }
+            subSelf(v) { this.x -= v.x; this.y -= v.y; return this; }
+            multSelf(n) { this.x *= n; this.y *= n; return this; }
+            normalizeSelf() {
+                const m = this.mag();
+                if (m > 0) { this.x /= m; this.y /= m; } else { this.x = 0; this.y = 0; }
+                return this;
+            }
+            set(x, y) { this.x = x; this.y = y; return this; }
+            mag() { return Math.sqrt(this.x * this.x + this.y * this.y); }
             dist(v) {
                 const dx = this.x - v.x, dy = this.y - v.y;
                 return Math.sqrt(dx * dx + dy * dy);
@@ -1897,14 +1908,16 @@
                 // 击退效果处理
                 if (this.knockbackVelocity && this.knockbackTimer > 0) {
                     this.knockbackTimer -= dt;
-                    this.segments[0] = this.segments[0].add(this.knockbackVelocity.mult(dt * 60));
-                    this.knockbackVelocity = this.knockbackVelocity.mult(0.85);
+                    this.segments[0].addSelf(this.knockbackVelocity.clone().multSelf(dt * 60));
+                    this.knockbackVelocity.multSelf(0.85);
                     // 更新身体跟随
+                    const spacing = CONFIG.SEGMENT_SPACING;
                     for (let i = 1; i < this.segments.length; i++) {
                         const prev = this.segments[i - 1];
                         const curr = this.segments[i];
-                        const dir = prev.sub(curr).normalize();
-                        this.segments[i] = prev.sub(dir.mult(CONFIG.SEGMENT_SPACING));
+                        const dx = prev.x - curr.x, dy = prev.y - curr.y;
+                        const d = Math.sqrt(dx * dx + dy * dy);
+                        if (d > 0) { curr.x = prev.x - dx / d * spacing; curr.y = prev.y - dy / d * spacing; }
                     }
                     return;  // 击退期间不进行其他移动
                 }
@@ -1927,8 +1940,9 @@
                     return;
                 }
                 
-                const direction = moveTarget.sub(head).normalize();
-                const distanceToTarget = head.dist(moveTarget);
+                const dx = moveTarget.x - head.x;
+                const dy = moveTarget.y - head.y;
+                const distanceToTarget = Math.sqrt(dx * dx + dy * dy);
                 
                 // 如果已经到达目标附近，停止移动（身体正弦波波动已提供生命感）
                 if (distanceToTarget < CONFIG.STOP_DISTANCE) {
@@ -1936,20 +1950,19 @@
                         this.isMoving = false;
                     } else {
                         const lerpFactor = CONFIG.LERP_MOVE_FACTOR;
-                        this.segments[0] = new Vector(
-                            head.x + (moveTarget.x - head.x) * lerpFactor,
-                            head.y + (moveTarget.y - head.y) * lerpFactor
-                        );
+                        head.x += (moveTarget.x - head.x) * lerpFactor;
+                        head.y += (moveTarget.y - head.y) * lerpFactor;
                         this.isMoving = false;
                     }
                 } else {
-                    if (direction.mag() > 0) {
-                        this.velocity = direction;
+                    if (distanceToTarget > 0) {
+                        this.velocity.x = dx / distanceToTarget;
+                        this.velocity.y = dy / distanceToTarget;
                     }
 
-                    const moveStep = this.velocity.mult(this.speed * dt * 60);
-                    const newHead = head.add(moveStep);
-                    this.segments[0] = newHead;
+                    const speedDt = this.speed * dt * 60;
+                    head.x += this.velocity.x * speedDt;
+                    head.y += this.velocity.y * speedDt;
                     this.isMoving = true;
                 }
                 
@@ -2142,19 +2155,23 @@
 
             // 更新身体段跟随
             updateBodyFollowing() {
+                const spacing = CONFIG.SEGMENT_SPACING;
+                const lerpFactor = CONFIG.LERP_BODY_FACTOR;
                 for (let i = 1; i < this.segments.length; i++) {
                     const prev = this.segments[i - 1];
                     const curr = this.segments[i];
-                    const dir = prev.sub(curr);
-                    const dist = dir.mag();
+                    const dx = prev.x - curr.x;
+                    const dy = prev.y - curr.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
 
-                    if (dist > CONFIG.SEGMENT_SPACING) {
-                        const targetPos = prev.sub(dir.normalize().mult(CONFIG.SEGMENT_SPACING));
-                        const lerpFactor = CONFIG.LERP_BODY_FACTOR;
-                        this.segments[i] = new Vector(
-                            curr.x + (targetPos.x - curr.x) * lerpFactor,
-                            curr.y + (targetPos.y - curr.y) * lerpFactor
-                        );
+                    if (dist > spacing) {
+                        const invDist = 1 / dist;
+                        const nx = dx * invDist;
+                        const ny = dy * invDist;
+                        const targetX = prev.x - nx * spacing;
+                        const targetY = prev.y - ny * spacing;
+                        curr.x += (targetX - curr.x) * lerpFactor;
+                        curr.y += (targetY - curr.y) * lerpFactor;
                     }
                 }
             }
@@ -3734,8 +3751,9 @@
                     for (let i = 1; i < this.segments.length; i++) {
                         const prev = this.segments[i - 1];
                         const curr = this.segments[i];
-                        const dir = prev.sub(curr).normalize();
-                        this.segments[i] = prev.sub(dir.mult(8));
+                        const dx = prev.x - curr.x, dy = prev.y - curr.y;
+                        const d = Math.sqrt(dx * dx + dy * dy);
+                        if (d > 0) { curr.x = prev.x - dx / d * 8; curr.y = prev.y - dy / d * 8; }
                     }
                 }
             }
@@ -3893,7 +3911,8 @@
                 
                 // 击退效果
                 if (hitDir) {
-                    this.knockbackVelocity = hitDir.normalize().mult(8);
+                    const hd = Math.sqrt(hitDir.x * hitDir.x + hitDir.y * hitDir.y);
+                    this.knockbackVelocity = new Vector(hd > 0 ? hitDir.x / hd * 8 : 0, hd > 0 ? hitDir.y / hd * 8 : 0);
                     this.knockbackTimer = 0.2;
                 }
                 
@@ -5205,12 +5224,14 @@
                         }
                         
                         // 计算吸引方向和距离
-                        const dirToPlayer = playerHead.sub(food.pos).normalize();
+                        const ddx = playerHead.x - food.pos.x;
+                        const ddy = playerHead.y - food.pos.y;
+                        const ddist = Math.sqrt(ddx * ddx + ddy * ddy);
                         const maxMove = dist * 0.5 * attractStrength;  // 最多移动 1/2 距离
                         const moveSpeed = Math.min(8, maxMove * dt * 5);  // 速度限制
                         
-                        // 移动宝珠
-                        food.pos = food.pos.add(dirToPlayer.mult(moveSpeed));
+                        // 移动宝珠（就地修改）
+                        if (ddist > 0) { food.pos.x += ddx / ddist * moveSpeed; food.pos.y += ddy / ddist * moveSpeed; }
                     }
                 }
                 
@@ -5242,11 +5263,13 @@
                         if (bullet.checkFoodHit(food)) {
                             // 宝珠减速
                             this.slowedFoods.set(food, 3.0);  // 减速 3 秒
-                            food.velocity = food.velocity.mult(0.2);  // 速度降为 20%
+                            food.velocity.multSelf(0.2);  // 速度降为 20%
                             
                             // 击中位移效果 - 宝珠沿子弹方向移动
-                            const hitDir = food.pos.sub(bullet.pos).normalize();
-                            food.pos = food.pos.add(hitDir.mult(15));  // 击退15像素
+                            const hx = food.pos.x - bullet.pos.x;
+                            const hy = food.pos.y - bullet.pos.y;
+                            const hd = Math.sqrt(hx * hx + hy * hy);
+                            if (hd > 0) { food.pos.x += hx / hd * 15; food.pos.y += hy / hd * 15; }
                             
                             // 击中特效
                             for (let k = 0; k < 4; k++) {
@@ -5286,8 +5309,10 @@
                                 });
                                 
                                 // 击中位移效果 - 蚯蚓沿子弹方向移动
-                                const hitDir = worm.head.sub(bullet.pos).normalize();
-                                worm.knockbackVelocity = hitDir.mult(6);
+                                const khx = worm.head.x - bullet.pos.x;
+                                const khy = worm.head.y - bullet.pos.y;
+                                const khd = Math.sqrt(khx * khx + khy * khy);
+                                worm.knockbackVelocity = new Vector(khd > 0 ? khx / khd * 6 : 0, khd > 0 ? khy / khd * 6 : 0);
                                 worm.knockbackTimer = 0.15;
                                 
                                 // 击中特效
@@ -5312,7 +5337,10 @@
                             const dist = bullet.pos.dist(enemyHead);
                             if (dist < bullet.radius + enemy.size) {
                                 // 计算击中方向（从子弹指向敌人）
-                                const hitDir = enemy.pos.sub(bullet.pos).normalize();
+                                const ehx = enemy.pos.x - bullet.pos.x;
+                                const ehy = enemy.pos.y - bullet.pos.y;
+                                const ehd = Math.sqrt(ehx * ehx + ehy * ehy);
+                                const hitDir = new Vector(ehd > 0 ? ehx / ehd : 0, ehd > 0 ? ehy / ehd : 0);
                                 
                                 // 击中特效
                                 for (let k = 0; k < 6; k++) {
@@ -5467,15 +5495,19 @@
                 // 子弹方向：嘴部开合的方向（基于头部到第二段的向量）
                 let mouthAngle = Math.atan2(player.velocity.y, player.velocity.x);
                 if (player.segments.length > 1) {
-                    const dir = player.head.sub(player.segments[1]);
-                    if (dir.mag() > 0) {
-                        mouthAngle = Math.atan2(dir.y, dir.x);
+                    const dx = player.head.x - player.segments[1].x;
+                    const dy = player.head.y - player.segments[1].y;
+                    if (dx !== 0 || dy !== 0) {
+                        mouthAngle = Math.atan2(dy, dx);
                     }
                 }
-                const direction = new Vector(Math.cos(mouthAngle), Math.sin(mouthAngle));
-                const bulletPos = player.head.add(direction.mult(CONFIG.SEGMENT_RADIUS + 5));
+                const cosMA = Math.cos(mouthAngle);
+                const sinMA = Math.sin(mouthAngle);
+                const direction = new Vector(cosMA, sinMA);
+                const bpx = player.head.x + cosMA * (CONFIG.SEGMENT_RADIUS + 5);
+                const bpy = player.head.y + sinMA * (CONFIG.SEGMENT_RADIUS + 5);
                 
-                this.bullets.push(new Bullet(bulletPos.x, bulletPos.y, direction));
+                this.bullets.push(new Bullet(bpx, bpy, direction));
                 player.bulletCount--;
                 
                 // 每射1发子弹，减少第一个蓝色段的强度
@@ -5812,7 +5844,10 @@
                             player.adultHitCount++;
                             
                             // 计算击退方向（从玩家指向敌人）
-                            const hitDir = enemy.pos.sub(player.head).normalize();
+                            const phx = enemy.pos.x - player.head.x;
+                            const phy = enemy.pos.y - player.head.y;
+                            const phd = Math.sqrt(phx * phx + phy * phy);
+                            const hitDir = new Vector(phd > 0 ? phx / phd : 0, phd > 0 ? phy / phd : 0);
                             const killed = enemy.takeDamage(hitDir);
                             
                             if (killed) {
@@ -5948,7 +5983,10 @@
                         if (!enemy.isAlive || enemy.isDying) continue;
                         
                         if (enemy.checkCollisionWithPlayer(player)) {
-                            const bounceDir = enemy.pos.sub(player.head).normalize();
+                            const bdx = enemy.pos.x - player.head.x;
+                            const bdy = enemy.pos.y - player.head.y;
+                            const bd = Math.sqrt(bdx * bdx + bdy * bdy);
+                            const bounceDir = new Vector(bd > 0 ? bdx / bd : 0, bd > 0 ? bdy / bd : 0);
                             enemy.die(bounceDir);
                             if (player.segments.length > 3) {
                                 player.segments.pop();
