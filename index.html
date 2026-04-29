@@ -8,7 +8,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="format-detection" content="telephone=no">
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐛</text></svg>">
-    <title>Melody Worm v1.34 - 旋律虫虫</title>
+    <title>Melody Worm v1.35 - 旋律虫虫</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -577,7 +577,7 @@
             <div class="split-notice" id="splitNotice">⚡ 咬尾分裂！新蚯蚓诞生！</div>
             <div class="split-notice" id="familyNotice" style="color: #FFD700; font-size: 16px;">👶 你就要有一个孩子了！保护好他！</div>
             <div id="startScreen">
-                <h2>🎵 Melody Worm<br>旋律虫虫 <span style="color:#888; font-size:14px;">v1.34</span></h2>
+                <h2>🎵 Melody Worm<br>旋律虫虫 <span style="color:#888; font-size:14px;">v1.35</span></h2>
                 <div class="start-instructions">
                     <div class="inst-row inst-main">
                         <span class="inst-icon">🖱️</span>
@@ -635,7 +635,7 @@
 
     <script>
         /**
-         * Melody Worm v1.34 - 旋律虫虫（断尾幼体去掉光圈缩放+成年时给无敌防碰死）
+         * Melody Worm v1.35 - 旋律虫虫（FloatingText对象池+update就地修改消除临时Vector）
          * 
          * 实验机制:
          * - 任何蚯蚓的头部咬到任何其他蚯蚓的尾巴（最后 1/3 段）→ 被咬者断尾分裂
@@ -1426,7 +1426,9 @@
             }
             
             update(dt) {
-                this.pos = this.pos.add(this.velocity.mult(dt * 60));
+                const f = dt * 60;
+                this.pos.x += this.velocity.x * f;
+                this.pos.y += this.velocity.y * f;
                 this.life -= dt;
                 
                 // 超出边界或时间到则消失
@@ -1489,6 +1491,19 @@
 
         /* ========== 浮动文字类 ========== */
         class FloatingText {
+            static _pool = [];
+            static acquire(x, y, text, color = '#ffe66d') {
+                if (FloatingText._pool.length > 0) {
+                    const ft = FloatingText._pool.pop();
+                    ft._reset(x, y, text, color);
+                    return ft;
+                }
+                return new FloatingText(x, y, text, color);
+            }
+            static release(ft) {
+                FloatingText._pool.push(ft);
+            }
+
             constructor(x, y, text, color = '#ffe66d') {
                 this.pos = new Vector(x, y);
                 this.text = text;
@@ -1497,8 +1512,20 @@
                 this.maxLife = 0.8;
                 this.velocity = new Vector(0, -1.5);  // 向上飘动
             }
+            _reset(x, y, text, color) {
+                this.pos.x = x;
+                this.pos.y = y;
+                this.text = text;
+                this.color = color;
+                this.life = 0.8;
+                this.maxLife = 0.8;
+                this.velocity.x = 0;
+                this.velocity.y = -1.5;
+            }
             update(dt) {
-                this.pos = this.pos.add(this.velocity.mult(dt * 60));
+                const f = dt * 60;
+                this.pos.x += this.velocity.x * f;
+                this.pos.y += this.velocity.y * f;
                 this.life -= dt;
                 return this.life > 0;
             }
@@ -1532,6 +1559,10 @@
                 // 宝珠初生动画系统：白点 → 变形 → 启用互动
                 this.birthPhase = 'none';  // 'none' | 'white' | 'morphing' | 'active'
                 this.birthTimer = 0;
+                // 缓存解析后的颜色RGB（避免每帧重复parseInt）
+                this._cr = parseInt(type.color.slice(1, 3), 16);
+                this._cg = parseInt(type.color.slice(3, 5), 16);
+                this._cb = parseInt(type.color.slice(5, 7), 16);
                 this.morphTimer = 0;
                 this.morphDuration = 0.6;  // 变形动画持续0.6秒
             }
@@ -1668,12 +1699,9 @@
                     ctx.beginPath();
                     ctx.arc(this.pos.x, this.pos.y, morphR, 0, Math.PI * 2);
                     // 颜色从白色渐变到宝珠色
-                    const cr = parseInt(this.type.color.slice(1, 3), 16);
-                    const cg = parseInt(this.type.color.slice(3, 5), 16);
-                    const cb = parseInt(this.type.color.slice(5, 7), 16);
-                    const mixR = Math.round(255 + (cr - 255) * easeT);
-                    const mixG = Math.round(255 + (cg - 255) * easeT);
-                    const mixB = Math.round(255 + (cb - 255) * easeT);
+                    const mixR = Math.round(255 + (this._cr - 255) * easeT);
+                    const mixG = Math.round(255 + (this._cg - 255) * easeT);
+                    const mixB = Math.round(255 + (this._cb - 255) * easeT);
                     ctx.fillStyle = `rgba(${mixR}, ${mixG}, ${mixB}, ${0.6 + 0.4 * easeT})`;
                     ctx.fill();
                     
@@ -3524,8 +3552,10 @@
                 
                 // 击退效果
                 if (this.knockbackVelocity && this.knockbackTimer > 0) {
-                    this.pos = this.pos.add(this.knockbackVelocity.mult(dt * 60));
-                    this.knockbackVelocity = this.knockbackVelocity.mult(CONFIG.FAMILY.ENEMY_KNOCKBACK_DECAY);
+                    const f = dt * 60;
+                    this.pos.x += this.knockbackVelocity.x * f;
+                    this.pos.y += this.knockbackVelocity.y * f;
+                    this.knockbackVelocity.multSelf(CONFIG.FAMILY.ENEMY_KNOCKBACK_DECAY);
                     this.updateBodySegments();
                     return;  // 击退期间不进行其他行为
                 }
@@ -3580,7 +3610,11 @@
                 }
                 
                 // 更新位置
-                this.pos = this.pos.add(this.velocity.mult(dt * 60));
+                {
+                    const f = dt * 60;
+                    this.pos.x += this.velocity.x * f;
+                    this.pos.y += this.velocity.y * f;
+                }
                 
                 // 边界反弹
                 const margin = CONFIG.WALL_MARGIN * 2 + CONFIG.SEGMENT_RADIUS * 2;
@@ -3605,19 +3639,26 @@
                 this.sinkSpeed += CONFIG.FAMILY.ENEMY_SINK_GRAVITY * dt;
                 
                 if (this.bounceVelocity) {
-                    this.pos = this.pos.add(this.bounceVelocity.mult(dt * 60));
-                    this.bounceVelocity = this.bounceVelocity.mult(CONFIG.FAMILY.ENEMY_KNOCKBACK_DECAY);
+                    const f = dt * 60;
+                    this.pos.x += this.bounceVelocity.x * f;
+                    this.pos.y += this.bounceVelocity.y * f;
+                    this.bounceVelocity.multSelf(CONFIG.FAMILY.ENEMY_KNOCKBACK_DECAY);
                 }
                 
                 this.pos.y += this.sinkSpeed * dt;
                 
                 if (this.segments.length > 0) {
                     this.segments[0] = this.pos;
+                    const spacing = CONFIG.FAMILY.ENEMY_SEG_SPACING;
                     for (let i = 1; i < this.segments.length; i++) {
                         const prev = this.segments[i - 1];
                         const curr = this.segments[i];
-                        const dir = prev.sub(curr).normalize();
-                        this.segments[i] = prev.sub(dir.mult(CONFIG.FAMILY.ENEMY_SEG_SPACING));
+                        const dx = prev.x - curr.x, dy = prev.y - curr.y;
+                        const d = Math.sqrt(dx * dx + dy * dy);
+                        if (d > 0) {
+                            curr.x = prev.x - dx / d * spacing;
+                            curr.y = prev.y - dy / d * spacing;
+                        }
                     }
                 }
                 
@@ -3672,14 +3713,14 @@
                         }
                         // 显示伤害提示
                         if (typeof game !== 'undefined' && game.floatingTexts) {
-                            game.floatingTexts.push(new FloatingText(lostSegment.x, lostSegment.y - 15, 'OUCH!', '#ff6b6b'));
+                            game.floatingTexts.push(FloatingText.acquire(lostSegment.x, lostSegment.y - 15, 'OUCH!', '#ff6b6b'));
                         }
                     } else {
                         // 身体太短，直接死亡
                         juv.isAlive = false;
                         juv.segments = [];
                         if (typeof game !== 'undefined' && game.floatingTexts) {
-                            game.floatingTexts.push(new FloatingText(juv.head.x, juv.head.y - 20, 'EATEN!', '#ff0000'));
+                            game.floatingTexts.push(FloatingText.acquire(juv.head.x, juv.head.y - 20, 'EATEN!', '#ff0000'));
                         }
                     }
                     
@@ -3849,7 +3890,7 @@
                         }
                     }
                     if (game.floatingTexts) {
-                        game.floatingTexts.push(new FloatingText(this.pos.x, this.pos.y - 15, 'YUM!', '#888888'));
+                        game.floatingTexts.push(FloatingText.acquire(this.pos.x, this.pos.y - 15, 'YUM!', '#888888'));
                     }
                 } else if (this.feedingTarget.type === 'whiteOrb') {
                     // 消耗白色初生宝珠
@@ -3869,7 +3910,7 @@
                         }
                     }
                     if (game.floatingTexts) {
-                        game.floatingTexts.push(new FloatingText(this.pos.x, this.pos.y - 15, 'YUM!', '#ffffff'));
+                        game.floatingTexts.push(FloatingText.acquire(this.pos.x, this.pos.y - 15, 'YUM!', '#ffffff'));
                     }
                 }
             }
@@ -4843,6 +4884,7 @@
                 this.foods = [];
                 this.enemies = [];           // 清理敌人
                 this.particles = [];         // 清理粒子
+                for (const ft of this.floatingTexts) FloatingText.release(ft);
                 this.floatingTexts = [];     // 清理浮动文字
                 this.bullets = [];           // 清理子弹
                 this.slowedFoods = new Map();   // 清理减速宝珠
@@ -5027,15 +5069,15 @@
                 // 节奏解锁通知
                 if (!this.rhythmNotified.yellow && (this.gameTime >= CONFIG.RHYTHM.YELLOW_UNLOCK_TIME || player.length >= CONFIG.RHYTHM.YELLOW_UNLOCK_LENGTH)) {
                     this.rhythmNotified.yellow = true;
-                    this.floatingTexts.push(new FloatingText(CONFIG.CANVAS_WIDTH / 2, CONFIG.CANVAS_HEIGHT / 2 - 50, '🟡 黄色宝珠已解锁！', '#ffd700'));
+                    this.floatingTexts.push(FloatingText.acquire(CONFIG.CANVAS_WIDTH / 2, CONFIG.CANVAS_HEIGHT / 2 - 50, '🟡 黄色宝珠已解锁！', '#ffd700'));
                 }
                 if (!this.rhythmNotified.orange && this.gameTime >= CONFIG.RHYTHM.ORANGE_UNLOCK_TIME) {
                     this.rhythmNotified.orange = true;
-                    this.floatingTexts.push(new FloatingText(CONFIG.CANVAS_WIDTH / 2, CONFIG.CANVAS_HEIGHT / 2 - 50, '🟠 橙色宝珠已解锁！', '#ff8c42'));
+                    this.floatingTexts.push(FloatingText.acquire(CONFIG.CANVAS_WIDTH / 2, CONFIG.CANVAS_HEIGHT / 2 - 50, '🟠 橙色宝珠已解锁！', '#ff8c42'));
                 }
                 if (!this.rhythmNotified.red && this.gameTime >= CONFIG.RHYTHM.RED_UNLOCK_TIME && player.length >= CONFIG.RHYTHM.RED_UNLOCK_LENGTH) {
                     this.rhythmNotified.red = true;
-                    this.floatingTexts.push(new FloatingText(CONFIG.CANVAS_WIDTH / 2, CONFIG.CANVAS_HEIGHT / 2 - 50, '🔵 蓝色宝珠已解锁！可以发射减速子弹！', '#4dabf7'));
+                    this.floatingTexts.push(FloatingText.acquire(CONFIG.CANVAS_WIDTH / 2, CONFIG.CANVAS_HEIGHT / 2 - 50, '🔵 蓝色宝珠已解锁！可以发射减速子弹！', '#4dabf7'));
                 }
 
                 // 按住鼠标连续射击
@@ -5152,7 +5194,7 @@
                             worm.growStepTimer = 0;
                             // 启动黄色宝珠冷却：旋律播完(3秒) + 间隔(2秒)
                             this.yellowCooldown = CONFIG.RHYTHM.YELLOW_COOLDOWN;
-                            this.floatingTexts.push(new FloatingText(foodPos.x, foodPos.y - 30, '🎵 等待旋律...', '#ffd700'));
+                            this.floatingTexts.push(FloatingText.acquire(foodPos.x, foodPos.y - 30, '🎵 等待旋律...', '#ffd700'));
                         } else if (food.type.score === 60) {  // 橙色宝珠：触发磁力效果
                             worm.magnetTimer = 3.0;  // 磁力持续 3 秒（加倍）
                             worm.magnetCombo = 0;  // 重置连击数
@@ -5162,7 +5204,7 @@
                             worm.blueStrengths.push(5);  // 新蓝色段强度为5
                             worm.bulletCount = worm.blueSegments * 5;  // 子弹数量 = 蓝色段数 × 5
                             worm.bulletFiredCount = 0;  // 重置已发射计数
-                            this.floatingTexts.push(new FloatingText(foodPos.x, foodPos.y - 20, '🔫 +5', '#4dabf7'));
+                            this.floatingTexts.push(FloatingText.acquire(foodPos.x, foodPos.y - 20, '🔫 +5', '#4dabf7'));
                             worm.grow(CONFIG.GROWTH_PER_FOOD);
                             // 第一次吃到蓝宝珠：显示瞄准镜提示
                             if (!this.rhythmNotified.redAim) {
@@ -5178,7 +5220,7 @@
                             worm.purpleParticleTimer = 10.0;  // 紫色粒子特效持续时间（与无敌状态同步）
                             worm.tailYellowDash = false;  // 尾部黄色虚线消失
                             worm.tailYellowDashTimer = 10.0;  // 尾部虚线消失持续时间
-                            this.floatingTexts.push(new FloatingText(foodPos.x, foodPos.y - 20, '⭐ 无敌', '#c77dff'));
+                            this.floatingTexts.push(FloatingText.acquire(foodPos.x, foodPos.y - 20, '⭐ 无敌', '#c77dff'));
                             worm.grow(CONFIG.GROWTH_PER_FOOD);
                         } else {
                             worm.grow(CONFIG.GROWTH_PER_FOOD);
@@ -5197,7 +5239,7 @@
                             }
                             
                             // 浮动文字效果（显示实际分数）
-                            this.floatingTexts.push(new FloatingText(foodPos.x, foodPos.y - 10, `+${food.type.score}`, food.type.color));
+                            this.floatingTexts.push(FloatingText.acquire(foodPos.x, foodPos.y - 10, `+${food.type.score}`, food.type.color));
                         }
                         
                         // 设置该类型宝珠的刷新计时器
@@ -5421,7 +5463,7 @@
                                     for (let k = 0; k < 4; k++) {
                                         this.particles.push(Particle.acquire(food.pos.x, food.pos.y, '#4dabf7'));
                                     }
-                                    this.floatingTexts.push(new FloatingText(food.pos.x, food.pos.y - 15, 'SLOW', '#4dabf7'));
+                                    this.floatingTexts.push(FloatingText.acquire(food.pos.x, food.pos.y - 15, 'SLOW', '#4dabf7'));
                                     hit = true;
                                     break;
                                 }
@@ -5457,7 +5499,7 @@
                                         this.particles.push(Particle.acquire(worm.head.x, worm.head.y, '#4dabf7'));
                                     }
                                     const stackText = worm.slowStacks > 1 ? `SLOW x${worm.slowStacks}!` : 'SLOW!';
-                                    this.floatingTexts.push(new FloatingText(worm.head.x, worm.head.y - 20, stackText, '#4dabf7'));
+                                    this.floatingTexts.push(FloatingText.acquire(worm.head.x, worm.head.y - 20, stackText, '#4dabf7'));
                                     hit = true;
                                     break;
                                 }
@@ -5481,9 +5523,9 @@
                                     }
                                     const killed = enemy.takeDamage(hitDir);
                                     if (killed) {
-                                        this.floatingTexts.push(new FloatingText(enemyHead.x, enemyHead.y - 20, 'KILL!', '#ff6b6b'));
+                                        this.floatingTexts.push(FloatingText.acquire(enemyHead.x, enemyHead.y - 20, 'KILL!', '#ff6b6b'));
                                     } else {
-                                        this.floatingTexts.push(new FloatingText(enemyHead.x, enemyHead.y - 20, `HIT! ${enemy.health}/${enemy.maxHealth}`, '#4dabf7'));
+                                        this.floatingTexts.push(FloatingText.acquire(enemyHead.x, enemyHead.y - 20, `HIT! ${enemy.health}/${enemy.maxHealth}`, '#4dabf7'));
                                     }
                                     hit = true;
                                     break;
@@ -5623,6 +5665,8 @@
                     for (let i = 0; i < this.floatingTexts.length; i++) {
                         if (this.floatingTexts[i].update(dt)) {
                             this.floatingTexts[w++] = this.floatingTexts[i];
+                        } else {
+                            FloatingText.release(this.floatingTexts[i]);
                         }
                     }
                     this.floatingTexts.length = w;
@@ -6002,9 +6046,9 @@
                                 const hitDir = new Vector(phd > 0 ? phx / phd : 0, phd > 0 ? phy / phd : 0);
                                 const killed = enemy.takeDamage(hitDir);
                                 if (killed) {
-                                    this.floatingTexts.push(new FloatingText(enemy.segments[0].x, enemy.segments[0].y - 20, 'KILL!', '#ff6b6b'));
+                                    this.floatingTexts.push(FloatingText.acquire(enemy.segments[0].x, enemy.segments[0].y - 20, 'KILL!', '#ff6b6b'));
                                 } else {
-                                    this.floatingTexts.push(new FloatingText(enemy.segments[0].x, enemy.segments[0].y - 20, `${enemy.health}/${enemy.maxHealth}`, '#ffa500'));
+                                    this.floatingTexts.push(FloatingText.acquire(enemy.segments[0].x, enemy.segments[0].y - 20, `${enemy.health}/${enemy.maxHealth}`, '#ffa500'));
                                 }
                                 if (player.adultHitCount >= CONFIG.FAMILY.ADULT_HITS_TO_LOSE) {
                                     player.adultHitCount = 0;
@@ -6075,7 +6119,7 @@
                     for (let k = 0; k < 12; k++) {
                         this.particles.push(Particle.acquire(headPos.x, headPos.y, '#ffd700'));
                     }
-                    this.floatingTexts.push(new FloatingText(headPos.x, headPos.y - 30, '🦋 成年了！', '#ffd700'));
+                    this.floatingTexts.push(FloatingText.acquire(headPos.x, headPos.y - 30, '🦋 成年了！', '#ffd700'));
                 }
             }
 
