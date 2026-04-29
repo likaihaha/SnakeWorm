@@ -10,6 +10,24 @@
 - Git Credential Manager 已配置，推送自动认证
 
 ## 当前版本
+- v1.18: 宝珠光圈闪烁效果 - 三层光圈+核心光点呼吸变化
+- v1.17: 三叶虫攻击幼体改进+觅食系统 - 咬中一次撤离+幼体挣扎+吃灰色尾巴和白色宝珠
+- v1.16: 三叶虫生命系统+击中位移效果 - 3点生命、掉身体部件、击退效果
+- v1.15: 幼体保护增强 - checkTailBite添加幼体保护，防止成年子代咬死幼体
+- v1.14: 宝珠颜色鲜艳优化 - 混合模式改为source-over+光环减少+发光区域缩小
+- v1.13: 幼体保护 - 亲体不能咬死幼体颈部（checkNeckBite跳过isJuvenile）
+- v1.12: 游戏状态机 - 添加GAME_STATE枚举和state字段统一管理游戏状态
+- v1.11: Enemy状态模式 - 添加ENEMY_STATE枚举和state字段统一管理状态转换
+- v1.10: 错误处理增强 - playNote/_addSustainTail添加try-catch + startGame DOM null检查
+- v1.09: Magic Number整理 - 射击系统(FIRE)和饥饿系统(HUNGER)常量提取到CONFIG
+- v1.08: shadowBlur优化 - Bullet和Food用径向渐变替代GPU阴影渲染
+- v1.07: 渲染优化 - 清理冗余globalCompositeOperation切换 + DeadBody移除不必要的screen模式
+- v1.05.2: 3个crash修复汇总（dir.length()→dir.mag() + release()后null访问 + player.pos→player.head）+ 尾巴动画尺寸加大+下沉减半 + 幼体挣扎状态修复
+- v1.05.3: 玩家撞死敌人不再需要幼体在附近（移除nearJuvenile条件）
+- v1.05.4: 蓝色子弹可以击杀敌人（三叶虫）
+- v1.05.5: 幼体可以吃父代消耗沉下的灰色尾巴（shrinkingSegments）
+- v1.06: 敌人发现幼体后先绕圈2-3圈再攻击
+- v1.05.1: Enemy.update crash修复（dir.length()→dir.mag()）+ deprecated meta标签
 - v1.05: 幼体系统优化（速度70%+追逐沉下尾部+平滑跟随+成年动画+Crash修复）
 - v1.04: 敌人咬幼体系统改进（咬任意部位+多敌人不重复+挣扎+幼体不触发成年体碰撞）
 - v1.03: 亲子系统Bug修复（分裂提示+幼体不吃宝珠+敌人弹开下沉）

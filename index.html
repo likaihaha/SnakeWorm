@@ -8,7 +8,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="format-detection" content="telephone=no">
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐛</text></svg>">
-    <title>Melody Worm v1.18 - 旋律虫虫</title>
+    <title>Melody Worm v1.19 - 旋律虫虫</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -568,7 +568,7 @@
     <div id="mouseIndicator"></div>
     
     <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 8px; box-sizing: border-box; width: 100%; height: 100vh;">
-        <h1 style="margin: 0; font-size: 20px; white-space: nowrap;">🎵 Melody Worm <span style="color:#888; font-size:14px;">v1.18</span> - 旋律虫虫</h1>
+        <h1 style="margin: 0; font-size: 20px; white-space: nowrap;">🎵 Melody Worm <span style="color:#888; font-size:14px;">v1.19</span> - 旋律虫虫</h1>
         <div style="display: flex; align-items: center; gap: 20px; font-size: 11px; color: #ccc;">
             <span>🎮 鼠标控制方向 | 按住左键连续射击 | 咬尾分裂 | 碰颈/框死</span>
         </div>
@@ -577,7 +577,7 @@
             <div class="split-notice" id="splitNotice">⚡ 咬尾分裂！新蚯蚓诞生！</div>
             <div class="split-notice" id="familyNotice" style="color: #FFD700; font-size: 16px;">👶 你就要有一个孩子了！保护好他！</div>
             <div id="startScreen">
-                <h2>🎵 Melody Worm<br>旋律虫虫 <span style="color:#888; font-size:14px;">v1.18</span></h2>
+                <h2>🎵 Melody Worm<br>旋律虫虫 <span style="color:#888; font-size:14px;">v1.19</span></h2>
                 <div class="start-instructions">
                     <div class="inst-row inst-main">
                         <span class="inst-icon">🖱️</span>
@@ -635,7 +635,7 @@
 
     <script>
         /**
-         * Melody Worm v1.18 - 旋律虫虫
+         * Melody Worm v1.19 - 旋律虫虫
          * 
          * 实验机制:
          * - 任何蚯蚓的头部咬到任何其他蚯蚓的尾巴（最后 1/3 段）→ 被咬者断尾分裂
@@ -1134,6 +1134,11 @@
             AI_WANDER_CHANGE: 2.0,
             // 实验配置：尾巴定义为最后 1/3 段
             TAIL_RATIO: 0.33,
+            // 移动停止判定
+            STOP_DISTANCE: 15,            // 距离目标<15px停止移动
+            LERP_STOP_THRESHOLD: 1,       // 距离目标<1px完全停止
+            LERP_MOVE_FACTOR: 0.15,       // 缓慢移动插值因子
+            LERP_BODY_FACTOR: 0.3,        // 身体跟随插值因子
         // 多色宝珠配置（重力掉落）
             FOOD_TYPES: [
                 { color: '#4ecca3', score: 10, radius: 8, gravity: 0.01, wobble: 0, weight: 60, maxCount: 5, respawnTime: 0.5 },  // 绿色：超慢速直落
@@ -1200,7 +1205,11 @@
 
             clear() {
                 for (let i = 0; i < this.cells.length; i++) {
-                    this.cells[i] = [];
+                    if (this.cells[i]) {
+                        this.cells[i].length = 0;  // 复用数组，减少GC
+                    } else {
+                        this.cells[i] = [];
+                    }
                 }
             }
 
@@ -1922,11 +1931,11 @@
                 const distanceToTarget = head.dist(moveTarget);
                 
                 // 如果已经到达目标附近，停止移动（身体正弦波波动已提供生命感）
-                if (distanceToTarget < 15) {
-                    if (distanceToTarget < 1) {
+                if (distanceToTarget < CONFIG.STOP_DISTANCE) {
+                    if (distanceToTarget < CONFIG.LERP_STOP_THRESHOLD) {
                         this.isMoving = false;
                     } else {
-                        const lerpFactor = 0.15;
+                        const lerpFactor = CONFIG.LERP_MOVE_FACTOR;
                         this.segments[0] = new Vector(
                             head.x + (moveTarget.x - head.x) * lerpFactor,
                             head.y + (moveTarget.y - head.y) * lerpFactor
@@ -2141,7 +2150,7 @@
 
                     if (dist > CONFIG.SEGMENT_SPACING) {
                         const targetPos = prev.sub(dir.normalize().mult(CONFIG.SEGMENT_SPACING));
-                        const lerpFactor = 0.3;
+                        const lerpFactor = CONFIG.LERP_BODY_FACTOR;
                         this.segments[i] = new Vector(
                             curr.x + (targetPos.x - curr.x) * lerpFactor,
                             curr.y + (targetPos.y - curr.y) * lerpFactor
@@ -2480,18 +2489,33 @@
              * 检测头部是否碰到其他蚯蚓的尾巴段
              * 返回: { worm: 被咬的蚯蚓，segmentIndex: 被咬的段索引 } 或 null
              */
-            checkTailBite(otherWorms) {
+            checkTailBite(otherWorms, spatialGrid) {
                 if (this.segments.length === 0) return null;
                 const head = this.segments[0];
                 const collisionDist = CONFIG.SEGMENT_RADIUS * 1.2;
 
+                if (spatialGrid) {
+                    // 空间网格加速：只检测头部附近的段
+                    const candidates = spatialGrid.query(head.x, head.y, collisionDist);
+                    for (const { worm: other, segIndex } of candidates) {
+                        if (other === this || !other.isAlive) continue;
+                        if (other.invincibleTimer > 0) continue;
+                        if (other.activationTimer > 0) continue;
+                        if (other.isJuvenile) continue;
+                        // 检查是否为尾巴段
+                        const tailIndices = other.tailSegmentIndices;
+                        if (!tailIndices.includes(segIndex)) continue;
+                        if (head.dist(other.segments[segIndex]) < collisionDist) {
+                            return { worm: other, segmentIndex: segIndex };
+                        }
+                    }
+                    return null;
+                }
+
                 for (const other of otherWorms) {
                     if (other === this || !other.isAlive) continue;
-                    // 跳过无敌状态的蚯蚓
                     if (other.invincibleTimer > 0) continue;
-                    // 跳过激活中的蚯蚓
                     if (other.activationTimer > 0) continue;
-                    // 幼体保护：不能咬幼体的尾巴
                     if (other.isJuvenile) continue;
 
                     const tailIndices = other.tailSegmentIndices;
@@ -2508,16 +2532,32 @@
              * 检测头部是否碰到其他蚯蚓的颈部段（索引 1 ~ len/3）
              * 返回：{ worm: 被咬的蚯蚓，segmentIndex: 被咬的段索引 } 或 null
              */
-            checkNeckBite(otherWorms) {
+            checkNeckBite(otherWorms, spatialGrid) {
                 if (this.segments.length === 0) return null;
                 const head = this.segments[0];
                 const collisionDist = CONFIG.SEGMENT_RADIUS * 1.2;
+
+                if (spatialGrid) {
+                    const candidates = spatialGrid.query(head.x, head.y, collisionDist);
+                    for (const { worm: other, segIndex } of candidates) {
+                        if (other === this || !other.isAlive) continue;
+                        if (other.invincibleTimer > 0) continue;
+                        if (other.activationTimer > 0) continue;
+                        if (other.isJuvenile) continue;
+                        const neckIndices = other.neckSegmentIndices;
+                        if (!neckIndices.includes(segIndex)) continue;
+                        if (head.dist(other.segments[segIndex]) < collisionDist) {
+                            return { worm: other, segmentIndex: segIndex };
+                        }
+                    }
+                    return null;
+                }
 
                 for (const other of otherWorms) {
                     if (other === this || !other.isAlive) continue;
                     if (other.invincibleTimer > 0) continue;
                     if (other.activationTimer > 0) continue;
-                    if (other.isJuvenile) continue;  // 幼体不能被咬死
+                    if (other.isJuvenile) continue;
 
                     const neckIndices = other.neckSegmentIndices;
                     for (const segIndex of neckIndices) {
@@ -2534,10 +2574,27 @@
              * 跳过无敌状态的蚯蚓
              * 腹部碰撞不触发死亡
              */
-            checkOtherWormCollision(otherWorms) {
+            checkOtherWormCollision(otherWorms, spatialGrid) {
                 if (this.segments.length === 0) return null;
                 const head = this.segments[0];
                 const collisionDist = CONFIG.SEGMENT_RADIUS * 1.2;
+
+                if (spatialGrid) {
+                    const candidates = spatialGrid.query(head.x, head.y, collisionDist);
+                    for (const { worm: other, segIndex } of candidates) {
+                        if (other === this || !other.isAlive) continue;
+                        if (other.invincibleTimer > 0) continue;
+                        if (other.activationTimer > 0) continue;
+                        const tailSet = new Set(other.tailSegmentIndices);
+                        const neckSet = new Set(other.neckSegmentIndices);
+                        const abdomenSet = new Set(other.abdomenSegmentIndices);
+                        if (tailSet.has(segIndex) || neckSet.has(segIndex) || abdomenSet.has(segIndex)) continue;
+                        if (head.dist(other.segments[segIndex]) < collisionDist) {
+                            return { worm: other, segmentIndex: segIndex };
+                        }
+                    }
+                    return null;
+                }
 
                 for (const other of otherWorms) {
                     if (other === this || !other.isAlive) continue;
@@ -4621,6 +4678,13 @@
                 this.brokenTails = [];
                 this.deadBodies = [];
                 this.foods = [];
+                this.enemies = [];           // 清理敌人
+                this.particles = [];         // 清理粒子
+                this.floatingTexts = [];     // 清理浮动文字
+                this.bullets = [];           // 清理子弹
+                this.slowedFoods = new Map();   // 清理减速宝珠
+                this.slowedWorms = new Map();   // 清理减速蚯蚓
+                this.enemySpawnTimer = 0;    // 重置敌人生成计时器
                 this.score = 0;
                 this.splitCount = 0;
                 this.splitCooldown = 0;
@@ -4664,6 +4728,10 @@
                 const greenType = CONFIG.FOOD_TYPES.find(t => t.score === 10);
                 this.foods.push(Food.random(greenType));
                 this.initialGreenSpawned = 1;  // 记录已生成的初始绿宝珠数量
+                this.foodRespawnTimers = {};
+                CONFIG.FOOD_TYPES.forEach(type => {
+                    this.foodRespawnTimers[type.score] = 0;
+                });
 
                 document.getElementById('gameOver').style.display = 'none';
                 this.updateUI();
@@ -4985,6 +5053,8 @@
                 }
 
                 // 4. 所有蚯蚓咬到自己尾巴检测（玩家出场动画期间不检测）
+                // 先刷新空间网格（用于碰撞加速查询）
+                this.populateSpatialGrid();
                 if (this.splitCooldown <= 0 && player && !player.isEntering) {
                     for (const worm of this.worms) {
                         if (!worm.isAlive || worm.isDead) continue;
@@ -5011,7 +5081,7 @@
                     if (!worm.isAlive || worm.isEntering || worm.isJuvenile) continue;
                     
                     const others = activeWorms.filter(w => w !== worm);
-                    const tailBite = worm.checkTailBite(others);
+                    const tailBite = worm.checkTailBite(others, this.spatialGrid);
                     if (tailBite) {
                         const biteType = worm.isPlayer ? '玩家' : 'AI';
                         const biteeType = tailBite.worm.isPlayer ? '玩家' : 'AI';
@@ -5026,7 +5096,7 @@
                 for (const worm of this.worms) {
                     if (!worm.isAlive || worm.isEntering || worm.invincibleTimer > 0 || worm.isJuvenile) continue;
                     
-                    const neckBite = worm.checkNeckBite(activeWorms);
+                    const neckBite = worm.checkNeckBite(activeWorms, this.spatialGrid);
                     if (neckBite) {
                         const biter = worm.isPlayer ? '玩家' : 'AI';
                         const bitee = neckBite.worm.isPlayer ? '玩家' : 'AI';
@@ -5040,7 +5110,7 @@
                 // 7. 玩家碰到其他蚯蚓身体（只有咬到尾部才能咬断，其他地方不咬断）
                 if (player && player.isAlive && !this.playerDeadWaitingForBodies) {
                     const adultWorms = activeWorms.filter(w => !w.isJuvenile);
-                    const otherCollision = player.checkOtherWormCollision(adultWorms);
+                    const otherCollision = player.checkOtherWormCollision(adultWorms, this.spatialGrid);
                     if (otherCollision) {
                         if (player.invincibleTimer > 0) {
                             // 玩家处于无敌状态，不被吞噬也不咬断对方
@@ -5943,7 +6013,7 @@
                 const btn = document.createElement('button');
                 btn.textContent = '重新开始';
                 btn.style.cssText = 'background: #ff6b6b; color: #fff; border: none; padding: 10px 30px; font-size: 16px; border-radius: 5px; cursor: pointer;';
-                btn.onclick = function() { document.getElementById('playerDeathDialog').remove(); location.reload(); };
+                btn.onclick = function() { document.getElementById('playerDeathDialog').remove(); game.restart(); };
                 dialog.appendChild(btn);
                 
                 document.body.appendChild(dialog);
@@ -5997,6 +6067,20 @@
                 }
                 for (let y = 0; y < CONFIG.CANVAS_HEIGHT; y += gridSize) {
                     gridCtx.beginPath(); gridCtx.moveTo(0, y); gridCtx.lineTo(CONFIG.CANVAS_WIDTH, y); gridCtx.stroke();
+                }
+            }
+
+            /**
+             * 将所有存活蚯蚓的段填充到空间网格中（每帧调用一次）
+             */
+            populateSpatialGrid() {
+                this.spatialGrid.clear();
+                for (const worm of this.worms) {
+                    if (!worm.isAlive || worm.isDead) continue;
+                    for (let i = 0; i < worm.segments.length; i++) {
+                        const seg = worm.segments[i];
+                        this.spatialGrid.insert({ worm, segIndex: i }, seg.x, seg.y);
+                    }
                 }
             }
 
