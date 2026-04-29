@@ -8,7 +8,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="format-detection" content="telephone=no">
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐛</text></svg>">
-    <title>Melody Worm v1.29 - 旋律虫虫</title>
+    <title>Melody Worm v1.30 - 旋律虫虫</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -568,7 +568,7 @@
     <div id="mouseIndicator"></div>
     
     <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 8px; box-sizing: border-box; width: 100%; height: 100vh;">
-        <h1 style="margin: 0; font-size: 20px; white-space: nowrap;">🎵 Melody Worm <span style="color:#888; font-size:14px;">v1.29</span> - 旋律虫虫</h1>
+        <h1 style="margin: 0; font-size: 20px; white-space: nowrap;">🎵 Melody Worm <span style="color:#888; font-size:14px;">v1.30</span> - 旋律虫虫</h1>
         <div style="display: flex; align-items: center; gap: 20px; font-size: 11px; color: #ccc;">
             <span>🎮 鼠标控制方向 | 按住左键连续射击 | 咬尾分裂 | 碰颈/框死</span>
         </div>
@@ -577,7 +577,7 @@
             <div class="split-notice" id="splitNotice">⚡ 咬尾分裂！新蚯蚓诞生！</div>
             <div class="split-notice" id="familyNotice" style="color: #FFD700; font-size: 16px;">👶 你就要有一个孩子了！保护好他！</div>
             <div id="startScreen">
-                <h2>🎵 Melody Worm<br>旋律虫虫 <span style="color:#888; font-size:14px;">v1.29</span></h2>
+                <h2>🎵 Melody Worm<br>旋律虫虫 <span style="color:#888; font-size:14px;">v1.30</span></h2>
                 <div class="start-instructions">
                     <div class="inst-row inst-main">
                         <span class="inst-icon">🖱️</span>
@@ -635,7 +635,7 @@
 
     <script>
         /**
-         * Melody Worm v1.29 - 旋律虫虫（消除魔法数字 — Enemy/Particle/Bullet常量提取到CONFIG）
+         * Melody Worm v1.30 - 旋律虫虫（全局错误边界 — 主循环try-catch+window.onerror防止游戏静默卡死）
          * 
          * 实验机制:
          * - 任何蚯蚓的头部咬到任何其他蚯蚓的尾巴（最后 1/3 段）→ 被咬者断尾分裂
@@ -4823,6 +4823,7 @@
     restart() {
                 // 回收粒子到对象池
                 for (const p of this.particles) { Particle.release(p); }
+
                 this.worms = [];
                 this.brokenTails = [];
                 this.deadBodies = [];
@@ -4931,33 +4932,38 @@
             }
 
             loop(timestamp) {
-                const deltaTime = this.lastTime ? (timestamp - this.lastTime) / 1000 : 1 / 60;
-                this.lastTime = timestamp;
+                try {
+                    const deltaTime = this.lastTime ? (timestamp - this.lastTime) / 1000 : 1 / 60;
+                    this.lastTime = timestamp;
 
-                // FPS锁定：累积时间，按目标帧率更新
-                this.fpsAccumulator += deltaTime;
-                const targetInterval = 1 / this.targetFPS;
+                    // FPS锁定：累积时间，按目标帧率更新
+                    this.fpsAccumulator += deltaTime;
+                    const targetInterval = 1 / this.targetFPS;
 
-                // FPS显示更新（每秒更新一次）
-                this.fpsUpdateTimer += deltaTime;
-                if (this.fpsUpdateTimer >= 1.0) {
-                    this.fpsDisplay = Math.round(this.frameCount / this.fpsUpdateTimer);
-                    this.frameCount = 0;
-                    this.fpsUpdateTimer = 0;
-                }
-
-                // 按目标帧率执行更新
-                while (this.fpsAccumulator >= targetInterval) {
-                    if (this.state === GAME_STATE.PLAYING || this.state === GAME_STATE.GAME_OVER) {
-                        // 游戏结束但还有尸体需要处理时，继续更新
-                        if (this.state === GAME_STATE.PLAYING || this.deadBodies.length > 0 || this.playerDeadWaitingForBodies) {
-                            this.update(targetInterval);
-                        }
+                    // FPS显示更新（每秒更新一次）
+                    this.fpsUpdateTimer += deltaTime;
+                    if (this.fpsUpdateTimer >= 1.0) {
+                        this.fpsDisplay = Math.round(this.frameCount / this.fpsUpdateTimer);
+                        this.frameCount = 0;
+                        this.fpsUpdateTimer = 0;
                     }
-                    this.fpsAccumulator -= targetInterval;
-                }
 
-                this.draw();
+                    // 按目标帧率执行更新
+                    while (this.fpsAccumulator >= targetInterval) {
+                        if (this.state === GAME_STATE.PLAYING || this.state === GAME_STATE.GAME_OVER) {
+                            // 游戏结束但还有尸体需要处理时，继续更新
+                            if (this.state === GAME_STATE.PLAYING || this.deadBodies.length > 0 || this.playerDeadWaitingForBodies) {
+                                this.update(targetInterval);
+                            }
+                        }
+                        this.fpsAccumulator -= targetInterval;
+                    }
+
+                    this.draw();
+                } catch (e) {
+                    console.error('[Game.loop] 主循环异常:', e);
+                }
+                // requestAnimationFrame放在try外面，保证帧循环永不中断
                 requestAnimationFrame((t) => this.loop(t));
             }
 
@@ -6490,6 +6496,33 @@
             ctx.beginPath();
             ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
             ctx.stroke();
+        });
+
+        // 全局错误边界：防止未捕获异常导致游戏静默卡死
+        window.onerror = function(msg, url, line, col, error) {
+            console.error(`[全局异常] ${msg} at ${url}:${line}:${col}`, error);
+            // 如果游戏还在运行，尝试提示用户
+            try {
+                const game = document.querySelector('#gameOver');
+                // 在canvas上显示错误提示
+                const canvas = document.getElementById('gameCanvas');
+                if (canvas) {
+                    const ctx = canvas.getContext('2d');
+                    ctx.fillStyle = 'rgba(0,0,0,0.7)';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    ctx.fillStyle = '#ff6b6b';
+                    ctx.font = '16px monospace';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('游戏遇到异常，请刷新页面重试', canvas.width/2, canvas.height/2 - 10);
+                    ctx.fillStyle = '#888';
+                    ctx.font = '12px monospace';
+                    ctx.fillText(msg, canvas.width/2, canvas.height/2 + 20);
+                }
+            } catch(_) {}
+            return true; // 阻止默认行为（避免浏览器弹出错误）
+        };
+        window.addEventListener('unhandledrejection', function(e) {
+            console.error('[未处理的Promise异常]', e.reason);
         });
     </script>
 </body>
