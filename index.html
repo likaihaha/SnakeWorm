@@ -8,7 +8,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="format-detection" content="telephone=no">
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐛</text></svg>">
-    <title>Melody Worm v1.05.5 - 旋律虫虫</title>
+    <title>Melody Worm v1.06 - 旋律虫虫</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -568,7 +568,7 @@
     <div id="mouseIndicator"></div>
     
     <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 8px; box-sizing: border-box; width: 100%; height: 100vh;">
-        <h1 style="margin: 0; font-size: 20px; white-space: nowrap;">🎵 Melody Worm <span style="color:#888; font-size:14px;">v1.05.5</span> - 旋律虫虫</h1>
+        <h1 style="margin: 0; font-size: 20px; white-space: nowrap;">🎵 Melody Worm <span style="color:#888; font-size:14px;">v1.06</span> - 旋律虫虫</h1>
         <div style="display: flex; align-items: center; gap: 20px; font-size: 11px; color: #ccc;">
             <span>🎮 鼠标控制方向 | 按住左键连续射击 | 咬尾分裂 | 碰颈/框死</span>
         </div>
@@ -577,7 +577,7 @@
             <div class="split-notice" id="splitNotice">⚡ 咬尾分裂！新蚯蚓诞生！</div>
             <div class="split-notice" id="familyNotice" style="color: #FFD700; font-size: 16px;">👶 你就要有一个孩子了！保护好他！</div>
             <div id="startScreen">
-                <h2>🎵 Melody Worm<br>旋律虫虫 <span style="color:#888; font-size:14px;">v1.05.5</span></h2>
+                <h2>🎵 Melody Worm<br>旋律虫虫 <span style="color:#888; font-size:14px;">v1.06</span></h2>
                 <div class="start-instructions">
                     <div class="inst-row inst-main">
                         <span class="inst-icon">🖱️</span>
@@ -635,7 +635,7 @@
 
     <script>
         /**
-         * Melody Worm v1.05.5 - 旋律虫虫
+         * Melody Worm v1.06 - 旋律虫虫
          * 
          * 实验机制:
          * - 任何蚯蚓的头部咬到任何其他蚯蚓的尾巴（最后 1/3 段）→ 被咬者断尾分裂
@@ -3173,6 +3173,15 @@
                 this.latchedSegmentIndex = -1;  // 咬住的段索引
                 this.biteDamageTimer = 0;  // 伤害计时器
                 
+                // 绕圈观察相关
+                this.isCircling = false;  // 是否正在绕圈
+                this.circleTarget = null;  // 绕圈目标（幼体）
+                this.circleAngle = 0;  // 当前绕圈角度
+                this.circleRadius = 60;  // 绕圈半径
+                this.circleSpeed = 2.5;  // 绕圈速度（弧度/秒）
+                this.circleCount = 0;  // 已绕圈数
+                this.circlesBeforeAttack = 2 + Math.random();  // 攻击前绕2-3圈
+                
                 // 初始化身体节段
                 for (let i = 0; i < this.segmentCount; i++) {
                     this.segments.push(new Vector(x - i * 8, y));
@@ -3284,14 +3293,54 @@
                 }
                 
                 // 移动逻辑
-                if (nearestJuvenile) {
-                    // 追击幼体
+                if (this.isCircling && this.circleTarget) {
+                    // 绕圈观察模式
+                    if (!this.circleTarget.isAlive || !this.circleTarget.isJuvenile) {
+                        // 目标失效，停止绕圈
+                        this.isCircling = false;
+                        this.circleTarget = null;
+                    } else {
+                        const targetPos = this.circleTarget.head;
+                        this.circleAngle += this.circleSpeed * dt;
+                        
+                        // 检测是否完成一圈
+                        if (this.circleAngle >= Math.PI * 2) {
+                            this.circleAngle -= Math.PI * 2;
+                            this.circleCount++;
+                        }
+                        
+                        // 绕够圈数，切换到攻击模式
+                        if (this.circleCount >= this.circlesBeforeAttack) {
+                            this.isCircling = false;
+                            this.circleTarget = null;
+                            this.circleCount = 0;
+                            this.circlesBeforeAttack = 2 + Math.random();  // 下次绕2-3圈
+                        } else {
+                            // 计算绕圈位置
+                            const circleX = targetPos.x + Math.cos(this.circleAngle) * this.circleRadius;
+                            const circleY = targetPos.y + Math.sin(this.circleAngle) * this.circleRadius;
+                            const targetPoint = new Vector(circleX, circleY);
+                            const dir = targetPoint.sub(this.pos).normalize();
+                            this.velocity = dir.mult(CONFIG.FAMILY.ENEMY_CHASE_SPEED * 0.8);  // 绕圈时稍慢
+                        }
+                    }
+                } else if (nearestJuvenile) {
+                    // 发现幼体，开始绕圈观察
+                    if (!this.isCircling) {
+                        this.isCircling = true;
+                        this.circleTarget = nearestJuvenile;
+                        this.circleAngle = Math.atan2(this.pos.y - nearestJuvenile.head.y, this.pos.x - nearestJuvenile.head.x);
+                        this.circleCount = 0;
+                    }
+                    // 追击幼体（绕圈期间也会靠近）
                     this.chaseTarget = nearestJuvenile;
                     const dir = nearestJuvenile.head.sub(this.pos).normalize();
                     this.velocity = dir.mult(CONFIG.FAMILY.ENEMY_CHASE_SPEED);
                 } else {
                     // 随机巡逻
                     this.chaseTarget = null;
+                    this.isCircling = false;
+                    this.circleTarget = null;
                     if (this.wanderTimer <= 0) {
                         this.wanderTimer = 2 + Math.random() * 3;
                         this.wanderDir = Vector.randomDir();
