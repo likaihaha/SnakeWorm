@@ -8,7 +8,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="format-detection" content="telephone=no">
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐛</text></svg>">
-    <title>Melody Worm v1.25 - 旋律虫虫</title>
+    <title>Melody Worm v1.26 - 旋律虫虫</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -568,7 +568,7 @@
     <div id="mouseIndicator"></div>
     
     <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 8px; box-sizing: border-box; width: 100%; height: 100vh;">
-        <h1 style="margin: 0; font-size: 20px; white-space: nowrap;">🎵 Melody Worm <span style="color:#888; font-size:14px;">v1.25</span> - 旋律虫虫</h1>
+        <h1 style="margin: 0; font-size: 20px; white-space: nowrap;">🎵 Melody Worm <span style="color:#888; font-size:14px;">v1.26</span> - 旋律虫虫</h1>
         <div style="display: flex; align-items: center; gap: 20px; font-size: 11px; color: #ccc;">
             <span>🎮 鼠标控制方向 | 按住左键连续射击 | 咬尾分裂 | 碰颈/框死</span>
         </div>
@@ -577,7 +577,7 @@
             <div class="split-notice" id="splitNotice">⚡ 咬尾分裂！新蚯蚓诞生！</div>
             <div class="split-notice" id="familyNotice" style="color: #FFD700; font-size: 16px;">👶 你就要有一个孩子了！保护好他！</div>
             <div id="startScreen">
-                <h2>🎵 Melody Worm<br>旋律虫虫 <span style="color:#888; font-size:14px;">v1.25</span></h2>
+                <h2>🎵 Melody Worm<br>旋律虫虫 <span style="color:#888; font-size:14px;">v1.26</span></h2>
                 <div class="start-instructions">
                     <div class="inst-row inst-main">
                         <span class="inst-icon">🖱️</span>
@@ -635,7 +635,7 @@
 
     <script>
         /**
-         * Melody Worm v1.25 - 旋律虫虫
+         * Melody Worm v1.26 - 旋律虫虫
          * 
          * 实验机制:
          * - 任何蚯蚓的头部咬到任何其他蚯蚓的尾巴（最后 1/3 段）→ 被咬者断尾分裂
@@ -2242,11 +2242,15 @@
                     }
                 }
                 
-                for (let i = this.iceOverlays.length - 1; i >= 0; i--) {
-                    this.iceOverlays[i].timer -= dt;
-                    if (this.iceOverlays[i].timer <= 0) {
-                        this.iceOverlays.splice(i, 1);
+                {
+                    let w = 0;
+                    for (let i = 0; i < this.iceOverlays.length; i++) {
+                        this.iceOverlays[i].timer -= dt;
+                        if (this.iceOverlays[i].timer > 0) {
+                            this.iceOverlays[w++] = this.iceOverlays[i];
+                        }
                     }
+                    this.iceOverlays.length = w;
                 }
             }
 
@@ -5243,58 +5247,61 @@
 
                 // 6.5 AI蚯蚓头部互撞：不咬断，只是碰撞
 
-                // 8. 更新断尾
-                for (let i = this.brokenTails.length - 1; i >= 0; i--) {
-                    const tail = this.brokenTails[i];
-                    const finished = tail.update(dt);
-
-                    if (finished) {
-                        const newWorm = tail.spawnWorm(tail.parentWorm);
-                        if (newWorm && this.worms.length < CONFIG.MAX_WORMS) {
-                            this.worms.push(newWorm);
-                            this.splitCount++;
-                            // 第一次分裂时显示亲子提示
-                            if (this.splitCount === 1) {
-                                this.showFamilyNotice();
-                            } else {
-                                this.showSplitNotice();
+                // 8. 更新断尾（紧凑过滤替代splice）
+                {
+                    let w = 0;
+                    for (let i = 0; i < this.brokenTails.length; i++) {
+                        const tail = this.brokenTails[i];
+                        const finished = tail.update(dt);
+                        if (!finished) {
+                            this.brokenTails[w++] = tail;
+                        } else {
+                            const newWorm = tail.spawnWorm(tail.parentWorm);
+                            if (newWorm && this.worms.length < CONFIG.MAX_WORMS) {
+                                this.worms.push(newWorm);
+                                this.splitCount++;
+                                if (this.splitCount === 1) {
+                                    this.showFamilyNotice();
+                                } else {
+                                    this.showSplitNotice();
+                                }
                             }
                         }
-                        this.brokenTails.splice(i, 1);
                     }
+                    this.brokenTails.length = w;
                 }
 
                 // 8.5 更新敌人系统
                 this.updateEnemies(dt, player);
                 
-                // 9. 更新尸体下沉动画
-                for (let i = this.deadBodies.length - 1; i >= 0; i--) {
-                    const body = this.deadBodies[i];
-                    const emitted = body.update(dt, CONFIG.CANVAS_HEIGHT);
+                // 9. 更新尸体下沉动画（紧凑过滤替代splice）
+                {
+                    let w = 0;
+                    for (let i = 0; i < this.deadBodies.length; i++) {
+                        const body = this.deadBodies[i];
+                        const emitted = body.update(dt, CONFIG.CANVAS_HEIGHT);
 
-                    // 每一段碰底的尸体转化为宝珠，从该段位置向上发射
-                    for (const emit of emitted) {
-                        const food = new Food(emit.x, emit.y, emit.type);
-                        // 扇形发射：更广角度 5°~175°，更充分向两边散开
-                        const angle = (5 + Math.random() * 170) * Math.PI / 180;
-                        const speed = 4.0 + Math.random() * 4.0;  // 速度4~8
-                        food.velocity.x = speed * Math.cos(angle);
-                        food.velocity.y = -speed * Math.sin(angle);  // 负号因为y轴向下
-                        food.inactiveTimer = 2.0;  // 初生冷却2秒，期间不能被吃、不能被磁力吸引
-                        // 初生动画：白点1.2秒 → 变形0.6秒 → 激活（与inactiveTimer=2.0同步）
-                        food.birthPhase = 'white';
-                        food.birthTimer = 1.2;
-                        this.foods.push(food);
-                        
-                        // 添加粒子特效（尸体段变宝珠的转化效果）
-                        for (let j = 0; j < 6; j++) {
-                            this.particles.push(Particle.acquire(emit.x, emit.y, emit.type.color));
+                        // 每一段碰底的尸体转化为宝珠，从该段位置向上发射
+                        for (const emit of emitted) {
+                            const food = new Food(emit.x, emit.y, emit.type);
+                            const angle = (5 + Math.random() * 170) * Math.PI / 180;
+                            const speed = 4.0 + Math.random() * 4.0;
+                            food.velocity.x = speed * Math.cos(angle);
+                            food.velocity.y = -speed * Math.sin(angle);
+                            food.inactiveTimer = 2.0;
+                            food.birthPhase = 'white';
+                            food.birthTimer = 1.2;
+                            this.foods.push(food);
+                            for (let j = 0; j < 6; j++) {
+                                this.particles.push(Particle.acquire(emit.x, emit.y, emit.type.color));
+                            }
+                        }
+
+                        if (!body.isFinished) {
+                            this.deadBodies[w++] = body;
                         }
                     }
-
-                    if (body.isFinished) {
-                        this.deadBodies.splice(i, 1);
-                    }
+                    this.deadBodies.length = w;
                 }
 
                 // 10. 检查玩家死亡是否等待尸体处理完成
@@ -5349,118 +5356,106 @@
                     if (player) player.magnetCombo = 0;  // 重置连击
                 }
                 
-                // 7.6 更新子弹和碰撞检测
-                for (let i = this.bullets.length - 1; i >= 0; i--) {
-                    const bullet = this.bullets[i];
-                    if (!bullet.update(dt)) {
-                        this.bullets.splice(i, 1);
-                        continue;
-                    }
-                    
-                    // 检测子弹击中宝珠
-                    for (let j = this.foods.length - 1; j >= 0; j--) {
-                        const food = this.foods[j];
-                        if (bullet.checkFoodHit(food)) {
-                            // 宝珠减速
-                            this.slowedFoods.set(food, 3.0);  // 减速 3 秒
-                            food.velocity.multSelf(0.2);  // 速度降为 20%
-                            
-                            // 击中位移效果 - 宝珠沿子弹方向移动
-                            const hx = food.pos.x - bullet.pos.x;
-                            const hy = food.pos.y - bullet.pos.y;
-                            const hd = Math.sqrt(hx * hx + hy * hy);
-                            if (hd > 0) { food.pos.x += hx / hd * 15; food.pos.y += hy / hd * 15; }
-                            
-                            // 击中特效
-                            for (let k = 0; k < 4; k++) {
-                                this.particles.push(Particle.acquire(food.pos.x, food.pos.y, '#4dabf7'));
-                            }
-                            this.floatingTexts.push(new FloatingText(food.pos.x, food.pos.y - 15, 'SLOW', '#4dabf7'));
-                            
-                            this.bullets.splice(i, 1);
-                            break;
+                // 7.6 更新子弹和碰撞检测（紧凑过滤替代splice）
+                {
+                    let w = 0;
+                    for (let i = 0; i < this.bullets.length; i++) {
+                        const bullet = this.bullets[i];
+                        if (!bullet.update(dt)) {
+                            continue; // 过期子弹，丢弃
                         }
-                    }
-                    
-                    // 检测子弹击中蚯蚓
-                    if (this.bullets[i]) {
-                        for (const worm of this.worms) {
-                            if (!worm.isAlive || worm.isPlayer || worm.segments.length === 0) continue;
-                            if (bullet.checkWormHit(worm)) {
-                                // 找到被击中的段索引
-                                let hitSegmentIndex = 0;
-                                for (let si = 0; si < worm.segments.length; si++) {
-                                    if (bullet.pos.dist(worm.segments[si]) < bullet.radius + CONFIG.SEGMENT_RADIUS) {
-                                        hitSegmentIndex = si;
-                                        break;
+
+                        let hit = false;
+
+                        // 检测子弹击中宝珠
+                        if (!hit) {
+                            for (let j = this.foods.length - 1; j >= 0; j--) {
+                                const food = this.foods[j];
+                                if (bullet.checkFoodHit(food)) {
+                                    this.slowedFoods.set(food, 3.0);
+                                    food.velocity.multSelf(0.2);
+                                    const hx = food.pos.x - bullet.pos.x;
+                                    const hy = food.pos.y - bullet.pos.y;
+                                    const hd = Math.sqrt(hx * hx + hy * hy);
+                                    if (hd > 0) { food.pos.x += hx / hd * 15; food.pos.y += hy / hd * 15; }
+                                    for (let k = 0; k < 4; k++) {
+                                        this.particles.push(Particle.acquire(food.pos.x, food.pos.y, '#4dabf7'));
                                     }
+                                    this.floatingTexts.push(new FloatingText(food.pos.x, food.pos.y - 15, 'SLOW', '#4dabf7'));
+                                    hit = true;
+                                    break;
                                 }
-                                
-                                // 可叠加减速效果
-                                worm.slowStacks = Math.min((worm.slowStacks || 0) + 1, 5);  // 最多5层
-                                worm.slowTimer = 3.0;  // 每层持续3秒
-                                worm.updateSpeed();  // updateSpeed会自动应用减速
-                                
-                                // 添加冰晶覆盖效果
-                                worm.iceOverlays.push({
-                                    segmentIndex: hitSegmentIndex,
-                                    timer: 2.0,
-                                    maxTimer: 2.0
-                                });
-                                
-                                // 击中位移效果 - 蚯蚓沿子弹方向移动
-                                const khx = worm.head.x - bullet.pos.x;
-                                const khy = worm.head.y - bullet.pos.y;
-                                const khd = Math.sqrt(khx * khx + khy * khy);
-                                worm.knockbackVelocity = new Vector(khd > 0 ? khx / khd * 6 : 0, khd > 0 ? khy / khd * 6 : 0);
-                                worm.knockbackTimer = 0.15;
-                                
-                                // 击中特效
-                                for (let k = 0; k < 6; k++) {
-                                    this.particles.push(Particle.acquire(worm.head.x, worm.head.y, '#4dabf7'));
-                                }
-                                const stackText = worm.slowStacks > 1 ? `SLOW x${worm.slowStacks}!` : 'SLOW!';
-                                this.floatingTexts.push(new FloatingText(worm.head.x, worm.head.y - 20, stackText, '#4dabf7'));
-                                
-                                this.bullets.splice(i, 1);
-                                break;
                             }
                         }
-                    }
-                    
-                    // 检测子弹击中敌人（三叶虫）
-                    if (this.bullets[i]) {
-                        for (const enemy of this.enemies) {
-                            if (!enemy.isAlive || enemy.isDying) continue;
-                            const enemyHead = enemy.segments[0];
-                            if (!enemyHead) continue;
-                            const dist = bullet.pos.dist(enemyHead);
-                            if (dist < bullet.radius + enemy.size) {
-                                // 计算击中方向（从子弹指向敌人）
-                                const ehx = enemy.pos.x - bullet.pos.x;
-                                const ehy = enemy.pos.y - bullet.pos.y;
-                                const ehd = Math.sqrt(ehx * ehx + ehy * ehy);
-                                const hitDir = new Vector(ehd > 0 ? ehx / ehd : 0, ehd > 0 ? ehy / ehd : 0);
-                                
-                                // 击中特效
-                                for (let k = 0; k < 6; k++) {
-                                    this.particles.push(Particle.acquire(enemyHead.x, enemyHead.y, '#4dabf7'));
+
+                        // 检测子弹击中蚯蚓
+                        if (!hit) {
+                            for (const worm of this.worms) {
+                                if (!worm.isAlive || worm.isPlayer || worm.segments.length === 0) continue;
+                                if (bullet.checkWormHit(worm)) {
+                                    let hitSegmentIndex = 0;
+                                    for (let si = 0; si < worm.segments.length; si++) {
+                                        if (bullet.pos.dist(worm.segments[si]) < bullet.radius + CONFIG.SEGMENT_RADIUS) {
+                                            hitSegmentIndex = si;
+                                            break;
+                                        }
+                                    }
+                                    worm.slowStacks = Math.min((worm.slowStacks || 0) + 1, 5);
+                                    worm.slowTimer = 3.0;
+                                    worm.updateSpeed();
+                                    worm.iceOverlays.push({
+                                        segmentIndex: hitSegmentIndex,
+                                        timer: 2.0,
+                                        maxTimer: 2.0
+                                    });
+                                    const khx = worm.head.x - bullet.pos.x;
+                                    const khy = worm.head.y - bullet.pos.y;
+                                    const khd = Math.sqrt(khx * khx + khy * khy);
+                                    worm.knockbackVelocity = new Vector(khd > 0 ? khx / khd * 6 : 0, khd > 0 ? khy / khd * 6 : 0);
+                                    worm.knockbackTimer = 0.15;
+                                    for (let k = 0; k < 6; k++) {
+                                        this.particles.push(Particle.acquire(worm.head.x, worm.head.y, '#4dabf7'));
+                                    }
+                                    const stackText = worm.slowStacks > 1 ? `SLOW x${worm.slowStacks}!` : 'SLOW!';
+                                    this.floatingTexts.push(new FloatingText(worm.head.x, worm.head.y - 20, stackText, '#4dabf7'));
+                                    hit = true;
+                                    break;
                                 }
-                                
-                                // 造成伤害（可能死亡）
-                                const killed = enemy.takeDamage(hitDir);
-                                
-                                if (killed) {
-                                    this.floatingTexts.push(new FloatingText(enemyHead.x, enemyHead.y - 20, 'KILL!', '#ff6b6b'));
-                                } else {
-                                    this.floatingTexts.push(new FloatingText(enemyHead.x, enemyHead.y - 20, `HIT! ${enemy.health}/${enemy.maxHealth}`, '#4dabf7'));
-                                }
-                                
-                                this.bullets.splice(i, 1);
-                                break;
                             }
                         }
+
+                        // 检测子弹击中敌人（三叶虫）
+                        if (!hit) {
+                            for (const enemy of this.enemies) {
+                                if (!enemy.isAlive || enemy.isDying) continue;
+                                const enemyHead = enemy.segments[0];
+                                if (!enemyHead) continue;
+                                const dist = bullet.pos.dist(enemyHead);
+                                if (dist < bullet.radius + enemy.size) {
+                                    const ehx = enemy.pos.x - bullet.pos.x;
+                                    const ehy = enemy.pos.y - bullet.pos.y;
+                                    const ehd = Math.sqrt(ehx * ehx + ehy * ehy);
+                                    const hitDir = new Vector(ehd > 0 ? ehx / ehd : 0, ehd > 0 ? ehy / ehd : 0);
+                                    for (let k = 0; k < 6; k++) {
+                                        this.particles.push(Particle.acquire(enemyHead.x, enemyHead.y, '#4dabf7'));
+                                    }
+                                    const killed = enemy.takeDamage(hitDir);
+                                    if (killed) {
+                                        this.floatingTexts.push(new FloatingText(enemyHead.x, enemyHead.y - 20, 'KILL!', '#ff6b6b'));
+                                    } else {
+                                        this.floatingTexts.push(new FloatingText(enemyHead.x, enemyHead.y - 20, `HIT! ${enemy.health}/${enemy.maxHealth}`, '#4dabf7'));
+                                    }
+                                    hit = true;
+                                    break;
+                                }
+                            }
+                        }
+
+                        if (!hit) {
+                            this.bullets[w++] = bullet;
+                        }
                     }
+                    this.bullets.length = w;
                 }
                 
                 // 更新减速计时器
@@ -5484,21 +5479,24 @@
                 this.foods.forEach(food => food.update(dt));
 
                 // 9. 按类型刷新宝珠 + 清理出画布的宝珠（底部消散特效）
-                const deathMargin = CONFIG.WALL_MARGIN * 2 + CONFIG.SEGMENT_RADIUS * 2;
-                for (let i = this.foods.length - 1; i >= 0; i--) {
-                    const food = this.foods[i];
-                    // 宝珠掉到底部死亡线时，播放消散特效（只处理向下掉的，底部发射向上飞的不删除）
-                    if (food.pos.y > CONFIG.CANVAS_HEIGHT - deathMargin && food.velocity.y >= 0) {
-                        // 创建消散粒子特效（使用宝珠颜色）
-                        for (let j = 0; j < 8; j++) {
-                            this.particles.push(Particle.acquire(food.pos.x, food.pos.y, food.type.color));
+                {
+                    const deathMargin = CONFIG.WALL_MARGIN * 2 + CONFIG.SEGMENT_RADIUS * 2;
+                    let w = 0;
+                    for (let i = 0; i < this.foods.length; i++) {
+                        const food = this.foods[i];
+                        if (food.pos.y > CONFIG.CANVAS_HEIGHT - deathMargin && food.velocity.y >= 0) {
+                            // 宝珠掉到底部死亡线时，播放消散特效
+                            for (let j = 0; j < 8; j++) {
+                                this.particles.push(Particle.acquire(food.pos.x, food.pos.y, food.type.color));
+                            }
+                            this.foodRespawnTimers[food.type.score] = food.type.respawnTime;
+                        } else if (food.pos.y < -50) {
+                            // 清理飞出顶部的宝珠
+                        } else {
+                            this.foods[w++] = food;
                         }
-                        this.foods.splice(i, 1);
-                        this.foodRespawnTimers[food.type.score] = food.type.respawnTime;
-                    } else if (food.pos.y < -50) {
-                        // 清理飞出顶部的宝珠
-                        this.foods.splice(i, 1);
                     }
+                    this.foods.length = w;
                 }
                 
                 // 节奏控制宝珠生成
@@ -5561,19 +5559,28 @@
                     }
                 }
 
-                // 10. 更新粒子效果
-                for (let i = this.particles.length - 1; i >= 0; i--) {
-                    if (!this.particles[i].update(dt)) {
-                        Particle.release(this.particles[i]);
-                        this.particles.splice(i, 1);
+                // 10. 更新粒子效果（紧凑过滤替代splice，O(n)）
+                {
+                    let w = 0;
+                    for (let i = 0; i < this.particles.length; i++) {
+                        if (this.particles[i].update(dt)) {
+                            this.particles[w++] = this.particles[i];
+                        } else {
+                            Particle.release(this.particles[i]);
+                        }
                     }
+                    this.particles.length = w;
                 }
 
-                // 11. 更新浮动文字
-                for (let i = this.floatingTexts.length - 1; i >= 0; i--) {
-                    if (!this.floatingTexts[i].update(dt)) {
-                        this.floatingTexts.splice(i, 1);
+                // 11. 更新浮动文字（紧凑过滤替代splice，O(n)）
+                {
+                    let w = 0;
+                    for (let i = 0; i < this.floatingTexts.length; i++) {
+                        if (this.floatingTexts[i].update(dt)) {
+                            this.floatingTexts[w++] = this.floatingTexts[i];
+                        }
                     }
+                    this.floatingTexts.length = w;
                 }
 
                 // 12. 更新 UI
@@ -5921,56 +5928,56 @@
                 // 生成敌人
                 this.spawnEnemies(dt);
                 
-                // 更新敌人
+                // 更新敌人（紧凑过滤替代splice）
                 const juveniles = this.worms.filter(w => w.isAlive && w.isJuvenile);
-                for (let i = this.enemies.length - 1; i >= 0; i--) {
-                    const enemy = this.enemies[i];
-                    enemy.update(dt, juveniles, player);
-                    
-                    // 检测敌人与幼体碰撞
-                    if (!enemy.latchedJuvenile) {
-                        for (const worm of this.worms) {
-                            if (!worm.isAlive || !worm.isJuvenile) continue;
-                            const segIndex = enemy.checkCollisionWithJuvenile(worm);
-                            if (segIndex >= 0) {
-                                enemy.latch(worm, segIndex);
-                                break;
-                            }
-                        }
-                    }
-                    
-                    // 检测敌人与玩家（成年体）碰撞
-                    if (player && player.isAlive && !player.isJuvenile) {
-                        if (enemy.checkCollisionWithPlayer(player)) {
-                            player.adultHitCount++;
-                            
-                            // 计算击退方向（从玩家指向敌人）
-                            const phx = enemy.pos.x - player.head.x;
-                            const phy = enemy.pos.y - player.head.y;
-                            const phd = Math.sqrt(phx * phx + phy * phy);
-                            const hitDir = new Vector(phd > 0 ? phx / phd : 0, phd > 0 ? phy / phd : 0);
-                            const killed = enemy.takeDamage(hitDir);
-                            
-                            if (killed) {
-                                this.floatingTexts.push(new FloatingText(enemy.segments[0].x, enemy.segments[0].y - 20, 'KILL!', '#ff6b6b'));
-                            } else {
-                                this.floatingTexts.push(new FloatingText(enemy.segments[0].x, enemy.segments[0].y - 20, `${enemy.health}/${enemy.maxHealth}`, '#ffa500'));
-                            }
-                            
-                            if (player.adultHitCount >= CONFIG.FAMILY.ADULT_HITS_TO_LOSE) {
-                                player.adultHitCount = 0;
-                                if (player.segments.length > 3) {
-                                    player.segments.pop();
-                                    player.targetLength = player.segments.length;
+                {
+                    let w = 0;
+                    for (let i = 0; i < this.enemies.length; i++) {
+                        const enemy = this.enemies[i];
+                        enemy.update(dt, juveniles, player);
+                        
+                        // 检测敌人与幼体碰撞
+                        if (!enemy.latchedJuvenile) {
+                            for (const worm of this.worms) {
+                                if (!worm.isAlive || !worm.isJuvenile) continue;
+                                const segIndex = enemy.checkCollisionWithJuvenile(worm);
+                                if (segIndex >= 0) {
+                                    enemy.latch(worm, segIndex);
+                                    break;
                                 }
                             }
                         }
+                        
+                        // 检测敌人与玩家（成年体）碰撞
+                        if (player && player.isAlive && !player.isJuvenile) {
+                            if (enemy.checkCollisionWithPlayer(player)) {
+                                player.adultHitCount++;
+                                const phx = enemy.pos.x - player.head.x;
+                                const phy = enemy.pos.y - player.head.y;
+                                const phd = Math.sqrt(phx * phx + phy * phy);
+                                const hitDir = new Vector(phd > 0 ? phx / phd : 0, phd > 0 ? phy / phd : 0);
+                                const killed = enemy.takeDamage(hitDir);
+                                if (killed) {
+                                    this.floatingTexts.push(new FloatingText(enemy.segments[0].x, enemy.segments[0].y - 20, 'KILL!', '#ff6b6b'));
+                                } else {
+                                    this.floatingTexts.push(new FloatingText(enemy.segments[0].x, enemy.segments[0].y - 20, `${enemy.health}/${enemy.maxHealth}`, '#ffa500'));
+                                }
+                                if (player.adultHitCount >= CONFIG.FAMILY.ADULT_HITS_TO_LOSE) {
+                                    player.adultHitCount = 0;
+                                    if (player.segments.length > 3) {
+                                        player.segments.pop();
+                                        player.targetLength = player.segments.length;
+                                    }
+                                }
+                            }
+                        }
+                        
+                        // 保留存活的敌人
+                        if (enemy.isAlive) {
+                            this.enemies[w++] = enemy;
+                        }
                     }
-                    
-                    // 移除死亡的敌人
-                    if (!enemy.isAlive) {
-                        this.enemies.splice(i, 1);
-                    }
+                    this.enemies.length = w;
                 }
                 
                 // 检测幼体吃尾巴
