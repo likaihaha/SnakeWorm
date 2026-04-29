@@ -1576,7 +1576,7 @@
                     return;
                 }
                 
-                // === 正常态渲染（光圈闪烁效果） ===
+                // === 正常态渲染 ===
                 // 拖尾效果
                 if (this.trail.length > 1) {
                     ctx.beginPath();
@@ -1589,53 +1589,46 @@
                     ctx.stroke();
                 }
                 
+                // 光环效果（根据稀有度，减少数量让颜色更鲜艳）
+                const ringCount = this.type.score >= 120 ? 2 :
+                                 this.type.score >= 30 ? 1 : 0;
+                
+                for (let i = 0; i < ringCount; i++) {
+                    const ringRadius = r + 3 + i * 3;
+                    ctx.beginPath();
+                    ctx.arc(this.pos.x, this.pos.y, ringRadius, 0, Math.PI * 2);
+                    ctx.strokeStyle = hexToRgba(this.type.color, 0.4 - i * 0.1);
+                    ctx.lineWidth = 1.5;
+                    ctx.stroke();
+                }
+                
+                // 叠加发光效果（闪烁）
+                const glowR = this.type.score >= 120 ? r * 1.6 : r * 1.4;
                 // 闪烁效果：使用pulsePhase产生呼吸般的明暗变化
-                const flashIntensity = 0.5 + 0.5 * Math.sin(this.pulsePhase * 1.5);
-                const baseAlpha = this.inactiveTimer > 0 ? 0.3 : 0.8;
-                const alpha = baseAlpha * (0.4 + 0.6 * flashIntensity);
-                
-                // 外层光圈（大半径，低透明度）
-                const outerRingR = r * 2.5;
-                ctx.beginPath();
-                ctx.arc(this.pos.x, this.pos.y, outerRingR, 0, Math.PI * 2);
-                ctx.strokeStyle = hexToRgba(this.type.color, alpha * 0.3);
-                ctx.lineWidth = 2;
-                ctx.stroke();
-                
-                // 中层光圈
-                const midRingR = r * 1.8;
-                ctx.beginPath();
-                ctx.arc(this.pos.x, this.pos.y, midRingR, 0, Math.PI * 2);
-                ctx.strokeStyle = hexToRgba(this.type.color, alpha * 0.5);
-                ctx.lineWidth = 2.5;
-                ctx.stroke();
-                
-                // 内层光圈（主光圈）
-                const innerRingR = r * 1.2;
-                ctx.beginPath();
-                ctx.arc(this.pos.x, this.pos.y, innerRingR, 0, Math.PI * 2);
-                ctx.strokeStyle = hexToRgba(this.type.color, alpha);
-                ctx.lineWidth = 3;
-                ctx.stroke();
-                
-                // 核心光点（小而亮）
-                const coreR = r * 0.4 * (0.7 + 0.3 * flashIntensity);
+                const flashIntensity = 0.4 + 0.6 * Math.sin(this.pulsePhase * 2);
                 const grd = ctx.createRadialGradient(
-                    this.pos.x, this.pos.y, 0,
-                    this.pos.x, this.pos.y, coreR * 2
+                    this.pos.x, this.pos.y, r * 0.6,
+                    this.pos.x, this.pos.y, glowR
                 );
-                grd.addColorStop(0, hexToRgba(this.type.color, alpha));
-                grd.addColorStop(0.5, hexToRgba(this.type.color, alpha * 0.5));
+                grd.addColorStop(0, hexToRgba(this.type.color, flashIntensity));
+                grd.addColorStop(0.7, hexToRgba(this.type.color, 0.4 * flashIntensity));
                 grd.addColorStop(1, hexToRgba(this.type.color, 0));
                 ctx.beginPath();
-                ctx.arc(this.pos.x, this.pos.y, coreR * 2, 0, Math.PI * 2);
+                ctx.arc(this.pos.x, this.pos.y, glowR, 0, Math.PI * 2);
                 ctx.fillStyle = grd;
                 ctx.fill();
                 
-                // 高光点
+                // 实心球体
                 ctx.beginPath();
-                ctx.arc(this.pos.x - 1, this.pos.y - 1, coreR * 0.6, 0, Math.PI * 2);
-                ctx.fillStyle = `rgba(255, 255, 255, ${alpha * 0.7})`;
+                ctx.arc(this.pos.x, this.pos.y, r, 0, Math.PI * 2);
+                // 初生冷却中的宝珠半透明，提示玩家还不能互动
+                ctx.fillStyle = this.inactiveTimer > 0
+                    ? hexToRgba(this.type.color, 0.5)
+                    : this.type.color;
+                ctx.fill();
+                ctx.beginPath();
+                ctx.arc(this.pos.x - 2, this.pos.y - 2, r * 0.4, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(255,255,255,0.5)';
                 ctx.fill();
                 
                 ctx.globalCompositeOperation = 'source-over';
