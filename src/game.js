@@ -1726,9 +1726,6 @@ export class Game {
         // 检测幼体吃尾巴
         this.checkJuvenileEatBrokenTails();
         this.checkJuvenileEatShrinkingSegments();
-        
-        // 玩家撞死敌人
-        this.checkPlayerKillingEnemies(player);
     }
 
     // 生成敌人
@@ -1839,27 +1836,7 @@ export class Game {
         }
     }
 
-    // 玩家撞死敌人
-    checkPlayerKillingEnemies(player) {
-        if (player && player.isAlive) {
-            for (let i = this.enemies.length - 1; i >= 0; i--) {
-                const enemy = this.enemies[i];
-                if (!enemy.isAlive || enemy.isDying) continue;
-                
-                if (enemy.checkCollisionWithPlayer(player)) {
-                    const bdx = enemy.pos.x - player.head.x;
-                    const bdy = enemy.pos.y - player.head.y;
-                    const bd = Math.sqrt(bdx * bdx + bdy * bdy);
-                    const bounceDir = new Vector(bd > 0 ? bdx / bd : 0, bd > 0 ? bdy / bd : 0);
-                    enemy.die(bounceDir);
-                    if (player.segments.length > 3) {
-                        player.segments.pop();
-                        player.targetLength = player.segments.length;
-                    }
-                }
-            }
-        }
-    }
+    // 注：玩家撞敌人的碰撞检测已移至主循环 updateWorms() 中，使用 takeDamage() 正确扣血
 
     /**
      * 显示玩家死亡对话框（排行榜版本）
