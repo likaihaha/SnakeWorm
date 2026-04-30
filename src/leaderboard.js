@@ -1,48 +1,65 @@
 /**
- * Leaderboard - 排行榜系统
- * LocalStorage存储，支持按字段排序，管理员可删除记录
+ * Leaderboard - 全球排行榜系统
+ * CloudBase 云端存储 + localStorage 离线回退
+ * 支持按字段排序，管理员可删除记录
  */
-const STORAGE_KEY = 'snakeworm_leaderboard';
-const MAX_ENTRIES = 100;
+import { initCloud, isCloudReady, cloudGetTop, cloudAddScore, cloudDeleteEntry, getLocalData, deleteLocalEntry } from './cloudbase.js';
+
 const ADMIN_USERNAME = 'admin';
 const ADMIN_PASSWORD_HASH = '23aa53b077ad35a3f680d5119efbab4f315c3ec7856bda41e9749aa393275136';
 
 export class Leaderboard {
     static _isAdmin = false;
+    static _cloudInited = false;
+    static _cachedData = [];       // 云端缓存数据
+    static _isCloudData = false;   // 当前展示的是云端数据？
 
     /**
-     * 获取排行榜数据
-     * @returns {Array<{name:string, length:number, score:number, children:number, date:string}>}
+     * 初始化云端连接（首次调用时执行）
      */
-    static getData() {
-        try {
-            const raw = localStorage.getItem(STORAGE_KEY);
-            return raw ? JSON.parse(raw) : [];
-        } catch (e) {
-            return [];
-        }
+    static async _ensureCloud() {
+        if (Leaderboard._cloudInited) return;
+        Leaderboard._cloudInited = true;
+        await initCloud();
     }
 
     /**
-     * 保存一条成绩
-     * @param {string} name 玩家名字
-     * @param {number} length 最终长度
-     * @param {number} score 最终分数
-     * @param {number} children 后代数量（诞生次数）
+     * 获取排行榜数据（优先云端，降级本地）
+     * @returns {Promise<Array>}
      */
-    static addScore(name, length, score, children) {
-        const data = Leaderboard.getData();
-        data.push({
+    static async getData() {
+        await Leaderboard._ensureCloud();
+        if (isCloudReady()) {
+            const cloudData = await cloudGetTop();
+            if (cloudData !== null) {
+                Leaderboard._cachedData = cloudData;
+                Leaderboard._isCloudData = true;
+                return cloudData;
+            }
+        }
+        // 降级到本地
+        Leaderboard._cachedData = getLocalData();
+        Leaderboard._isCloudData = false;
+        return Leaderboard._cachedData;
+    }
+
+    /**
+     * 保存一条成绩（同时写云端和本地）
+     */
+    static async addScore(name, length, score, children) {
+        const entry = {
             name: name.substring(0, 12),
             length,
             score,
             children,
             date: new Date().toLocaleDateString('zh-CN')
-        });
-        // 按分数降序排列，只保留前 MAX_ENTRIES 条
-        data.sort((a, b) => b.score - a.score);
-        if (data.length > MAX_ENTRIES) data.length = MAX_ENTRIES;
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+        };
+        await Leaderboard._ensureCloud();
+        const cloudOk = await cloudAddScore(entry);
+        if (!cloudOk) {
+            // 云端失败，本地已由 cloudbase.js 自动保存
+            console.warn('[Leaderboard] 云端提交失败，成绩已保存在本地');
+        }
     }
 
     /**
@@ -56,25 +73,21 @@ export class Leaderboard {
     }
 
     /**
-     * 删除一条记录（按原始索引）
+     * 删除一条记录
      */
-    static _deleteEntry(origIdx) {
-        const data = Leaderboard.getData();
-        if (origIdx >= 0 && origIdx < data.length) {
-            data.splice(origIdx, 1);
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    static async _deleteEntry(entry) {
+        if (Leaderboard._isCloudData && entry._id) {
+            await cloudDeleteEntry(entry._id);
+        }
+        if (entry._origIdx !== undefined) {
+            deleteLocalEntry(entry._origIdx);
         }
     }
 
     /**
      * 创建排行榜对话框
-     * @param {number} [resultLength] 游戏结束时的长度（如果有）
-     * @param {number} [resultScore] 游戏结束时的分数
-     * @param {number} [resultChildren] 游戏结束时的后代数量
-     * @param {Function} [onRestart] 点击重新开始的回调
-     * @param {Function} [onClose] 点击返回/关闭的回调
      */
-    static show(resultLength, resultScore, resultChildren, onRestart, onClose) {
+    static async show(resultLength, resultScore, resultChildren, onRestart, onClose) {
         // 移除旧对话框
         const old = document.getElementById('leaderboardDialog');
         if (old) old.remove();
@@ -95,13 +108,13 @@ export class Leaderboard {
             display: flex; flex-direction: column; color: #eee;
         `;
 
-        // 标题行（含管理员按钮）
+        // 标题行（含管理员按钮 + 云端状态）
         const titleRow = document.createElement('div');
         titleRow.style.cssText = 'display: flex; align-items: center; justify-content: center; margin: 0 0 16px 0; position: relative;';
 
         const title = document.createElement('h2');
         title.style.cssText = 'margin: 0; color: #e94560; font-size: 20px;';
-        title.textContent = '🏆 排行榜';
+        title.textContent = '🏆 全球排行榜';
 
         const adminBtn = document.createElement('span');
         adminBtn.textContent = '⚙️';
@@ -120,9 +133,16 @@ export class Leaderboard {
         titleRow.appendChild(adminBtn);
         panel.appendChild(titleRow);
 
+        // 云端状态指示
+        const cloudStatus = document.createElement('div');
+        cloudStatus.style.cssText = 'text-align: center; font-size: 11px; color: #666; margin-bottom: 8px;';
+        cloudStatus.textContent = '⏳ 正在连接全球排行榜...';
+        panel.appendChild(cloudStatus);
+
         // 如果有成绩，显示提交区域
         let showSubmit = resultLength !== undefined && resultScore !== undefined;
         let hasSubmitted = false;
+        let submitBtn, nameInput;
         if (showSubmit) {
             const submitArea = document.createElement('div');
             submitArea.style.cssText = 'margin-bottom: 16px; padding: 12px; background: rgba(233,69,96,0.1); border-radius: 8px; text-align: center;';
@@ -135,7 +155,7 @@ export class Leaderboard {
             const inputRow = document.createElement('div');
             inputRow.style.cssText = 'display: flex; gap: 8px; justify-content: center; align-items: center;';
 
-            const nameInput = document.createElement('input');
+            nameInput = document.createElement('input');
             nameInput.type = 'text';
             nameInput.placeholder = '输入你的名字';
             nameInput.maxLength = 12;
@@ -144,24 +164,26 @@ export class Leaderboard {
                 padding: 6px 12px; color: #fff; font-size: 14px; width: 140px; outline: none;
             `;
 
-            const submitBtn = document.createElement('button');
+            submitBtn = document.createElement('button');
             submitBtn.textContent = '提交成绩';
             submitBtn.style.cssText = `
                 background: #e94560; color: #fff; border: none; padding: 6px 18px;
                 font-size: 14px; border-radius: 6px; cursor: pointer;
             `;
-            submitBtn.onmouseover = () => submitBtn.style.background = '#c73652';
-            submitBtn.onmouseout = () => submitBtn.style.background = '#e94560';
-            submitBtn.onclick = () => {
+            submitBtn.onmouseover = () => { if (!submitBtn.disabled) submitBtn.style.background = '#c73652'; };
+            submitBtn.onmouseout = () => { if (!submitBtn.disabled) submitBtn.style.background = '#e94560'; };
+            submitBtn.onclick = async () => {
                 const name = nameInput.value.trim() || '匿名虫虫';
-                Leaderboard.addScore(name, resultLength, resultScore, resultChildren);
-                hasSubmitted = true;
                 submitBtn.disabled = true;
-                submitBtn.textContent = '已提交 ✓';
+                submitBtn.textContent = '提交中...';
                 submitBtn.style.background = '#555';
                 nameInput.disabled = true;
+
+                await Leaderboard.addScore(name, resultLength, resultScore, resultChildren);
+                hasSubmitted = true;
+                submitBtn.textContent = '已提交 ✓';
                 // 刷新表格
-                Leaderboard._renderTable(tableBody, sortState);
+                Leaderboard._refreshTable(tableBody, sortState, cloudStatus);
             };
 
             inputRow.appendChild(nameInput);
@@ -207,9 +229,8 @@ export class Leaderboard {
                         sortState.field = col.key;
                         sortState.dir = 'desc';
                     }
-                    // 更新表头箭头
                     Leaderboard._updateHeaders(headerRow, sortState);
-                    Leaderboard._renderTable(tableBody, sortState);
+                    Leaderboard._sortAndRender(tableBody, sortState);
                 });
             }
             headerRow.appendChild(th);
@@ -218,32 +239,48 @@ export class Leaderboard {
         table.appendChild(thead);
 
         const tableBody = document.createElement('tbody');
+        // 初始加载中状态
+        const loadingTr = document.createElement('tr');
+        const loadingTd = document.createElement('td');
+        loadingTd.colSpan = 6;
+        loadingTd.style.cssText = 'padding: 30px; text-align: center; color: #666;';
+        loadingTd.textContent = '⏳ 加载中...';
+        loadingTr.appendChild(loadingTd);
+        tableBody.appendChild(loadingTr);
+
         table.appendChild(tableBody);
         tableWrap.appendChild(table);
         panel.appendChild(tableWrap);
 
-        // 初始渲染
+        // 异步加载数据
+        const data = await Leaderboard.getData();
+        // 更新云端状态
+        if (Leaderboard._isCloudData) {
+            cloudStatus.textContent = '☁️ 全球排行榜';
+            cloudStatus.style.color = '#4ecca3';
+        } else {
+            cloudStatus.textContent = '💾 本地排行榜（离线模式）';
+            cloudStatus.style.color = '#ffa500';
+        }
         Leaderboard._updateHeaders(headerRow, sortState);
-        Leaderboard._renderTable(tableBody, sortState);
+        Leaderboard._sortAndRender(tableBody, sortState);
 
         // 管理员登录逻辑
         adminBtn.onclick = () => {
             if (Leaderboard._isAdmin) {
-                // 退出管理模式
                 Leaderboard._isAdmin = false;
                 adminBtn.style.opacity = '0.4';
                 adminBadge.style.display = 'none';
                 Leaderboard._updateHeaders(headerRow, sortState);
-                Leaderboard._renderTable(tableBody, sortState);
+                Leaderboard._sortAndRender(tableBody, sortState);
                 return;
             }
-            // 显示登录对话框
             Leaderboard._showAdminLogin(overlay, () => {
                 Leaderboard._isAdmin = true;
                 adminBtn.style.opacity = '1';
                 adminBadge.style.display = 'block';
                 Leaderboard._updateHeaders(headerRow, sortState);
-                Leaderboard._renderTable(tableBody, sortState);
+                Leaderboard._sortAndRender(tableBody, sortState);
             });
         };
 
@@ -276,11 +313,11 @@ export class Leaderboard {
         document.body.appendChild(overlay);
 
         // 回车提交
-        if (showSubmit) {
-            overlay.querySelector('input').addEventListener('keydown', (e) => {
-                if (e.key === 'Enter') overlay.querySelector('button[style*="e94560"]').click();
+        if (showSubmit && nameInput) {
+            nameInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && submitBtn && !submitBtn.disabled) submitBtn.click();
             });
-            overlay.querySelector('input').focus();
+            nameInput.focus();
         }
     }
 
@@ -307,7 +344,6 @@ export class Leaderboard {
         loginTitle.textContent = '🔒 管理员登录';
         loginPanel.appendChild(loginTitle);
 
-        // 用户名
         const userLabel = document.createElement('label');
         userLabel.style.cssText = 'display: block; font-size: 12px; color: #999; margin-bottom: 4px;';
         userLabel.textContent = '用户名';
@@ -322,7 +358,6 @@ export class Leaderboard {
         `;
         loginPanel.appendChild(userInput);
 
-        // 密码
         const passLabel = document.createElement('label');
         passLabel.style.cssText = 'display: block; font-size: 12px; color: #999; margin-bottom: 4px;';
         passLabel.textContent = '密码';
@@ -337,12 +372,10 @@ export class Leaderboard {
         `;
         loginPanel.appendChild(passInput);
 
-        // 错误提示
         const errorMsg = document.createElement('p');
         errorMsg.style.cssText = 'margin: 0 0 10px 0; font-size: 12px; color: #e94560; min-height: 16px;';
         loginPanel.appendChild(errorMsg);
 
-        // 按钮行
         const loginBtnRow = document.createElement('div');
         loginBtnRow.style.cssText = 'display: flex; gap: 8px; justify-content: center;';
 
@@ -381,7 +414,6 @@ export class Leaderboard {
         loginOkBtn.onclick = doLogin;
         loginCancelBtn.onclick = () => loginOverlay.remove();
 
-        // 回车登录
         passInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') doLogin(); });
         userInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') passInput.focus(); });
 
@@ -402,7 +434,6 @@ export class Leaderboard {
         const fieldMap = ['', 'name', 'length', 'score', 'children', 'date'];
         const labels = ['', '名字', '长度', '分数', '后代', '日期'];
 
-        // 移除旧的操作列
         const oldOp = headerRow.querySelector('th[data-op]');
         if (oldOp) oldOp.remove();
 
@@ -413,7 +444,6 @@ export class Leaderboard {
             th.textContent = labels[i] + arrow;
         });
 
-        // 管理模式下添加操作列
         if (Leaderboard._isAdmin) {
             const opTh = document.createElement('th');
             opTh.setAttribute('data-op', '1');
@@ -424,10 +454,27 @@ export class Leaderboard {
     }
 
     /**
-     * 渲染排行榜表格
+     * 刷新表格（异步重新获取数据）
      */
-    static _renderTable(tbody, sortState) {
-        let data = Leaderboard.getData().map((entry, i) => ({ ...entry, _origIdx: i }));
+    static async _refreshTable(tbody, sortState, cloudStatusEl) {
+        await Leaderboard.getData();
+        if (cloudStatusEl) {
+            if (Leaderboard._isCloudData) {
+                cloudStatusEl.textContent = '☁️ 全球排行榜';
+                cloudStatusEl.style.color = '#4ecca3';
+            } else {
+                cloudStatusEl.textContent = '💾 本地排行榜（离线模式）';
+                cloudStatusEl.style.color = '#ffa500';
+            }
+        }
+        Leaderboard._sortAndRender(tbody, sortState);
+    }
+
+    /**
+     * 用缓存数据排序并渲染表格（同步）
+     */
+    static _sortAndRender(tbody, sortState) {
+        let data = Leaderboard._cachedData.map((entry, i) => ({ ...entry, _origIdx: i }));
         const { field, dir } = sortState;
         data.sort((a, b) => {
             let va = a[field], vb = b[field];
@@ -460,7 +507,6 @@ export class Leaderboard {
                 tr.appendChild(td);
             });
 
-            // 管理模式：添加删除按钮
             if (isAdmin) {
                 const opTd = document.createElement('td');
                 opTd.style.cssText = 'padding: 6px; text-align: center; border-bottom: 1px solid #222;';
@@ -473,10 +519,10 @@ export class Leaderboard {
                 `;
                 delBtn.onmouseover = () => delBtn.style.background = 'rgba(233,69,96,0.3)';
                 delBtn.onmouseout = () => delBtn.style.background = 'none';
-                delBtn.onclick = () => {
+                delBtn.onclick = async () => {
                     if (confirm(`确定删除 ${entry.name} 的记录？\n分数: ${entry.score} | 长度: ${entry.length}`)) {
-                        Leaderboard._deleteEntry(entry._origIdx);
-                        Leaderboard._renderTable(tbody, sortState);
+                        await Leaderboard._deleteEntry(entry);
+                        Leaderboard._refreshTable(tbody, sortState);
                     }
                 };
                 opTd.appendChild(delBtn);
