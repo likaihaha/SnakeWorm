@@ -1343,8 +1343,9 @@ export class Game {
         if (this.state !== GAME_STATE.PLAYING) return;
         
         const player = this.worms[0];
-        if (!player || !player.isAlive || player.segments.length === 0) return;
+        if (!player || !player.isAlive || player.segments.length < 2) return;
         if (!player.bulletCount || player.bulletCount <= 0) return;
+        if (!player.blueSegments || player.blueSegments <= 0) return;
         
         // 子弹方向：嘴部开合的方向（基于头部到第二段的向量）
         let mouthAngle = Math.atan2(player.velocity.y, player.velocity.x);
@@ -1388,8 +1389,7 @@ export class Game {
                     
                     player.blueSegments--;
                     player.blueStrengths.splice(i, 1);  // 从数组中移除
-                    // 更新子弹数量
-                    player.bulletCount = player.blueSegments * 5;
+                    player.syncBlueToBody();  // 同步弹舱状态
                 }
                 break;  // 只减少一个段的强度
             }
@@ -1412,6 +1412,7 @@ export class Game {
     aiFireBullet(worm) {
         if (!worm || !worm.isAlive || worm.segments.length < 2) return;
         if (!worm.bulletCount || worm.bulletCount <= 0) return;
+        if (!worm.blueSegments || worm.blueSegments <= 0) return;
         
         // 计算射击方向（基于头部到第二段的方向，加随机偏移）
         const head = worm.segments[0];
@@ -1433,13 +1434,12 @@ export class Game {
                     // 蓝色段用完，移除
                     worm.blueSegments--;
                     worm.blueStrengths.splice(i, 1);
-                    worm.bulletCount = worm.blueSegments * 5;
                     // 移除该节身体
                     if (worm.segments.length > 3) {
                         worm.segments.pop();
                         worm.targetLength = worm.segments.length;
                     }
-                    break;
+                    worm.syncBlueToBody();  // 同步弹舱状态
                 }
                 break;
             }
@@ -1574,6 +1574,7 @@ export class Game {
         // 被咬的虫虫：删除尾巴段（从 biteIndex 开始）
         worm.segments = worm.segments.slice(0, biteIndex);
         worm.targetLength = worm.segments.length;
+        worm.syncBlueToBody();  // 同步弹舱状态
 
         // 如果剩余段太少（< 3），虫虫死亡
         if (worm.segments.length < 3) {
@@ -1638,6 +1639,7 @@ export class Game {
 
         worm.segments = keptSegments;
         worm.targetLength = keptSegments.length;
+        worm.syncBlueToBody();  // 同步弹舱状态
 
         const brokenTail = new BrokenTail(tailSegments, worm.color, worm);
         this.brokenTails.push(brokenTail);
@@ -1711,6 +1713,7 @@ export class Game {
                             if (player.segments.length > 3) {
                                 player.segments.pop();
                                 player.targetLength = player.segments.length;
+                                player.syncBlueToBody();  // 同步弹舱状态
                             }
                         }
                     }

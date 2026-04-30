@@ -128,6 +128,35 @@ export class Worm {
     get head() { return this.segments[0]; }
     get length() { return this.segments.length; }
 
+    /**
+     * 身体缩短后，同步弹舱状态
+     * 蓝色段位于身体索引 1 ~ blueSegments（头部是索引 0）
+     * 如果身体缩短到比蓝色段还短，裁剪多余的蓝色段
+     */
+    syncBlueToBody() {
+        const maxBlue = Math.max(0, this.segments.length - 1);  // 减去头部
+        while (this.blueSegments > maxBlue) {
+            this.blueSegments--;
+            if (this.blueStrengths.length > 0) {
+                this.blueStrengths.pop();
+            }
+        }
+        // 重新计算子弹数（蓝色段 × 5 - 已消耗的）
+        this.bulletCount = this.blueSegments * 5;
+        // 重算已消耗：累计 blueStrengths 中被用掉的
+        for (let i = 0; i < this.blueStrengths.length; i++) {
+            // blueStrengths[i] 是剩余强度（0~5），已消耗 = 5 - 剩余
+            // 但 bulletCount 已经按 blueSegments*5 算了总弹药
+            // 实际可发射 = 所有剩余强度之和
+        }
+        // 实际可用子弹 = 各段剩余强度之和
+        let total = 0;
+        for (let i = 0; i < this.blueStrengths.length; i++) {
+            total += this.blueStrengths[i];
+        }
+        this.bulletCount = total;
+    }
+
     updateSpeed() {
         const speedReduction = (this.length - CONFIG.WORM_INITIAL_LENGTH) * CONFIG.SPEED_DECAY;
         const base = this.isPlayer ? CONFIG.BASE_SPEED : CONFIG.AI_BASE_SPEED;
@@ -515,14 +544,8 @@ export class Worm {
                 } else {
                     this.segments.pop();
                     this.targetLength--;
-                    if (this.blueSegments > 0) {
-                        this.blueSegments--;
-                        if (this.blueStrengths.length > 0) {
-                            this.blueStrengths.pop();
-                        }
-                        this.bulletCount = this.blueSegments * 5;
-                    }
                 }
+                this.syncBlueToBody();  // 同步弹舱状态
             } else if (this.segments.length <= 2) {
                 this.isAlive = false;
                 return;
