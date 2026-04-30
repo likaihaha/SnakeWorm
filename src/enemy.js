@@ -51,6 +51,9 @@ export class Enemy {
         this.feedingTimer = 0;  // 觅食计时器
         this.feedingCooldown = 0;  // 觅食冷却时间
 
+        // 咬成功后冷却（见好就收，不再追幼体）
+        this.biteCooldown = 0;  // 咬成功后冷却计时器
+
         // 初始化身体节段
         for (let i = 0; i < this.segmentCount; i++) {
             this.segments.push(new Vector(x - i * CONFIG.FAMILY.ENEMY_SEG_SPACING, y));
@@ -96,6 +99,15 @@ export class Enemy {
             this.feedingCooldown -= dt;
         }
 
+        // 咬成功冷却（见好就收，清除绕圈状态）
+        if (this.biteCooldown > 0) {
+            this.biteCooldown -= dt;
+            if (this.isCircling) {
+                this.isCircling = false;
+                this.circleTarget = null;
+            }
+        }
+
         // 如果正在觅食
         if (this.feedingTarget && this.state === ENEMY_STATE.FEEDING) {
             this.updateFeeding(dt);
@@ -103,21 +115,23 @@ export class Enemy {
             return;
         }
 
-        // 寻找最近的幼体
+        // 寻找最近的幼体（咬成功冷却期间不追幼体，见好就收）
         let nearestJuvenile = null;
-        let minDist = CONFIG.FAMILY.ENEMY_CHASE_RADIUS;
+        if (this.biteCooldown <= 0) {
+            let minDist = CONFIG.FAMILY.ENEMY_CHASE_RADIUS;
 
-        for (const worm of juveniles) {
-            if (!worm.isAlive || !worm.isJuvenile || !worm.head) continue;
-            const d = this.pos.dist(worm.head);
-            if (d < minDist) {
-                minDist = d;
-                nearestJuvenile = worm;
+            for (const worm of juveniles) {
+                if (!worm.isAlive || !worm.isJuvenile || !worm.head) continue;
+                const d = this.pos.dist(worm.head);
+                if (d < minDist) {
+                    minDist = d;
+                    nearestJuvenile = worm;
+                }
             }
         }
 
         // 移动逻辑：优先追击幼体 > 觅食 > 漫游
-        if (this.isCircling && this.circleTarget) {
+        if (this.isCircling && this.circleTarget && this.biteCooldown <= 0) {
             this.state = ENEMY_STATE.CIRCLING;
             this.updateCircling(dt);
         } else if (nearestJuvenile) {
@@ -261,6 +275,7 @@ export class Enemy {
             this.release();
             this.state = ENEMY_STATE.WANDERING;
             this.wanderTimer = 2.0 + Math.random() * 2.0;  // 漫游2-4秒后才能再次追击
+            this.biteCooldown = CONFIG.FAMILY.ENEMY_BITE_COOLDOWN;  // 见好就收，冷却期间不再追幼体
         }
     }
 

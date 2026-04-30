@@ -82,6 +82,7 @@ export const CONFIG = {
         ENEMY_HIT_FLASH_BULLET: 0.5,
         ENEMY_HIT_FLASH_DAMAGE: 0.3,
         ENEMY_KNOCKBACK_TAKE: 0.2,
+        ENEMY_BITE_COOLDOWN: 10.0,  // 咬成功后冷却10秒，见好就收去巡游
         JUVENILE_FOLLOW_RADIUS: 250,
         JUVENILE_FEAR_RADIUS: 150,
         JUVENILE_EAT_RADIUS: 30,
