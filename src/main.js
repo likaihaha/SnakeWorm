@@ -3,6 +3,7 @@
  * 创建 Game 实例、初始化图例 canvas、绑定 HTML 按钮事件
  */
 import { Game } from './game.js';
+import { Leaderboard } from './leaderboard.js';
 
 // 创建游戏实例
 const game = new Game();
@@ -19,6 +20,10 @@ if (pauseResumeBtn) pauseResumeBtn.addEventListener('click', () => game.resumeGa
 
 const gameOverBtn = document.getElementById('gameOverRestartBtn');
 if (gameOverBtn) gameOverBtn.addEventListener('click', () => game.restart());
+
+// 排行榜按钮（开始界面）
+const leaderboardBtn = document.getElementById('leaderboardBtn');
+if (leaderboardBtn) leaderboardBtn.addEventListener('click', () => Leaderboard.show());
 
 const fullscreenBtn = document.getElementById('fullscreenBtn');
 if (fullscreenBtn) fullscreenBtn.addEventListener('click', () => game.requestFullscreen());

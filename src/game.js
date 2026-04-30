@@ -13,6 +13,7 @@ import { Worm } from './worm.js';
 import { Enemy } from './enemy.js';
 import { BrokenTail } from './broken-tail.js';
 import { DeadBody } from './dead-body.js';
+import { Leaderboard } from './leaderboard.js';
 
 export class Game {
     constructor() {
@@ -409,8 +410,10 @@ export class Game {
     startGame() {
         // 显示音频加载提示
         const startBtn = document.getElementById('startBtn');
+        const leaderboardBtn = document.getElementById('leaderboardBtn');
         const audioLoading = document.getElementById('audioLoading');
         if (startBtn) startBtn.style.display = 'none';
+        if (leaderboardBtn) leaderboardBtn.style.display = 'none';
         if (audioLoading) audioLoading.style.display = 'block';
         
         // 预初始化音频系统（避免首次播放音符时的延迟）
@@ -1817,64 +1820,12 @@ export class Game {
     }
 
     /**
-     * 显示玩家死亡对话框
+     * 显示玩家死亡对话框（排行榜版本）
      */
     showPlayerDeathDialog(reason = 'eaten') {
-        // 创建死亡对话框
-        const dialog = document.createElement('div');
-        dialog.id = 'playerDeathDialog';
-        dialog.style.cssText = `
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: rgba(0, 0, 0, 0.9);
-            border: 2px solid #ff6b6b;
-            border-radius: 10px;
-            padding: 30px;
-            text-align: center;
-            z-index: 10000;
-            min-width: 300px;
-        `;
-        
-        // 根据死亡原因显示不同标题
-        const deathTitles = {
-            wall: ['💀 越界了！边界外是深渊...', '💀 撞上了死亡之墙！', '💀 触碰了禁制之线！', '💀 被边界吞噬了！'],
-            eaten: ['💀 被猎杀了！', '💀 成为其他虫虫的美餐！', '💀 被吞噬了！', '💀 被咬死了！'],
-            hunger: ['💀 饿死了！身体消耗殆尽...', '💀 饥饿而亡！需要更多宝珠！', '💀 能量耗尽！身体消失了...', '💀 因饥饿而陨落！'],
-            neckBite: ['💀 颈部被咬断了！', '💀 被致命一击！', '💀 颈部受到致命伤害！', '💀 被咬中要害！']
-        };
-        const titles = deathTitles[reason] || deathTitles.eaten;
-        const randomTitle = titles[Math.floor(Math.random() * titles.length)];
-        
-        // 安全创建DOM元素，避免innerHTML注入风险
-        const h2 = document.createElement('h2');
-        h2.style.cssText = 'color: #ff6b6b; margin-bottom: 20px;';
-        h2.textContent = randomTitle;
-        dialog.appendChild(h2);
-        
-        const p1 = document.createElement('p');
-        p1.style.cssText = 'color: #fff; margin-bottom: 10px;';
-        p1.textContent = '最终长度: ' + (this.playerDeathLength || this.worms[0]?.segments?.length || 0);
-        dialog.appendChild(p1);
-        
-        const p2 = document.createElement('p');
-        p2.style.cssText = 'color: #fff; margin-bottom: 10px;';
-        p2.textContent = '最终分数: ' + this.score;
-        dialog.appendChild(p2);
-        
-        const p3 = document.createElement('p');
-        p3.style.cssText = 'color: #fff; margin-bottom: 20px;';
-        p3.textContent = '分裂次数: ' + this.splitCount;
-        dialog.appendChild(p3);
-        
-        const btn = document.createElement('button');
-        btn.textContent = '重新开始';
-        btn.style.cssText = 'background: #ff6b6b; color: #fff; border: none; padding: 10px 30px; font-size: 16px; border-radius: 5px; cursor: pointer;';
-        btn.onclick = function() { document.getElementById('playerDeathDialog').remove(); game.restart(); };
-        dialog.appendChild(btn);
-        
-        document.body.appendChild(dialog);
+        const finalLength = this.playerDeathLength || this.worms[0]?.segments?.length || 0;
+        const game = this;
+        Leaderboard.show(finalLength, this.score, this.splitCount, function() { game.restart(); });
     }
 
     draw() {
