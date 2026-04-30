@@ -495,6 +495,37 @@ export class Game {
         this.lastTime = 0;
     }
 
+    /**
+     * 返回开始菜单（关闭游戏循环，显示开始界面）
+     */
+    backToStartScreen() {
+        this.state = GAME_STATE.IDLE;
+        // 清理游戏对象
+        for (const p of this.particles) { Particle.release(p); }
+        this.worms = [];
+        this.brokenTails = [];
+        this.deadBodies = [];
+        this.foods = [];
+        this.enemies = [];
+        this.particles = [];
+        this.floatingTexts.forEach(ft => FloatingText.release(ft));
+        this.floatingTexts = [];
+        this.bullets = [];
+        this.slowedFoods = new Map();
+        this.slowedWorms = new Map();
+        this.score = 0;
+        this.splitCount = 0;
+        // 显示开始界面
+        const startScreen = document.getElementById('startScreen');
+        if (startScreen) startScreen.style.display = 'block';
+        const startBtn = document.getElementById('startBtn');
+        if (startBtn) startBtn.style.display = '';
+        const leaderboardBtn = document.getElementById('leaderboardBtn');
+        if (leaderboardBtn) leaderboardBtn.style.display = '';
+        const audioLoading = document.getElementById('audioLoading');
+        if (audioLoading) audioLoading.style.display = 'none';
+    }
+
     restart() {
         // 回收粒子到对象池
         for (const p of this.particles) { Particle.release(p); }
@@ -1825,7 +1856,13 @@ export class Game {
     showPlayerDeathDialog(reason = 'eaten') {
         const finalLength = this.playerDeathLength || this.worms[0]?.segments?.length || 0;
         const game = this;
-        Leaderboard.show(finalLength, this.score, this.splitCount, function() { game.restart(); });
+        Leaderboard.show(
+            finalLength, this.score, this.splitCount,
+            // 重新开始
+            function() { game.restart(); },
+            // 返回开始菜单
+            function() { game.backToStartScreen(); }
+        );
     }
 
     draw() {

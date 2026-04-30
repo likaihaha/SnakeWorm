@@ -47,8 +47,9 @@ export class Leaderboard {
      * @param {number} [resultScore] 游戏结束时的分数
      * @param {number} [resultChildren] 游戏结束时的孩子数量
      * @param {Function} [onRestart] 点击重新开始的回调
+     * @param {Function} [onClose] 点击返回/关闭的回调
      */
-    static show(resultLength, resultScore, resultChildren, onRestart) {
+    static show(resultLength, resultScore, resultChildren, onRestart, onClose) {
         // 移除旧对话框
         const old = document.getElementById('leaderboardDialog');
         if (old) old.remove();
@@ -202,7 +203,7 @@ export class Leaderboard {
             background: #555; color: #fff; border: none; padding: 8px 28px;
             font-size: 15px; border-radius: 6px; cursor: pointer;
         `;
-        closeBtn.onclick = () => overlay.remove();
+        closeBtn.onclick = () => { overlay.remove(); if (onClose) onClose(); };
         btnRow.appendChild(closeBtn);
 
         panel.appendChild(btnRow);
