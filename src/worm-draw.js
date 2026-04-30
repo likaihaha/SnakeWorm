@@ -271,7 +271,7 @@ export const WormDrawMixin = {
 
     /**
      * 绘制尾巴标识：虚线边框 + 颜色填充
-     * @param {boolean} isPlayer - 是否为玩家蚯蚓 (玩家用黄色，AI 用红色)
+     * @param {boolean} isPlayer - 是否为玩家虫虫 (玩家用黄色，AI 用红色)
      */
     drawTailIndicator(ctx, seg, radius, isPlayer) {
         // 如果尾部黄色虚线被禁用，直接返回
@@ -300,7 +300,7 @@ export const WormDrawMixin = {
 
     /**
      * 绘制颈部标识：短放射线，颜色比身体亮一点
-     * @param {boolean} isPlayer - 是否为玩家蚯蚓
+     * @param {boolean} isPlayer - 是否为玩家虫虫
      * @param {boolean} isBlueSegment - 是否为蓝色弹舱段（使用高对比度白色）
      */
     drawNeckIndicator(ctx, seg, radius, isPlayer, isBlueSegment = false) {

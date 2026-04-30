@@ -28,7 +28,7 @@ export class Game {
         this.initialGreenSpawned = 0;  // 初始绿宝珠已生成数量
         this.showCrosshairHint = false;  // 是否显示瞄准镜提示
         this.crosshairHintTimer = 0;  // 瞄准镜提示计时器
-        this.slowedWorms = new Map();  // 减速的蚯蚓 {worm: slowTimer}
+        this.slowedWorms = new Map();  // 减速的虫虫 {worm: slowTimer}
         this.musicSystem = new MusicSystem();  // 音效系统
         this.mousePos = new Vector(CONFIG.CANVAS_WIDTH / 2, CONFIG.CANVAS_HEIGHT / 2);
         this.isMouseDown = false;  // 鼠标按下状态（连续射击）
@@ -261,7 +261,7 @@ export class Game {
                     // 鼠标进入白圈范围（白圈直径24px，半径12px内）
                     if (distance <= cursorRadius + 5) {
                         this.waitingForPlayer = false;
-                        // 开始控制蚯蚓
+                        // 开始控制虫虫
                         const player = this.worms[0];
                         // 出场动画在waitingForPlayer期间已经完成，直接结束入场状态
                         player.isEntering = false;
@@ -547,7 +547,7 @@ export class Game {
         this.floatingTexts = [];     // 清理浮动文字
         this.bullets = [];           // 清理子弹
         this.slowedFoods = new Map();   // 清理减速宝珠
-        this.slowedWorms = new Map();   // 清理减速蚯蚓
+        this.slowedWorms = new Map();   // 清理减速虫虫
         this.enemySpawnTimer = 0;    // 重置敌人生成计时器
         this.score = 0;
         this.splitCount = 0;
@@ -566,7 +566,7 @@ export class Game {
         this.isMouseDown = false;  // 重置鼠标按下状态
         this.fireCooldown = 0;  // 重置射击冷却
 
-        // 玩家蚯蚓从框外左边开始（完全不可见）
+        // 玩家虫虫从框外左边开始（完全不可见）
         const player = new Worm(
             CONFIG.CANVAS_WIDTH / 2,  // 目标位置（中间）
             CONFIG.CANVAS_HEIGHT / 2,
@@ -577,7 +577,7 @@ export class Game {
         // 设置出场动画参数
         player.enterStartPos = new Vector(-50, CONFIG.CANVAS_HEIGHT / 2);  // 从框外左边开始
         player.enterMidPos = new Vector(CONFIG.CANVAS_WIDTH / 2, CONFIG.CANVAS_HEIGHT / 2);  // 画面中央
-        // 初始化蚯蚓身体位置到框外（这样一开始就不可见）
+        // 初始化虫虫身体位置到框外（这样一开始就不可见）
         for (let i = 0; i < player.segments.length; i++) {
             player.segments[i] = new Vector(-50 - i * 14, CONFIG.CANVAS_HEIGHT / 2);
         }
@@ -693,7 +693,7 @@ export class Game {
                 player.enterPhase = 1;  // 立即切换到phase 1
                 player.enterStartTime = performance.now() / 1000;
             }
-            // 更新蚯蚓出场动画
+            // 更新虫虫出场动画
             if (player && player.isEntering) {
                 player.updateEntering(dt);
             }
@@ -760,7 +760,7 @@ export class Game {
         // 检测玩家是否在出场动画中
         const isPlayerEntering = player && player.isEntering;
 
-        // 1. 更新所有蚯蚓
+        // 1. 更新所有虫虫
         for (const worm of this.worms) {
             if (!worm.isAlive || worm.segments.length === 0) continue;
             
@@ -785,7 +785,7 @@ export class Game {
                     return;
                 }
             } else {
-                // 玩家出场动画期间，AI 蚯蚓不更新
+                // 玩家出场动画期间，AI 虫虫不更新
                 if (isPlayerEntering) {
                     continue;
                 }
@@ -798,7 +798,7 @@ export class Game {
                     worm.segments[0].y = Math.max(margin, Math.min(CONFIG.CANVAS_HEIGHT - margin, worm.segments[0].y));
                 }
                 
-                // AI蚯蚓随机射击（有蓝色段时）
+                // AI虫虫随机射击（有蓝色段时）
                 if (worm.blueSegments > 0 && worm.bulletCount > 0) {
                     worm.aiShootTimer -= dt;
                     if (worm.aiShootTimer <= 0) {
@@ -819,7 +819,7 @@ export class Game {
             }
         }
         
-        // 总控AI：检测AI蚯蚓是否聚集，如果聚集就让它们分散
+        // 总控AI：检测AI虫虫是否聚集，如果聚集就让它们分散
         this.updateAIDispersal();
 
  // 2. 玩家进入预警线（显示红色闪烁预警）
@@ -906,7 +906,7 @@ export class Game {
                 
                 // 触发音效（立体声：基于宝珠位置）
                 if (worm.isPlayer) {
-                    // 黄色宝珠：播放水晶序曲音符，数量等于蚯蚓段数
+                    // 黄色宝珠：播放水晶序曲音符，数量等于虫虫段数
                     if (food.type.score === 30) {
                         this.musicSystem.playYellowBeadArpeggio(worm.segments.length, foodPos.x);
                     } else {
@@ -916,13 +916,13 @@ export class Game {
             }
         }
 
-        // 4. 所有蚯蚓咬到自己尾巴检测（玩家出场动画期间不检测）
+        // 4. 所有虫虫咬到自己尾巴检测（玩家出场动画期间不检测）
         // 先刷新空间网格（用于碰撞加速查询）
         this.populateSpatialGrid();
         if (this.splitCooldown <= 0 && player && !player.isEntering) {
             for (const worm of this.worms) {
                 if (!worm.isAlive || worm.isDead) continue;
-                // 跳过无敌状态的蚯蚓（刚诞生的后代）
+                // 跳过无敌状态的虫虫（刚诞生的后代）
                 if (worm.invincibleTimer > 0) continue;
                 
                 // 检测咬到自己尾巴
@@ -931,12 +931,12 @@ export class Game {
 
                     this.handleSplit(worm, selfTailBiteIndex);
                     this.splitCooldown = 2.0;
-                    break;  // 每次只处理一个蚯蚓的诞生
+                    break;  // 每次只处理一个虫虫的诞生
                 }
             }
         }
 
-        // 5. 【实验机制】所有蚯蚓咬到其他蚯蚓的尾巴 → 被咬者断尾诞生后代
+        // 5. 【实验机制】所有虫虫咬到其他虫虫的尾巴 → 被咬者断尾诞生后代
         const activeWorms = this.worms.filter(w => 
             w.isAlive && w.invincibleTimer <= 0 && w.activationTimer <= 0
         );
@@ -952,11 +952,11 @@ export class Game {
 
                 this.handleTailBiteSplit(tailBite.worm, tailBite.segmentIndex);
                 this.splitCooldown = 2.0;
-                break;  // 每次只处理一个蚯蚓的诞生
+                break;  // 每次只处理一个虫虫的诞生
             }
         }
 
-      // 6. 检测所有蚯蚓颈部被咬（被咬的死，不是咬人的死）
+      // 6. 检测所有虫虫颈部被咬（被咬的死，不是咬人的死）
         for (const worm of this.worms) {
             if (!worm.isAlive || worm.isEntering || worm.invincibleTimer > 0 || worm.isJuvenile) continue;
             
@@ -971,7 +971,7 @@ export class Game {
             }
         }
 
-        // 7. 玩家碰到其他蚯蚓身体（只有咬到尾部才能咬断，其他地方不咬断）
+        // 7. 玩家碰到其他虫虫身体（只有咬到尾部才能咬断，其他地方不咬断）
         if (player && player.isAlive && !this.playerDeadWaitingForBodies) {
             const adultWorms = activeWorms.filter(w => !w.isJuvenile);
             const otherCollision = player.checkOtherWormCollision(adultWorms, this.spatialGrid);
@@ -979,14 +979,14 @@ export class Game {
                 if (player.invincibleTimer > 0) {
                     // 玩家处于无敌状态，不被吞噬也不咬断对方
                 } else {
-                    // 玩家碰到其他蚯蚓身体，被吞噬
+                    // 玩家碰到其他虫虫身体，被吞噬
                     this.gameOver();
                     return;
                 }
             }
         }
 
-        // 6.5 AI蚯蚓头部互撞：不咬断，只是碰撞
+        // 6.5 AI虫虫头部互撞：不咬断，只是碰撞
 
         // 8. 更新断尾（紧凑过滤替代splice）
         {
@@ -1127,7 +1127,7 @@ export class Game {
                     }
                 }
 
-                // 检测子弹击中蚯蚓
+                // 检测子弹击中虫虫
                 if (!hit) {
                     for (const worm of this.worms) {
                         if (!worm.isAlive || worm.isPlayer || worm.segments.length === 0) continue;
@@ -1407,7 +1407,7 @@ export class Game {
     }
     
     /**
-     * AI蚯蚓发射子弹（随机方向）
+     * AI虫虫发射子弹（随机方向）
      */
     aiFireBullet(worm) {
         if (!worm || !worm.isAlive || worm.segments.length < 2) return;
@@ -1502,14 +1502,14 @@ export class Game {
     }
     
     /**
-     * 总控AI：检测AI蚯蚓是否聚集，如果聚集就让它们分散
+     * 总控AI：检测AI虫虫是否聚集，如果聚集就让它们分散
      */
     updateAIDispersal() {
-        // 获取所有存活的AI蚯蚓（排除segments为空的）
+        // 获取所有存活的AI虫虫（排除segments为空的）
         const aiWorms = this.worms.filter(w => w.isAlive && !w.isPlayer && w.segments.length > 0);
         if (aiWorms.length < 2) return;  // 少于2条AI不检测
         
-        // 计算所有AI蚯蚓的中心点
+        // 计算所有AI虫虫的中心点
         let centerX = 0, centerY = 0;
         for (const worm of aiWorms) {
             centerX += worm.head.x;
@@ -1527,10 +1527,10 @@ export class Game {
         }
         const avgDist = totalDist / aiWorms.length;
         
-        // 如果平均距离小于阈值（聚集），让大部分蚯蚓分散
+        // 如果平均距离小于阈值（聚集），让大部分虫虫分散
         const dispersalThreshold = 80;  // 聚集阈值（降低到80，更容易触发）
         if (avgDist < dispersalThreshold) {
-            // 让大部分AI蚯蚓分散（60%概率）
+            // 让大部分AI虫虫分散（60%概率）
             for (const worm of aiWorms) {
                 if (Math.random() < 0.6) {  // 60% 的概率触发分散（提高）
                     // 计算远离中心的方向
@@ -1559,7 +1559,7 @@ export class Game {
 
     /**
      * 处理咬尾诞生后代：被咬者断尾
-     * @param {Worm} worm - 被咬的蚯蚓
+     * @param {Worm} worm - 被咬的虫虫
      * @param {number} biteIndex - 被咬的段索引
      */
     handleTailBiteSplit(worm, biteIndex) {
@@ -1571,11 +1571,11 @@ export class Game {
             return;
         }
 
-        // 被咬的蚯蚓：删除尾巴段（从 biteIndex 开始）
+        // 被咬的虫虫：删除尾巴段（从 biteIndex 开始）
         worm.segments = worm.segments.slice(0, biteIndex);
         worm.targetLength = worm.segments.length;
 
-        // 如果剩余段太少（< 3），蚯蚓死亡
+        // 如果剩余段太少（< 3），虫虫死亡
         if (worm.segments.length < 3) {
 
             if (worm.isPlayer) {
@@ -1596,7 +1596,7 @@ export class Game {
 
     /**
      * 处理颈部被咬死亡：从被咬处断开，两部分身体柔软无力地下沉
-     * @param {Worm} worm - 被咬的蚯蚓
+     * @param {Worm} worm - 被咬的虫虫
      * @param {number} biteIndex - 被咬的段索引
      */
     handleNeckBiteDeath(worm, biteIndex) {
@@ -1905,7 +1905,7 @@ export class Game {
     }
 
     /**
-     * 将所有存活蚯蚓的段填充到空间网格中（每帧调用一次）
+     * 将所有存活虫虫的段填充到空间网格中（每帧调用一次）
      */
     populateSpatialGrid() {
         this.spatialGrid.clear();

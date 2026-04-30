@@ -34,7 +34,7 @@ export class Worm {
         this.tailYellowDashTimer = 0;  // 尾部虚线消失计时器
 
         // 出场动画相关
-        this.isEntering = isPlayer;  // 玩家蚯蚓需要出场动画
+        this.isEntering = isPlayer;  // 玩家虫虫需要出场动画
         this.enterPhase = 0;  // 动画阶段：0= 等待，1= 正弦波移动入框，2= 游向鼠标，3= 完成
         this.enterStartTime = 0;
         this.enterDuration1 = 2.0;  // 动画第一阶段：从框外游到中央（2 秒）
@@ -831,7 +831,7 @@ export class Worm {
             }
         }
 
-        // 2.5 追逐任何蚯蚓正在消耗沉下的尾部（shrinkingSegments）
+        // 2.5 追逐任何虫虫正在消耗沉下的尾部（shrinkingSegments）
         {
             let nearestShrink = null;
             let shrinkDist = Infinity;
@@ -935,8 +935,8 @@ export class Worm {
     }
 
     /**
-     * 检测头部是否碰到其他蚯蚓的尾巴段
-     * 返回: { worm: 被咬的蚯蚓，segmentIndex: 被咬的段索引 } 或 null
+     * 检测头部是否碰到其他虫虫的尾巴段
+     * 返回: { worm: 被咬的虫虫，segmentIndex: 被咬的段索引 } 或 null
      */
     checkTailBite(otherWorms, spatialGrid) {
         if (this.segments.length === 0) return null;
@@ -978,8 +978,8 @@ export class Worm {
     }
 
     /**
-     * 检测头部是否碰到其他蚯蚓的颈部段（索引 1 ~ len/3）
-     * 返回：{ worm: 被咬的蚯蚓，segmentIndex: 被咬的段索引 } 或 null
+     * 检测头部是否碰到其他虫虫的颈部段（索引 1 ~ len/3）
+     * 返回：{ worm: 被咬的虫虫，segmentIndex: 被咬的段索引 } 或 null
      */
     checkNeckBite(otherWorms, spatialGrid) {
         if (this.segments.length === 0) return null;
@@ -1019,8 +1019,8 @@ export class Worm {
     }
 
     /**
-     * 检测头部是否碰到其他蚯蚓的身体段（非尾巴、非颈部、非腹部）
-     * 跳过无敌状态的蚯蚓
+     * 检测头部是否碰到其他虫虫的身体段（非尾巴、非颈部、非腹部）
+     * 跳过无敌状态的虫虫
      * 腹部碰撞不触发死亡
      */
     checkOtherWormCollision(otherWorms, spatialGrid) {

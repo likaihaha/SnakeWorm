@@ -123,7 +123,7 @@ export class Bullet {
         return dist < this.radius + food.type.radius;
     }
 
-    // 检测是否击中蚯蚓
+    // 检测是否击中虫虫
     checkWormHit(worm) {
         for (let i = 0; i < worm.segments.length; i++) {
             const dist = this.pos.dist(worm.segments[i]);
