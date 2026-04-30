@@ -28,7 +28,7 @@ export class Leaderboard {
      * @param {string} name 玩家名字
      * @param {number} length 最终长度
      * @param {number} score 最终分数
-     * @param {number} children 孩子数量（分裂次数）
+     * @param {number} children 后代数量（诞生次数）
      */
     static addScore(name, length, score, children) {
         const data = Leaderboard.getData();
@@ -70,7 +70,7 @@ export class Leaderboard {
      * 创建排行榜对话框
      * @param {number} [resultLength] 游戏结束时的长度（如果有）
      * @param {number} [resultScore] 游戏结束时的分数
-     * @param {number} [resultChildren] 游戏结束时的孩子数量
+     * @param {number} [resultChildren] 游戏结束时的后代数量
      * @param {Function} [onRestart] 点击重新开始的回调
      * @param {Function} [onClose] 点击返回/关闭的回调
      */
@@ -129,7 +129,7 @@ export class Leaderboard {
 
             const resultText = document.createElement('p');
             resultText.style.cssText = 'margin: 0 0 10px 0; font-size: 14px;';
-            resultText.textContent = `最终长度: ${resultLength} | 分数: ${resultScore} | 孩子: ${resultChildren}`;
+            resultText.textContent = `最终长度: ${resultLength} | 分数: ${resultScore} | 后代: ${resultChildren}`;
             submitArea.appendChild(resultText);
 
             const inputRow = document.createElement('div');
@@ -188,7 +188,7 @@ export class Leaderboard {
             { key: 'name', label: '名字', width: 'auto' },
             { key: 'length', label: '长度', width: '70px' },
             { key: 'score', label: '分数', width: '80px' },
-            { key: 'children', label: '孩子', width: '60px' },
+            { key: 'children', label: '后代', width: '60px' },
             { key: 'date', label: '日期', width: '90px' }
         ];
         cols.forEach(col => {
@@ -400,7 +400,7 @@ export class Leaderboard {
     static _updateHeaders(headerRow, sortState) {
         const ths = headerRow.querySelectorAll('th');
         const fieldMap = ['', 'name', 'length', 'score', 'children', 'date'];
-        const labels = ['', '名字', '长度', '分数', '孩子', '日期'];
+        const labels = ['', '名字', '长度', '分数', '后代', '日期'];
 
         // 移除旧的操作列
         const oldOp = headerRow.querySelector('th[data-op]');

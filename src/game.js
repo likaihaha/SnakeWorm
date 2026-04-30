@@ -922,7 +922,7 @@ export class Game {
         if (this.splitCooldown <= 0 && player && !player.isEntering) {
             for (const worm of this.worms) {
                 if (!worm.isAlive || worm.isDead) continue;
-                // 跳过无敌状态的蚯蚓（刚分裂出来的蚯蚓）
+                // 跳过无敌状态的蚯蚓（刚诞生的后代）
                 if (worm.invincibleTimer > 0) continue;
                 
                 // 检测咬到自己尾巴
@@ -931,12 +931,12 @@ export class Game {
 
                     this.handleSplit(worm, selfTailBiteIndex);
                     this.splitCooldown = 2.0;
-                    break;  // 每次只处理一个蚯蚓的分裂
+                    break;  // 每次只处理一个蚯蚓的诞生
                 }
             }
         }
 
-        // 5. 【实验机制】所有蚯蚓咬到其他蚯蚓的尾巴 → 被咬者断尾分裂
+        // 5. 【实验机制】所有蚯蚓咬到其他蚯蚓的尾巴 → 被咬者断尾诞生后代
         const activeWorms = this.worms.filter(w => 
             w.isAlive && w.invincibleTimer <= 0 && w.activationTimer <= 0
         );
@@ -952,7 +952,7 @@ export class Game {
 
                 this.handleTailBiteSplit(tailBite.worm, tailBite.segmentIndex);
                 this.splitCooldown = 2.0;
-                break;  // 每次只处理一个蚯蚓的分裂
+                break;  // 每次只处理一个蚯蚓的诞生
             }
         }
 
@@ -1558,7 +1558,7 @@ export class Game {
     }
 
     /**
-     * 处理咬尾分裂：被咬者断尾
+     * 处理咬尾诞生后代：被咬者断尾
      * @param {Worm} worm - 被咬的蚯蚓
      * @param {number} biteIndex - 被咬的段索引
      */
@@ -1627,7 +1627,7 @@ export class Game {
     }
 
     /**
-     * 处理自噬分裂（原有逻辑）
+     * 处理自噬诞生后代（原有逻辑）
      */
     handleSplit(worm, collisionIndex) {
         const keptSegments = worm.segments.slice(0, collisionIndex);
@@ -1641,7 +1641,7 @@ export class Game {
         const brokenTail = new BrokenTail(tailSegments, worm.color, worm);
         this.brokenTails.push(brokenTail);
         
-        // 第一次分裂时显示亲子提示
+        // 第一次诞生后代时显示亲子提示
         if (!this.familyNoticeShown) {
             this.familyNoticeShown = true;
             this.showFamilyNotice();
