@@ -1633,7 +1633,8 @@ export class Game {
         const keptSegments = worm.segments.slice(0, collisionIndex);
         const tailSegments = worm.segments.slice(collisionIndex);
 
-        if (tailSegments.length < 3) return;
+        // 双向保护：断尾和本体都至少保留3节，否则不执行
+        if (tailSegments.length < 3 || keptSegments.length < 3) return;
 
         worm.segments = keptSegments;
         worm.targetLength = keptSegments.length;
