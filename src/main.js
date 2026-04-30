@@ -3,6 +3,7 @@
  * 创建 Game 实例、初始化图例 canvas、绑定 HTML 按钮事件
  */
 import { Game } from './game.js';
+import { GAME_STATE } from './config.js';
 import { Leaderboard } from './leaderboard.js';
 
 // 创建游戏实例
@@ -13,7 +14,13 @@ window.game = game;
 
 // 绑定按钮事件（替代 HTML inline onclick）
 const startBtn = document.getElementById('startBtn');
-if (startBtn) startBtn.addEventListener('click', () => game.startGame());
+if (startBtn) startBtn.addEventListener('click', () => {
+    if (game.state === GAME_STATE.PAUSED) {
+        game.resumeGame();
+    } else {
+        game.startGame();
+    }
+});
 
 const pauseResumeBtn = document.getElementById('pauseResumeBtn');
 if (pauseResumeBtn) pauseResumeBtn.addEventListener('click', () => game.resumeGame());

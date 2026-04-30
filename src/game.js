@@ -486,12 +486,19 @@ export class Game {
 
     pauseGame() {
         this.state = GAME_STATE.PAUSED;
-        document.getElementById('pauseScreen').style.display = 'block';
+        // 复用开始界面，按钮改为"继续游戏"
+        const startScreen = document.getElementById('startScreen');
+        if (startScreen) startScreen.style.display = 'block';
+        const startBtn = document.getElementById('startBtn');
+        if (startBtn) { startBtn.style.display = ''; startBtn.textContent = '继续游戏'; }
+        const leaderboardBtn = document.getElementById('leaderboardBtn');
+        if (leaderboardBtn) leaderboardBtn.style.display = '';
     }
 
     resumeGame() {
         this.state = GAME_STATE.PLAYING;
-        document.getElementById('pauseScreen').style.display = 'none';
+        const startScreen = document.getElementById('startScreen');
+        if (startScreen) startScreen.style.display = 'none';
         this.lastTime = 0;
     }
 
@@ -519,7 +526,7 @@ export class Game {
         const startScreen = document.getElementById('startScreen');
         if (startScreen) startScreen.style.display = 'block';
         const startBtn = document.getElementById('startBtn');
-        if (startBtn) startBtn.style.display = '';
+        if (startBtn) { startBtn.style.display = ''; startBtn.textContent = '开始游戏'; }
         const leaderboardBtn = document.getElementById('leaderboardBtn');
         if (leaderboardBtn) leaderboardBtn.style.display = '';
         const audioLoading = document.getElementById('audioLoading');
