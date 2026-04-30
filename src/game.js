@@ -1782,6 +1782,7 @@ export class Game {
     checkJuvenileEatBrokenTails() {
         for (const worm of this.worms) {
             if (!worm.isAlive || !worm.isJuvenile || !worm.head) continue;
+            if (worm.feedCooldown > 0) continue;  // 冷却中不吃
             for (let j = this.brokenTails.length - 1; j >= 0; j--) {
                 const tail = this.brokenTails[j];
                 if (!tail.segments || tail.segments.length === 0) continue;
@@ -1795,6 +1796,7 @@ export class Game {
                             this.matureJuvenile(worm);
                         }
                     }
+                    worm.feedCooldown = CONFIG.FAMILY.JUVENILE_FEED_COOLDOWN;  // 吃完设冷却
                     tail.segments.pop();
                     if (tail.segments.length === 0) {
                         this.brokenTails.splice(j, 1);
@@ -1809,6 +1811,7 @@ export class Game {
     checkJuvenileEatShrinkingSegments() {
         for (const worm of this.worms) {
             if (!worm.isAlive || !worm.isJuvenile || !worm.head) continue;
+            if (worm.feedCooldown > 0) continue;  // 冷却中不吃
             let ate = false;
             for (const sourceWorm of this.worms) {
                 if (!sourceWorm.isAlive || !sourceWorm.shrinkingSegments) continue;
@@ -1825,6 +1828,7 @@ export class Game {
                                 this.matureJuvenile(worm);
                             }
                         }
+                        worm.feedCooldown = CONFIG.FAMILY.JUVENILE_FEED_COOLDOWN;  // 吃完设冷却
                         sourceWorm.shrinkingSegments.splice(j, 1);
                         ate = true;
                         break;

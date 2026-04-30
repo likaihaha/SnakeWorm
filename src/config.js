@@ -85,6 +85,7 @@ export const CONFIG = {
         JUVENILE_FOLLOW_RADIUS: 250,
         JUVENILE_FEAR_RADIUS: 150,
         JUVENILE_EAT_RADIUS: 30,
+        JUVENILE_FEED_COOLDOWN: 3.0,  // 幼体吃一节后冷却3秒（游出去一圈再吃下一节）
         JUVENILE_SPEED_RATIO: 0.7,
     },
     PARTICLE: {

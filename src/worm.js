@@ -113,6 +113,7 @@ export class Worm {
         this.juvenileFollowTarget = null;  // 幼体跟随目标
         this.bittenSegments = new Set();  // 被敌人咬住的段索引集合
         this.isStruggling = false;  // 是否在挣扎
+        this.feedCooldown = 0;  // 吃食物冷却（吃一节后游出去一圈再吃下一节）
         this.strugglePhase = 0;  // 挣扎动画相位
 
         // 冰晶覆盖效果
@@ -735,6 +736,12 @@ export class Worm {
         this._allWorms = allWorms;  // 保存引用供findFoodTarget使用
         this.juvenileFearTimer -= dt;
 
+        // 冷却计时器递减
+        if (this.feedCooldown > 0) {
+            this.feedCooldown -= dt;
+            if (this.feedCooldown < 0) this.feedCooldown = 0;
+        }
+
         // 0. 如果正在被咬，在原地挣扎游走
         if (this.bittenSegments && this.bittenSegments.size > 0) {
             // 安全检查：确认确实有敌人咬住这个幼体
@@ -785,6 +792,26 @@ export class Worm {
         // 如果还在害怕状态，继续不动
         if (this.juvenileFearTimer > 0) {
             return this.head;
+        }
+
+        // 1.5 冷却期间跳过食物寻觅，直接去跟随或游荡
+        if (this.feedCooldown > 0) {
+            // 跟随父代
+            if (this.parentWorm && this.parentWorm.isAlive && this.parentWorm.segments.length > 0) {
+                const parentHead = this.parentWorm.segments[0];
+                const distToParent = this.head.dist(parentHead);
+                if (distToParent > CONFIG.FAMILY.JUVENILE_FOLLOW_RADIUS * 0.3) {
+                    const followIdx = Math.min(2, this.parentWorm.segments.length - 1);
+                    return this.parentWorm.segments[followIdx];
+                }
+            }
+            // 随机游荡
+            this.aiWanderTimer -= dt;
+            if (this.aiWanderTimer <= 0) {
+                this.aiWanderTimer = CONFIG.AI_WANDER_CHANGE + Math.random() * 2;
+                this.aiWanderDir = Vector.randomDir();
+            }
+            return this.head.add(this.aiWanderDir.mult(50));
         }
 
         // 2. 寻找成年体掉下的断尾（优先吃）

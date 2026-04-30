@@ -235,6 +235,21 @@ export class Enemy {
                 }
             }
 
+            // 敌人吃幼体后恢复一节身体（如果受过伤，身体段数 < 初始段数）
+            if (this.segments.length < this.segmentCount) {
+                const lastSeg = this.segments[this.segments.length - 1];
+                this.segments.push(new Vector(lastSeg.x, lastSeg.y));
+                // 恢复特效
+                if (typeof game !== 'undefined' && game.particles) {
+                    for (let k = 0; k < 3; k++) {
+                        game.particles.push(Particle.acquire(this.pos.x, this.pos.y, this.color));
+                    }
+                }
+                if (typeof game !== 'undefined' && game.floatingTexts) {
+                    game.floatingTexts.push(FloatingText.acquire(this.pos.x, this.pos.y - 15, 'HEAL!', '#44ff44'));
+                }
+            }
+
             // 三叶虫击退撤离（从幼体方向弹开）— 标量运算
             const bdx = this.pos.x - juv.head.x;
             const bdy = this.pos.y - juv.head.y;

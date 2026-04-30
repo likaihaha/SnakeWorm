@@ -3,14 +3,18 @@
 ## 版本管理流程
 - 完成功能修改后自动提交，不需要用户每次都提醒
 - 流程：git add → git commit → git push → 打标签
-- **每次提交必须同步更新页面标题和注释中的版本号**（index.html 第9行 `<title>` 和第624行注释）
+- **每次提交必须同步更新页面标题和注释中的版本号**（index.html 中 `<title>` 和页面内版本号，用 `grep -n "v1\." index.html` 检查三处）
 - GitHub 远程仓库：https://github.com/likaihaha/SnakeWorm
 - GitHub Pages 地址：https://likaihaha.github.io/SnakeWorm/
-- 配置文件：index.html（原 prototype_v0.12_pacman_with_eye.html）
+- 配置文件：index.html（v1.35起改为ESM多文件架构，src/目录14个模块）
 - Git Credential Manager 已配置，推送自动认证
 
 ## 当前版本
-- v1.35: FloatingText对象池+热路径临时Vector消除+Food颜色缓存
+- v1.39: ESC暂停复用开始界面 - 按钮显示继续游戏，再按ESC或点按钮恢复
+- v1.38: 排行榜管理员模式 - ⚙️登录后可删除记录（SHA-256哈希验证）
+- v1.37: 排行榜返回按钮修复 - 点击返回回到开始菜单
+- v1.36: 排行榜系统 - LocalStorage+排序+提交成绩
+- v1.35: 多文件ESM重构+6项审查修复（对象池+热路径+颜色缓存+死代码+重复函数+版本号统一）
 - v1.34: 断尾幼体去掉光圈缩放+成年给无敌防碰死
 - v1.32: 渲染热路径优化 - forEach→for+Float32Array+颜色缓存+消除临时对象
 - v1.31: 五项体验修复 - 文字模糊+幼体发光柔和+敌人卡顿+橙色光效+灰色尾巴放开
