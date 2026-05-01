@@ -3,9 +3,18 @@
  * 创建 Game 实例、初始化图例 canvas、绑定 HTML 按钮事件
  */
 import { Game } from './game.js';
-import { GAME_STATE } from './config.js';
+import { CONFIG, GAME_STATE } from './config.js';
 import { Leaderboard } from './leaderboard.js';
 import { DebugPanel } from './debug-panel.js';
+
+// 统一写入版本号到页面
+(function setVersion() {
+    const ver = CONFIG.VERSION;
+    document.title = `Melody Worm v${ver} - 旋律虫虫`;
+    document.querySelectorAll('[data-version]').forEach(el => {
+        el.textContent = `v${ver}`;
+    });
+})();
 
 // 创建游戏实例
 const game = new Game();
