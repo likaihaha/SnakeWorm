@@ -50,6 +50,7 @@ export class Game {
         this.enemies = [];  // 敌人列表
         this.enemySpawnTimer = 0;  // 敌人生成计时器
         this.playerDeathLength = 0;  // 玩家死亡时的长度（用于显示）
+        this.maxLengthReached = 0;  // 玩家达到过的最大长度（用于排行榜）
         this.waitingForPlayer = false;  // 等待玩家鼠标移入白圈
         this.mouseInCanvas = false;  // 鼠标是否在Canvas内
         this.familyNoticeShown = false;  // 亲子提示是否已显示
@@ -563,6 +564,7 @@ export class Game {
         this.waitingForPlayer = true;  // 等待玩家鼠标移入白圈
         this.playerDeadWaitingForBodies = false;  // 重置玩家死亡等待标志
         this.playerDeathLength = 0;  // 重置玩家死亡长度
+        this.maxLengthReached = 0;  // 重置历史最大长度
         this.isMouseDown = false;  // 重置鼠标按下状态
         this.fireCooldown = 0;  // 重置射击冷却
 
@@ -890,7 +892,10 @@ export class Game {
                 
                 if (worm.isPlayer) {
                     this.score += food.type.score;
-                    
+                    if (worm.segments.length > this.maxLengthReached) {
+                        this.maxLengthReached = worm.segments.length;
+                    }
+
                     // 粒子爆发效果（使用宝珠颜色）
                     const particleColor = food.type.color;
                     for (let i = 0; i < 6; i++) {
@@ -1847,9 +1852,10 @@ export class Game {
      */
     showPlayerDeathDialog(reason = 'eaten') {
         const finalLength = this.playerDeathLength || this.worms[0]?.segments?.length || 0;
+        const recordLength = Math.max(this.maxLengthReached, finalLength);
         const game = this;
         Leaderboard.show(
-            finalLength, this.score, this.splitCount,
+            recordLength, this.score, this.splitCount,
             // 重新开始
             function() { game.restart(); },
             // 返回开始菜单
