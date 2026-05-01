@@ -35,6 +35,8 @@ export class Game {
         this.fireCooldown = 0;  // 射击冷却计时器
         this.score = 0;
         this.state = GAME_STATE.IDLE;
+        this.spectating = false;  // 观战模式（死亡后继续播放）
+        this.postDeathOverlay = null;  // 死亡后观战界面按钮 overlay
         this.lastTime = 0;
         this.splitCount = 0;
         this.splitCooldown = 0;
@@ -507,6 +509,7 @@ export class Game {
      * 返回开始菜单（关闭游戏循环，显示开始界面）
      */
     backToStartScreen() {
+        this._hidePostDeathOverlay();
         this.state = GAME_STATE.IDLE;
         // 清理游戏对象
         for (const p of this.particles) { Particle.release(p); }
@@ -535,6 +538,7 @@ export class Game {
     }
 
     restart() {
+        this._hidePostDeathOverlay();
         // 回收粒子到对象池
         for (const p of this.particles) { Particle.release(p); }
 
@@ -667,8 +671,8 @@ export class Game {
             // 按目标帧率执行更新
             while (this.fpsAccumulator >= targetInterval) {
                 if (this.state === GAME_STATE.PLAYING || this.state === GAME_STATE.GAME_OVER) {
-                    // 游戏结束但还有尸体需要处理时，继续更新
-                    if (this.state === GAME_STATE.PLAYING || this.deadBodies.length > 0 || this.playerDeadWaitingForBodies) {
+                    // 游戏结束但还有尸体需要处理时，继续更新；观战模式下也持续更新
+                    if (this.state === GAME_STATE.PLAYING || this.deadBodies.length > 0 || this.playerDeadWaitingForBodies || this.spectating) {
                         this.update(targetInterval);
                     }
                 }
@@ -1858,9 +1862,95 @@ export class Game {
             recordLength, this.score, this.splitCount,
             // 重新开始
             function() { game.restart(); },
-            // 返回开始菜单
-            function() { game.backToStartScreen(); }
+            // 返回观战模式
+            function() { game._showPostDeathOverlay(); }
         );
+    }
+
+    /**
+     * 显示死亡后观战界面的操作按钮（重新开始 / 排行榜）
+     */
+    _showPostDeathOverlay() {
+        this.spectating = true;
+        this._hidePostDeathOverlay();
+
+        const overlay = document.createElement('div');
+        overlay.id = 'postDeathOverlay';
+        overlay.style.cssText = `
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 10000; pointer-events: none;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            gap: 16px; font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+        `;
+
+        // 闪烁动画 keyframes
+        const style = document.createElement('style');
+        style.id = 'postDeathBlinkStyle';
+        style.textContent = `
+            @keyframes postDeathBlink {
+                0%, 100% { opacity: 1; transform: scale(1); box-shadow: 0 0 20px rgba(233,69,96,0.6); }
+                50% { opacity: 0.7; transform: scale(1.05); box-shadow: 0 0 40px rgba(233,69,96,0.9); }
+            }
+            @keyframes postDeathBlinkSecondary {
+                0%, 100% { opacity: 1; transform: scale(1); box-shadow: 0 0 10px rgba(77,171,247,0.4); }
+                50% { opacity: 0.75; transform: scale(1.03); box-shadow: 0 0 25px rgba(77,171,247,0.7); }
+            }
+        `;
+        document.head.appendChild(style);
+
+        const restartBtn = document.createElement('button');
+        restartBtn.textContent = '🔄 重新开始';
+        restartBtn.style.cssText = `
+            pointer-events: auto; background: #e94560; color: #fff; border: none;
+            padding: 14px 48px; font-size: 20px; border-radius: 10px; cursor: pointer;
+            font-weight: bold; letter-spacing: 2px;
+            animation: postDeathBlink 1.2s ease-in-out infinite;
+            transition: background 0.2s;
+        `;
+        restartBtn.onmouseover = () => { restartBtn.style.background = '#c73652'; };
+        restartBtn.onmouseout = () => { restartBtn.style.background = '#e94560'; };
+        restartBtn.onclick = () => { this.restart(); };
+
+        const leaderboardBtn = document.createElement('button');
+        leaderboardBtn.textContent = '🏆 排行榜';
+        leaderboardBtn.style.cssText = `
+            pointer-events: auto; background: #4dabf7; color: #fff; border: none;
+            padding: 10px 36px; font-size: 16px; border-radius: 8px; cursor: pointer;
+            font-weight: bold; letter-spacing: 1px;
+            animation: postDeathBlinkSecondary 1.5s ease-in-out infinite;
+            transition: background 0.2s;
+        `;
+        leaderboardBtn.onmouseover = () => { leaderboardBtn.style.background = '#3a9ae6'; };
+        leaderboardBtn.onmouseout = () => { leaderboardBtn.style.background = '#4dabf7'; };
+        leaderboardBtn.onclick = () => {
+            this._hidePostDeathOverlay();
+            const finalLength = this.playerDeathLength || 0;
+            const recordLength = Math.max(this.maxLengthReached, finalLength);
+            Leaderboard.show(
+                recordLength, this.score, this.splitCount,
+                () => this.restart(),
+                () => this._showPostDeathOverlay()
+            );
+        };
+
+        overlay.appendChild(restartBtn);
+        overlay.appendChild(leaderboardBtn);
+        document.body.appendChild(overlay);
+        this.postDeathOverlay = overlay;
+    }
+
+    /**
+     * 隐藏死亡后观战界面的操作按钮
+     */
+    _hidePostDeathOverlay() {
+        if (this.postDeathOverlay) {
+            this.postDeathOverlay.remove();
+            this.postDeathOverlay = null;
+        }
+        const style = document.getElementById('postDeathBlinkStyle');
+        if (style) style.remove();
+        this.spectating = false;
     }
 
     draw() {
