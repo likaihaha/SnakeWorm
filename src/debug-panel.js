@@ -6,6 +6,7 @@
 import { CONFIG } from './config.js';
 import { Worm } from './worm.js';
 import { Enemy } from './enemy.js';
+import { Food } from './entities.js';
 import { Vector } from './vector.js';
 
 export class DebugPanel {
@@ -71,17 +72,23 @@ export class DebugPanel {
 
         // 按钮网格
         const grid = document.createElement('div');
-        grid.style.cssText = 'display: grid; grid-template-columns: 1fr 1fr; gap: 8px;';
+        grid.style.cssText = 'display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px;';
 
         const buttons = [
-            { label: '➕ 玩家 +10 节', action: () => this._growPlayer(10), color: '#4ecca3' },
-            { label: '➖ 玩家 -5 节', action: () => this._shrinkPlayer(5), color: '#e94560' },
-            { label: '🤖 生成 AI 虫虫', action: () => this._spawnAIWorm(), color: '#ffd700' },
-            { label: '👹 生成敌人', action: () => this._spawnEnemy(), color: '#ff6b6b' },
-            { label: '⭐ 无敌模式', action: () => this._toggleGodMode(), color: this._godMode ? '#ffd700' : '#888' },
-            { label: '💥 清除敌人', action: () => this._clearEnemies(), color: '#ff4444' },
-            { label: '💯 分数 +1000', action: () => this._addScore(1000), color: '#4dabf7' },
-            { label: '🔄 重置游戏', action: () => this._restart(), color: '#aaa' },
+            { label: '➕ +10节', action: () => this._growPlayer(10), color: '#4ecca3' },
+            { label: '➖ -5节', action: () => this._shrinkPlayer(5), color: '#e94560' },
+            { label: '⭐ 无敌', action: () => this._toggleGodMode(), color: this._godMode ? '#ffd700' : '#888' },
+            { label: '🟢 绿珠', action: () => this._spawnFood(0), color: '#4ecca3' },
+            { label: '🟡 黄珠', action: () => this._spawnFood(1), color: '#ffe66d' },
+            { label: '🟠 橙珠', action: () => this._spawnFood(2), color: '#ff8c42' },
+            { label: '🔵 蓝珠', action: () => this._spawnFood(3), color: '#4dabf7' },
+            { label: '🟣 紫珠', action: () => this._spawnFood(4), color: '#c77dff' },
+            { label: '🗑️ 清宝珠', action: () => this._clearFoods(), color: '#666' },
+            { label: '🤖 AI虫虫', action: () => this._spawnAIWorm(), color: '#ffd700' },
+            { label: '👹 敌人', action: () => this._spawnEnemy(), color: '#ff6b6b' },
+            { label: '💥 清敌人', action: () => this._clearEnemies(), color: '#ff4444' },
+            { label: '💯 +1000分', action: () => this._addScore(1000), color: '#4dabf7' },
+            { label: '🔄 重置', action: () => this._restart(), color: '#aaa' },
         ];
 
         buttons.forEach(btn => {
@@ -232,6 +239,31 @@ export class DebugPanel {
     _addScore(amount) {
         this.game.score = (this.game.score || 0) + amount;
         this._info(`✅ 分数 +${amount}`);
+    }
+
+    _spawnFood(typeIndex) {
+        const g = this.game;
+        const type = CONFIG.FOOD_TYPES[typeIndex];
+        if (!type) {
+            this._info('❌ 宝珠类型不存在');
+            return;
+        }
+        const margin = 40;
+        const x = margin + Math.random() * (CONFIG.CANVAS_WIDTH - margin * 2);
+        const y = margin + Math.random() * (CONFIG.CANVAS_HEIGHT - margin * 2);
+        const food = new Food(x, y, type);
+        // 给一点随机初速度，让它有动态感
+        food.velocity.x = (Math.random() - 0.5) * 1.5;
+        food.velocity.y = (Math.random() - 0.5) * 1.5;
+        g.foods.push(food);
+        const names = ['绿珠', '黄珠', '橙珠', '蓝珠', '紫珠'];
+        this._info(`✅ 生成 ${names[typeIndex] || '宝珠'}`);
+    }
+
+    _clearFoods() {
+        const count = this.game.foods?.length ?? 0;
+        this.game.foods = [];
+        this._info(`✅ 清除 ${count} 个宝珠`);
     }
 
     _restart() {
