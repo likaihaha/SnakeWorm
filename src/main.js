@@ -5,6 +5,7 @@
 import { Game } from './game.js';
 import { CONFIG, GAME_STATE } from './config.js';
 import { Leaderboard } from './leaderboard.js';
+import { Changelog } from './changelog.js';
 import { DebugPanel } from './debug-panel.js';
 
 // 统一写入版本号到页面
@@ -45,6 +46,10 @@ if (gameOverBtn) gameOverBtn.addEventListener('click', () => game.restart());
 // 排行榜按钮（开始界面）
 const leaderboardBtn = document.getElementById('leaderboardBtn');
 if (leaderboardBtn) leaderboardBtn.addEventListener('click', () => Leaderboard.show());
+
+// 更新日志按钮（开始界面）
+const changelogBtn = document.getElementById('changelogBtn');
+if (changelogBtn) changelogBtn.addEventListener('click', () => Changelog.show());
 
 const fullscreenBtn = document.getElementById('fullscreenBtn');
 if (fullscreenBtn) fullscreenBtn.addEventListener('click', () => game.requestFullscreen());
