@@ -242,10 +242,12 @@ export class Enemy {
                 }
             } else {
                 // 身体太短，直接死亡
+                const deathX = juv.head ? juv.head.x : this.pos.x;
+                const deathY = juv.head ? juv.head.y : this.pos.y;
                 juv.isAlive = false;
                 juv.segments = [];
                 if (typeof game !== 'undefined' && game.floatingTexts) {
-                    game.floatingTexts.push(FloatingText.acquire(juv.head.x, juv.head.y - 20, 'EATEN!', '#ff0000'));
+                    game.floatingTexts.push(FloatingText.acquire(deathX, deathY - 20, 'EATEN!', '#ff0000'));
                 }
             }
 
