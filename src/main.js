@@ -5,12 +5,17 @@
 import { Game } from './game.js';
 import { GAME_STATE } from './config.js';
 import { Leaderboard } from './leaderboard.js';
+import { DebugPanel } from './debug-panel.js';
 
 // 创建游戏实例
 const game = new Game();
 
 // 暴露到全局供 HTML inline onclick 使用（兼容性）
 window.game = game;
+
+// 初始化调试面板（Shift+D 呼出）
+const debugPanel = new DebugPanel(game);
+window.debugPanel = debugPanel;
 
 // 绑定按钮事件（替代 HTML inline onclick）
 const startBtn = document.getElementById('startBtn');
