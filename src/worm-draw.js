@@ -6,6 +6,12 @@ export const WormDrawMixin = {
     draw(ctx) {
         if (!this.isAlive || this.segments.length === 0) return;
 
+        // === Phase 1: 幼体死亡动画渲染 ===
+        if (this.deathPhase && this.deathPhase !== 'none') {
+            this._drawDeathAnimation(ctx);
+            return;
+        }
+
         // 获取各区域段索引集合 (用于视觉标识，使用缓存)
         const rs = this._regionSets;
         const tailIndices = rs.tail;
@@ -86,6 +92,17 @@ export const WormDrawMixin = {
                 // 身体段保持圆形
                 let alpha = 0.3 + 0.5 * (1 - i / this.segments.length);
                 let color = this.color;
+
+                // 幼体 sulkGlow 视觉效果：撒娇时身体暗淡，庆祝时更亮
+                if (this.isJuvenile && this.sulkGlow !== undefined) {
+                    alpha *= this.sulkGlow;
+                    // 庆祝时加金色闪烁粒子感
+                    if (this.isCelebrating) {
+                        const sparkle = Math.sin(performance.now() * 0.01 + i * 1.2) * 0.3;
+                        alpha = Math.min(1.0, alpha + sparkle);
+                        color = '#ffe66d'; // 庆祝金色
+                    }
+                }
                 const isBlueSegment = i > 0 && i <= this.blueSegments;
 
                 // 黄光效果检查（优先级最高，覆盖所有类型）
@@ -362,6 +379,215 @@ export const WormDrawMixin = {
         }
 
         ctx.restore();
+    },
+
+    /**
+     * 幼体死亡动画渲染
+     * 四个阶段：
+     *  - flashing (0~1.5s): 身体段依次闪烁变灰
+     *  - turning (1.5~2.5s): 整体变灰，头部眼睛转向母体方向
+     *  - sinking (2.5~4.0s): 缓慢下沉变小变透明
+     *  - gone (4.0s+): 完全消失，留下光点
+     */
+    _drawDeathAnimation(ctx) {
+        const t = this.deathTimer;
+        const phase = this.deathPhase;
+        const segs = this.segments;
+        if (!segs || segs.length === 0) return;
+
+        const headPos = segs[0];
+
+        if (phase === 'flashing') {
+            // 阶段1：身体段从尾到头依次闪烁变灰（0~1.5s）
+            const flashDuration = 1.5;
+            const progress = Math.min(1, t / flashDuration);
+            const flashCount = segs.length;
+            // 当前闪烁到哪一节（从尾部开始）
+            const flashIndex = Math.floor(progress * flashCount);
+
+            for (let i = 0; i < segs.length; i++) {
+                const seg = segs[i];
+                const isHead = (i === 0);
+                let sizeRatio = isHead ? 1.0 : (0.7 + 0.3 * (1 - i / segs.length));
+                let radius = CONFIG.SEGMENT_RADIUS * sizeRatio;
+                if (isHead) radius *= (this.headScale || 1.0);
+
+                if (i >= flashCount - flashIndex) {
+                    // 已闪烁变灰
+                    const gray = Math.floor(100 + 30 * Math.sin(t * 10 + i));
+                    ctx.beginPath();
+                    ctx.arc(seg.x, seg.y, radius, 0, Math.PI * 2);
+                    ctx.fillStyle = `rgba(${gray}, ${gray}, ${gray}, 0.5)`;
+                    ctx.fill();
+                } else {
+                    // 还没轮到，正常颜色但带闪烁
+                    const blink = Math.sin(t * 15 + i * 2) > 0 ? 1.0 : 0.3;
+                    ctx.beginPath();
+                    ctx.arc(seg.x, seg.y, radius, 0, Math.PI * 2);
+                    ctx.fillStyle = hexToRgba(this.color, 0.5 * blink);
+                    ctx.fill();
+                }
+
+                // 头部画眼睛（正常方向）
+                if (isHead) {
+                    this._drawDeadEyes(ctx, seg, radius, null);
+                }
+            }
+
+        } else if (phase === 'turning') {
+            // 阶段2：整体变灰，头部眼睛缓慢转向母体方向（1.5~2.5s）
+            const turnProgress = Math.min(1, (t - 1.5) / 1.0);
+
+            // 计算母体方向
+            let parentAngle = null;
+            if (this.parentWorm) {
+                const parentHead = this.parentWorm.segments && this.parentWorm.segments[0];
+                if (parentHead) {
+                    parentAngle = Math.atan2(parentHead.y - headPos.y, parentHead.x - headPos.x);
+                }
+            }
+
+            for (let i = 0; i < segs.length; i++) {
+                const seg = segs[i];
+                const isHead = (i === 0);
+                let sizeRatio = isHead ? 1.0 : (0.7 + 0.3 * (1 - i / segs.length));
+                let radius = CONFIG.SEGMENT_RADIUS * sizeRatio;
+                if (isHead) radius *= (this.headScale || 1.0);
+
+                // 全灰，带微微脉冲
+                const pulse = 0.45 + 0.05 * Math.sin(t * 3);
+                ctx.beginPath();
+                ctx.arc(seg.x, seg.y, radius, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(128, 128, 128, ${pulse})`;
+                ctx.fill();
+
+                // 头部画眼睛（朝母体方向看）
+                if (isHead) {
+                    this._drawDeadEyes(ctx, seg, radius, parentAngle, turnProgress);
+                }
+            }
+
+            // 一丝依恋的光从身体中心透出
+            if (parentAngle !== null) {
+                const glowAlpha = 0.1 + turnProgress * 0.2;
+                const glowSize = 8 + turnProgress * 12;
+                drawGlow(ctx, headPos.x, headPos.y, glowSize, this.color, glowAlpha * 20);
+            }
+
+        } else if (phase === 'sinking') {
+            // 阶段3：缓慢下沉变小变透明（2.5~4.0s）
+            const sinkProgress = Math.min(1, (t - 2.5) / 1.5);
+            const easeOut = 1 - (1 - sinkProgress) * (1 - sinkProgress); // easeOutQuad
+            const sinkY = easeOut * 30; // 下沉30px
+            const shrink = 1 - easeOut * 0.6; // 缩小到40%
+            const fadeAlpha = 1 - easeOut * 0.8; // 渐隐到20%
+
+            for (let i = 0; i < segs.length; i++) {
+                const seg = segs[i];
+                const isHead = (i === 0);
+                let sizeRatio = isHead ? 1.0 : (0.7 + 0.3 * (1 - i / segs.length));
+                let radius = CONFIG.SEGMENT_RADIUS * sizeRatio * shrink;
+                if (isHead) radius *= (this.headScale || 1.0);
+
+                const drawX = seg.x;
+                const drawY = seg.y + sinkY;
+
+                // 灰色半透明
+                ctx.beginPath();
+                ctx.arc(drawX, drawY, radius, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(128, 128, 128, ${0.35 * fadeAlpha})`;
+                ctx.fill();
+
+                // 头部眼睛（闭眼效果 — 用横线代替圆眼）
+                if (isHead && fadeAlpha > 0.3) {
+                    ctx.globalCompositeOperation = 'source-over';
+                    const eyeOffset = radius * 0.4;
+                    const mouthAngle = Math.atan2(this.velocity.y, this.velocity.x);
+                    const eyeAngle1 = mouthAngle + 0.5;
+                    const eyeAngle2 = mouthAngle - 0.5;
+
+                    // 闭眼：画短横线
+                    ctx.strokeStyle = `rgba(50, 50, 50, ${fadeAlpha})`;
+                    ctx.lineWidth = 1.5;
+                    for (const angle of [eyeAngle1, eyeAngle2]) {
+                        const ex = drawX + Math.cos(angle) * eyeOffset;
+                        const ey = drawY + Math.sin(angle) * eyeOffset;
+                        ctx.beginPath();
+                        ctx.moveTo(ex - 1.5, ey);
+                        ctx.lineTo(ex + 1.5, ey);
+                        ctx.stroke();
+                    }
+                    ctx.globalCompositeOperation = 'screen';
+                }
+            }
+
+            // 底部光点（消散前的最后光芒）
+            const lightAlpha = (1 - sinkProgress) * 0.3;
+            if (lightAlpha > 0.05) {
+                drawGlow(ctx, headPos.x, headPos.y + sinkY, 15 * (1 - sinkProgress * 0.5), this.color, lightAlpha * 10);
+            }
+
+        } else if (phase === 'gone') {
+            // 阶段4：完全消失，留下几个光点粒子（由game.js用Particle系统处理）
+            // 这里什么都不画，等待game.js设置 isAlive = false
+        }
+    },
+
+    /**
+     * 绘制死亡幼体的眼睛
+     * @param {number|null} lookAtAngle - 看向的角度（null则用velocity方向）
+     * @param {number} turnProgress - 转向进度0~1（null则不用转向）
+     */
+    _drawDeadEyes(ctx, headPos, radius, lookAtAngle, turnProgress = null) {
+        ctx.globalCompositeOperation = 'source-over';
+
+        const eyeOffset = radius * 0.4;
+        const eyeRadius = 2;
+
+        // 默认朝向
+        let baseAngle = Math.atan2(this.velocity.y, this.velocity.x);
+        if (this.segments.length > 1) {
+            const dir = headPos.sub(this.segments[1]);
+            if (dir.mag() > 0) baseAngle = Math.atan2(dir.y, dir.x);
+        }
+
+        // 如果有转向目标且有进度，平滑插值
+        let finalAngle = baseAngle;
+        if (lookAtAngle !== null && turnProgress !== null) {
+            // 用最短路径插值角度
+            let diff = lookAtAngle - baseAngle;
+            while (diff > Math.PI) diff -= Math.PI * 2;
+            while (diff < -Math.PI) diff += Math.PI * 2;
+            finalAngle = baseAngle + diff * turnProgress;
+        }
+
+        const eyeAngle1 = finalAngle + 0.5;
+        const eyeAngle2 = finalAngle - 0.5;
+
+        for (const angle of [eyeAngle1, eyeAngle2]) {
+            const ex = headPos.x + Math.cos(angle) * eyeOffset;
+            const ey = headPos.y + Math.sin(angle) * eyeOffset;
+
+            // 白色眼白
+            ctx.fillStyle = '#fff';
+            ctx.beginPath();
+            ctx.arc(ex, ey, eyeRadius + 1, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 黑色瞳孔
+            ctx.fillStyle = '#000';
+            ctx.beginPath();
+            ctx.arc(ex, ey, eyeRadius, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 高光
+            ctx.fillStyle = '#fff';
+            ctx.beginPath();
+            ctx.arc(ex - 0.5, ey - 0.5, eyeRadius * 0.3, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        ctx.globalCompositeOperation = 'screen';
     },
 
     // 幼体头部绘制：圆形 + 2个眼睛（无吃豆人嘴巴）

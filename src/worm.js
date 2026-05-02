@@ -118,6 +118,17 @@ export class Worm {
         this.strugglePhase = 0;  // 挣扎动画相位
         this.protectingTimer = 0;  // 保护幼体计时器（成年体）
 
+        // === Phase 1 亲子情感：撒娇系统 ===
+        this.sulkTimer = 0;           // 远离母体累计时间
+        this.isSulking = false;       // 是否在撒娇状态
+        this.sulkGlow = 1.0;          // 身体发光强度（1.0正常，0.3暗淡）
+        this.celebrateTimer = 0;      // 靠近母体庆祝计时器
+        this.isCelebrating = false;   // 是否在庆祝
+
+        // === Phase 1 亲子情感：死亡动画 ===
+        this.deathPhase = 'none';     // 死亡阶段：none → flashing → turning → sinking → gone
+        this.deathTimer = 0;          // 死亡动画计时器
+
         // 冰晶覆盖效果
         this.iceOverlays = [];  // [{segmentIndex, timer, maxTimer}]
 
@@ -332,6 +343,23 @@ export class Worm {
     update(targetPos, dt, allFoods = [], allWorms = []) {
         // 空指针保护：如果segments为空，直接返回
         if (this.segments.length === 0) return;
+
+        // === Phase 1 亲子情感：幼体死亡动画更新 ===
+        if (this.isJuvenile && this.deathPhase && this.deathPhase !== 'none') {
+            this.deathTimer += dt;
+            // 状态机推进
+            if (this.deathPhase === 'flashing' && this.deathTimer >= 1.5) {
+                this.deathPhase = 'turning';
+            } else if (this.deathPhase === 'turning' && this.deathTimer >= 2.5) {
+                this.deathPhase = 'sinking';
+            } else if (this.deathPhase === 'sinking' && this.deathTimer >= 4.0) {
+                this.deathPhase = 'gone';
+                // 标记死亡，game.js会处理清理（创建尸体+光点粒子）
+                this.isAlive = false;
+            }
+            // 死亡动画期间不做任何移动/AI，只更新死亡计时器
+            return;
+        }
 
         // 更新计时器
         this.updateTimers(dt);
@@ -849,6 +877,60 @@ export class Worm {
             }
         } else {
             this.isStruggling = false;
+        }
+
+        // === Phase 1 亲子情感：撒娇/庆祝逻辑 ===
+        if (this.parentWorm && this.parentWorm.isAlive && this.parentWorm.head) {
+            const distToParent = this.head.dist(this.parentWorm.head);
+
+            // 庆祝中：围着母体头部快速转圈
+            if (this.isCelebrating) {
+                this.celebrateTimer -= dt;
+                if (this.celebrateTimer <= 0) {
+                    this.isCelebrating = false;
+                    this.celebrateTimer = 0;
+                }
+                // 快速环绕母体头部（速度是正常的3倍）
+                const parentHead = this.parentWorm.head;
+                this.juvenileOrbitPhase += 0.045;  // 3倍速旋转
+                const orbitDist = CONFIG.SEGMENT_RADIUS * 2.5;
+                const angle = this.juvenileOrbitPhase;
+                const targetX = parentHead.x + Math.cos(angle) * orbitDist;
+                const targetY = parentHead.y + Math.sin(angle) * orbitDist;
+                this.sulkGlow += (1.1 - this.sulkGlow) * dt * 5;  // 快速恢复亮度
+                return this._juvenileAvoidWalls(new Vector(targetX, targetY));
+            }
+
+            // 远离母体超过300px
+            if (distToParent > 300) {
+                this.sulkTimer += dt;
+                // 远离超过10秒，进入撒娇状态
+                if (this.sulkTimer > 10 && !this.isSulking) {
+                    this.isSulking = true;
+                    // 撒娇音效（通过返回标记让game.js触发）
+                    this._pendingSulkSound = true;
+                }
+            } else {
+                // 靠近母体，重置远离计时
+                this.sulkTimer = Math.max(0, this.sulkTimer - dt * 2);
+            }
+
+            // 撒娇状态中靠近母体（距离<80px），触发庆祝
+            if (this.isSulking && distToParent < 80) {
+                this.isSulking = false;
+                this.isCelebrating = true;
+                this.celebrateTimer = 2.0;
+                this.sulkTimer = 0;
+                // 庆祝音效标记
+                this._pendingCelebrateSound = true;
+            }
+
+            // 撒娇状态：身体变暗
+            if (this.isSulking) {
+                this.sulkGlow += (0.3 - this.sulkGlow) * dt * 3;  // lerp到0.3
+            } else if (!this.isCelebrating) {
+                this.sulkGlow += (1.0 - this.sulkGlow) * dt * 3;  // lerp回1.0
+            }
         }
 
         // 1. 检查附近是否有敌人（害怕/逃亡）

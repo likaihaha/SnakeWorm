@@ -60,6 +60,12 @@ export class Game {
         this.mouseInCanvas = false;  // 鼠标是否在Canvas内
         this.familyNoticeShown = false;  // 亲子提示是否已显示
 
+        // 屏幕震动系统
+        this.screenShake = { intensity: 0, duration: 0, timer: 0 };
+
+        // 波纹特效列表
+        this.ripples = [];
+
         // 相机系统
         this.camera = new Camera();
 
@@ -650,6 +656,8 @@ export class Game {
         this.maxLengthReached = 0;  // 重置历史最大长度
         this.isMouseDown = false;  // 重置鼠标按下状态
         this.fireCooldown = 0;  // 重置射击冷却
+        this.screenShake = { intensity: 0, duration: 0, timer: 0 };  // 重置屏幕震动
+        this.ripples = [];  // 重置波纹
 
         // 玩家虫虫从框外左边开始（完全不可见）
         const spawnX = 400;   // 左下方偏高
@@ -911,6 +919,35 @@ export class Game {
                 }
                 worm.pendingParticles = [];
             }
+
+            // === Phase 1 亲子情感：触发幼体撒娇/庆祝音效 ===
+            if (worm._pendingSulkSound) {
+                worm._pendingSulkSound = false;
+                this.musicSystem.playSulkSound(worm.head ? worm.head.x : 400);
+            }
+            if (worm._pendingCelebrateSound) {
+                worm._pendingCelebrateSound = false;
+                this.musicSystem.playCelebrateSound(worm.head ? worm.head.x : 400);
+            }
+
+            // === Phase 1 亲子情感：幼体死亡动画完成后清理 ===
+            if (worm.isJuvenile && worm.deathPhase === 'gone') {
+                // 创建灰色尸体下沉
+                if (worm.segments.length > 0) {
+                    const deadSegments = worm.segments.map(s => ({ x: s.x, y: s.y }));
+                    this.deadBodies.push(new DeadBody(deadSegments, worm.color));
+                }
+                // 留下光点粒子（消散感）+ 波纹
+                const cx = worm.head ? worm.head.x : 0;
+                const cy = worm.head ? worm.head.y : 0;
+                for (let k = 0; k < 8; k++) {
+                    this.particles.push(Particle.acquire(cx, cy, worm.color));
+                }
+                this.createRipple(cx, cy, worm.color, 60, 1.5);
+                // 清空segments，下次循环会被跳过
+                worm.segments = [];
+                worm.deathPhase = 'done';
+            }
         }
         
         // 总控AI：检测AI虫虫是否聚集，如果聚集就让它们分散
@@ -1114,6 +1151,19 @@ export class Game {
                         } else {
                             this.showSplitNotice();
                         }
+
+                        // === Phase 1 亲子情感：出生奖励 ===
+                        // 母体获得3秒无敌
+                        if (tail.parentWorm && tail.parentWorm.isAlive) {
+                            tail.parentWorm.invincibleTimer = 3.0;
+                            const parentHead = tail.parentWorm.head;
+                            if (parentHead) {
+                                this.floatingTexts.push(FloatingText.acquire(parentHead.x, parentHead.y - 30, '✨ +3s无敌', '#ffd700'));
+                            }
+                        }
+                        // 出生音效
+                        const birthX = newWorm.head ? newWorm.head.x : 400;
+                        this.musicSystem.playBirthChime(birthX);
                     } else {
                         // 无法生成新虫（达到上限等），转为尸体下沉并产出食物，避免白白消失
                         if (tail.segments && tail.segments.length > 0) {
@@ -1443,6 +1493,10 @@ export class Game {
             }
             this.floatingTexts.length = w;
         }
+
+        // 11.5 更新屏幕震动和波纹
+        this.updateScreenShake(dt);
+        this.updateRipples(dt);
 
         // 12. 更新 UI
         this.updateUI();
@@ -1785,14 +1839,94 @@ export class Game {
         notice.style.animation = 'fadeInOut 4s ease-in-out';
         setTimeout(() => { notice.style.display = 'none'; }, 4000);
     }
-    
+
+    /**
+     * 触发屏幕震动
+     * @param {number} intensity - 震动强度（像素）
+     * @param {number} duration - 震动持续时间（秒）
+     */
+    triggerScreenShake(intensity, duration) {
+        this.screenShake.intensity = intensity;
+        this.screenShake.duration = duration;
+        this.screenShake.timer = duration;
+    }
+
+    /**
+     * 更新屏幕震动
+     */
+    updateScreenShake(dt) {
+        if (this.screenShake.timer > 0) {
+            this.screenShake.timer -= dt;
+            if (this.screenShake.timer < 0) this.screenShake.timer = 0;
+        }
+    }
+
+    /**
+     * 获取当前震动偏移量
+     */
+    getShakeOffset() {
+        if (this.screenShake.timer <= 0) return { x: 0, y: 0 };
+        const progress = this.screenShake.timer / this.screenShake.duration;
+        const currentIntensity = this.screenShake.intensity * progress;
+        return {
+            x: (Math.random() - 0.5) * 2 * currentIntensity,
+            y: (Math.random() - 0.5) * 2 * currentIntensity,
+        };
+    }
+
+    /**
+     * 创建波纹特效
+     */
+    createRipple(x, y, color, maxRadius, duration) {
+        this.ripples.push({
+            x, y, color,
+            radius: 5,
+            maxRadius,
+            alpha: 0.6,
+            timer: 0,
+            duration,
+        });
+    }
+
+    /**
+     * 更新波纹特效
+     */
+    updateRipples(dt) {
+        let w = 0;
+        for (let i = 0; i < this.ripples.length; i++) {
+            const r = this.ripples[i];
+            r.timer += dt;
+            const progress = r.timer / r.duration;
+            if (progress >= 1) continue;
+            r.radius = 5 + (r.maxRadius - 5) * progress;
+            r.alpha = 0.6 * (1 - progress);
+            this.ripples[w++] = r;
+        }
+        this.ripples.length = w;
+    }
+
+    /**
+     * 绘制波纹特效（在世界坐标中绘制）
+     */
+    drawRipples() {
+        for (const r of this.ripples) {
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(r.x, r.y, r.radius, 0, Math.PI * 2);
+            ctx.strokeStyle = r.color.replace('ALPHA', r.alpha.toFixed(2));
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            ctx.restore();
+        }
+    }
+
     // 敌人系统更新
     updateEnemies(dt, player) {
         // 生成敌人
         this.spawnEnemies(dt);
         
         // 更新敌人（紧凑过滤替代splice）
-        const juveniles = this.worms.filter(w => w.isAlive && w.isJuvenile);
+        const juveniles = this.worms.filter(w => w.isAlive && w.isJuvenile && (!w.deathPhase || w.deathPhase === 'none'));
         {
             let w = 0;
             for (let i = 0; i < this.enemies.length; i++) {
@@ -2137,9 +2271,10 @@ export class Game {
         // 绘制程序化动态背景（视口大小，直接画到屏幕）
         this.bg.draw(ctx);
 
-        // === 应用相机偏移 ===
+        // === 应用相机偏移 + 屏幕震动 ===
+        const shake = this.getShakeOffset();
         ctx.save();
-        ctx.translate(-this.camera.x, -this.camera.y);
+        ctx.translate(-this.camera.x + shake.x, -this.camera.y + shake.y);
 
         this.drawGrid();
 
@@ -2168,6 +2303,9 @@ export class Game {
         // 恢复source-over模式绘制UI
         ctx.globalCompositeOperation = 'source-over';
         for (let i = 0; i < this.floatingTexts.length; i++) this.floatingTexts[i].draw(ctx);
+
+        // 绘制波纹特效
+        this.drawRipples();
 
         // 绘制地图边界（在世界坐标中）
         this.drawMapBorder();

@@ -336,6 +336,95 @@ export class MusicSystem {
         }
     }
 
+    // === 亲子音效系统 ===
+
+    /** 幼体出生音效：C5→E5→G5 上行琶音，温暖轻柔 */
+    playBirthChime(screenX) {
+        if (!this.audioContext) this.init();
+        if (!this.audioContext) return;
+        const now = this.audioContext.currentTime;
+        // 3个上行音符，每个间隔120ms，velocity渐弱
+        const notes = [
+            { freq: 523.25, delay: 0, velocity: 0.85, duration: 120 },
+            { freq: 659.25, delay: 0.12, velocity: 0.75, duration: 120 },
+            { freq: 783.99, delay: 0.24, velocity: 0.65, duration: 140 },
+        ];
+        for (const n of notes) {
+            setTimeout(() => {
+                this.playNote(n.freq, n.duration, n.velocity, true, screenX);
+            }, n.delay * 1000);
+        }
+    }
+
+    /** 幼体受伤音效：G4 一个忧伤长音 */
+    playHurtChime(screenX) {
+        if (!this.audioContext) this.init();
+        if (!this.audioContext) return;
+        this.playNote(392.00, 300, 0.35, true, screenX);
+    }
+
+    /** 幼体死亡音效：低频心跳停止 + 沉默 */
+    playDeathHeartbeat(screenX) {
+        if (!this.audioContext) this.init();
+        if (!this.audioContext) return;
+        if (this.audioContext.state === 'suspended') this.audioContext.resume();
+
+        const now = this.audioContext.currentTime;
+        try {
+            // 低频脉冲：80Hz sine波，快速衰减
+            const osc = this.audioContext.createOscillator();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(80, now);
+
+            const gain = this.audioContext.createGain();
+            gain.gain.setValueAtTime(0, now);
+            gain.gain.linearRampToValueAtTime(0.4, now + 0.02);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+
+            osc.connect(gain);
+            if (this.convolver) {
+                gain.connect(this.convolver);
+            } else {
+                gain.connect(this.audioContext.destination);
+            }
+
+            osc.start(now);
+            osc.stop(now + 0.6);
+        } catch (e) {
+            console.warn('playDeathHeartbeat error:', e);
+        }
+    }
+
+    /** 幼体撒娇音效：G4→E4 下行，低沉 */
+    playSulkSound(screenX) {
+        if (!this.audioContext) this.init();
+        if (!this.audioContext) return;
+        const notes = [
+            { freq: 392.00, delay: 0, velocity: 0.4, duration: 150 },
+            { freq: 329.63, delay: 0.15, velocity: 0.35, duration: 180 },
+        ];
+        for (const n of notes) {
+            setTimeout(() => {
+                this.playNote(n.freq, n.duration, n.velocity, true, screenX);
+            }, n.delay * 1000);
+        }
+    }
+
+    /** 幼体庆祝音效（靠近母体）：C5→E5 上行，明亮 */
+    playCelebrateSound(screenX) {
+        if (!this.audioContext) this.init();
+        if (!this.audioContext) return;
+        const notes = [
+            { freq: 523.25, delay: 0, velocity: 0.6, duration: 100 },
+            { freq: 659.25, delay: 0.1, velocity: 0.65, duration: 120 },
+        ];
+        for (const n of notes) {
+            setTimeout(() => {
+                this.playNote(n.freq, n.duration, n.velocity, true, screenX);
+            }, n.delay * 1000);
+        }
+    }
+
     playYellowBeadArpeggio(segmentCount, screenX) {
         const song = this.songs['水晶序曲'];
         if (!song || song.length === 0) return;

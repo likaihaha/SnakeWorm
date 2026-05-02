@@ -196,7 +196,7 @@ export class Enemy {
 
     // 更新咬住幼体状态
     updateLatched(dt) {
-        if (!this.latchedJuvenile.isAlive || !this.latchedJuvenile.isJuvenile) {
+        if (!this.latchedJuvenile.isAlive || !this.latchedJuvenile.isJuvenile || (this.latchedJuvenile.deathPhase && this.latchedJuvenile.deathPhase !== 'none')) {
             this.release();
             return;
         }
@@ -241,24 +241,35 @@ export class Enemy {
                 if (typeof game !== 'undefined' && game.floatingTexts) {
                     game.floatingTexts.push(FloatingText.acquire(lostSegment.x, lostSegment.y - 15, 'OUCH!', '#ff6b6b'));
                 }
+                // 播放受伤音效
+                if (typeof game !== 'undefined' && game.musicSystem) {
+                    game.musicSystem.playHurtChime(lostSegment.x);
+                }
                 // 调试日志
                 if (typeof game !== 'undefined' && game.debugLogger) {
                     game.debugLogger.logEnemyBiteDamage(this, juv, game.gameTime);
                 }
             } else {
-                // 身体太短，变灰色沉底（而非瞬间消失）
+                // === Phase 1 亲子情感：幼体死亡动画 ===
+                // 不再瞬间消失，触发死亡动画状态机（flashing→turning→sinking→gone）
                 const deathX = juv.head ? juv.head.x : this.pos.x;
                 const deathY = juv.head ? juv.head.y : this.pos.y;
                 if (typeof game !== 'undefined' && game.debugLogger) {
                     game.debugLogger.logJuvenileDeath(juv, '被敌人咬死', game.gameTime);
                 }
-                // 创建灰色尸体下沉动画
-                if (juv.segments.length > 0 && typeof game !== 'undefined' && game.deadBodies) {
-                    const deadSegments = juv.segments.map(s => ({ x: s.x, y: s.y }));
-                    game.deadBodies.push(new DeadBody(deadSegments, juv.color));
+                // 触发死亡动画（保留segments用于渲染，由game.js的deathPhase update管理生命周期）
+                if (juv.deathPhase === 'none') {
+                    juv.deathPhase = 'flashing';
+                    juv.deathTimer = 0;
+                    // 播放死亡心跳音效
+                    if (typeof game !== 'undefined' && game.musicSystem) {
+                        game.musicSystem.playDeathHeartbeat(deathX);
+                    }
+                    // 屏幕震动
+                    if (typeof game !== 'undefined' && game.triggerScreenShake) {
+                        game.triggerScreenShake(4, 0.3);
+                    }
                 }
-                juv.isAlive = false;
-                juv.segments = [];
                 if (typeof game !== 'undefined' && game.floatingTexts) {
                     game.floatingTexts.push(FloatingText.acquire(deathX, deathY - 20, 'EATEN!', '#ff0000'));
                 }
