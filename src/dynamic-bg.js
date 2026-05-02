@@ -360,14 +360,49 @@ export class DynamicBG {
             // 只有两个点，直线连接
             ctx.lineTo(pts[1][0] * w, pts[1][1] * h);
         } else {
-            // 多个点，使用贝塞尔曲线（与编辑器 _drawCurve 相同逻辑）
+            // 多个点，使用贝塞尔曲线
+            const tw = s.tangentWeights;
+            const th = s.tangentHandles;
             for (let i = 1; i < pts.length; i++) {
                 const x0 = pts[i - 1][0] * w, y0 = pts[i - 1][1] * h;
                 const x1 = pts[i][0] * w, y1 = pts[i][1] * h;
-                const cp1x = x0 + (x1 - x0) * 0.5;
-                const cp1y = y0;
-                const cp2x = x1 - (x1 - x0) * 0.5;
-                const cp2y = y1;
+
+                let cp1x, cp1y, cp2x, cp2y;
+
+                // 优先使用 tangentHandles（自由方向）
+                if (th && th[i - 1]) {
+                    cp1x = x0 + th[i - 1].dx * w;
+                    cp1y = y0 + th[i - 1].dy * h;
+                } else {
+                    // 回退到 Catmull-Rom + weight
+                    const w1 = (tw && tw[i - 1] !== undefined) ? tw[i - 1] : 0.5;
+                    let tdx, tdy;
+                    if (i - 2 >= 0) {
+                        tdx = (pts[i][0] - pts[i - 2][0]) * w;
+                        tdy = (pts[i][1] - pts[i - 2][1]) * h;
+                    } else {
+                        tdx = x1 - x0; tdy = y1 - y0;
+                    }
+                    cp1x = x0 + tdx * w1 / 2;
+                    cp1y = y0 + tdy * w1 / 2;
+                }
+
+                if (th && th[i]) {
+                    cp2x = x1 - th[i].dx * w;
+                    cp2y = y1 - th[i].dy * h;
+                } else {
+                    const w2 = (tw && tw[i] !== undefined) ? tw[i] : 0.5;
+                    let tdx2, tdy2;
+                    if (i + 1 < pts.length) {
+                        tdx2 = (pts[i + 1][0] - pts[i - 1][0]) * w;
+                        tdy2 = (pts[i + 1][1] - pts[i - 1][1]) * h;
+                    } else {
+                        tdx2 = x1 - x0; tdy2 = y1 - y0;
+                    }
+                    cp2x = x1 - tdx2 * w2 / 2;
+                    cp2y = y1 - tdy2 * w2 / 2;
+                }
+
                 ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, x1, y1);
             }
         }

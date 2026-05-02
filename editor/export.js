@@ -152,16 +152,51 @@ class ExportManager {
             svg += `<${shape.type === 'polygon' ? 'polygon' : 'polyline'} points="${points}" fill="${shape.fill}" stroke="${shape.stroke}" stroke-width="${shape.strokeWidth}" ${shape.closed ? '' : 'fill="none"'}/>`;
             break;
           case 'path':
-            if (shape.points && shape.points.length >= 4) {
-              let d = `M ${shape.points[0][0] * width} ${shape.points[0][1] * height}`;
-              for (let i = 1; i < shape.points.length; i++) {
-                const p0 = shape.points[i - 1];
-                const p1 = shape.points[i];
-                const cp1x = p0[0] * width + (p1[0] - p0[0]) * width * 0.5;
-                const cp1y = p0[1] * height;
-                const cp2x = p1[0] * width - (p1[0] - p0[0]) * width * 0.5;
-                const cp2y = p1[1] * height;
-                d += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${p1[0] * width} ${p1[1] * height}`;
+            if (shape.points && shape.points.length >= 2) {
+              const tw = shape.tangentWeights;
+              const th = shape.tangentHandles;
+              const pts = shape.points;
+              let d = `M ${pts[0][0] * width} ${pts[0][1] * height}`;
+              for (let i = 1; i < pts.length; i++) {
+                const x0 = pts[i - 1][0] * width, y0 = pts[i - 1][1] * height;
+                const x1 = pts[i][0] * width, y1 = pts[i][1] * height;
+
+                let cp1x, cp1y, cp2x, cp2y;
+
+                // 优先使用 tangentHandles
+                if (th && th[i - 1]) {
+                  cp1x = x0 + th[i - 1].dx * width;
+                  cp1y = y0 + th[i - 1].dy * height;
+                } else {
+                  const w1 = (tw && tw[i - 1] !== undefined) ? tw[i - 1] : 0.5;
+                  let tdx, tdy;
+                  if (i - 2 >= 0) {
+                    tdx = (pts[i][0] - pts[i - 2][0]) * width;
+                    tdy = (pts[i][1] - pts[i - 2][1]) * height;
+                  } else {
+                    tdx = x1 - x0; tdy = y1 - y0;
+                  }
+                  cp1x = x0 + tdx * w1 / 2;
+                  cp1y = y0 + tdy * w1 / 2;
+                }
+
+                if (th && th[i]) {
+                  cp2x = x1 - th[i].dx * width;
+                  cp2y = y1 - th[i].dy * height;
+                } else {
+                  const w2 = (tw && tw[i] !== undefined) ? tw[i] : 0.5;
+                  let tdx2, tdy2;
+                  if (i + 1 < pts.length) {
+                    tdx2 = (pts[i + 1][0] - pts[i - 1][0]) * width;
+                    tdy2 = (pts[i + 1][1] - pts[i - 1][1]) * height;
+                  } else {
+                    tdx2 = x1 - x0; tdy2 = y1 - y0;
+                  }
+                  cp2x = x1 - tdx2 * w2 / 2;
+                  cp2y = y1 - tdy2 * w2 / 2;
+                }
+
+                d += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${x1} ${y1}`;
               }
               svg += `<path d="${d}" fill="${shape.fill}" stroke="${shape.stroke}" stroke-width="${shape.strokeWidth}"/>`;
             }

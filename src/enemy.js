@@ -1,6 +1,7 @@
 import { Vector } from './vector.js';
 import { CONFIG, ENEMY_STATE } from './config.js';
 import { FloatingText, Particle } from './entities.js';
+import { DeadBody } from './dead-body.js';
 
 export { ENEMY_STATE };
 
@@ -245,11 +246,16 @@ export class Enemy {
                     game.debugLogger.logEnemyBiteDamage(this, juv, game.gameTime);
                 }
             } else {
-                // 身体太短，直接死亡
+                // 身体太短，变灰色沉底（而非瞬间消失）
                 const deathX = juv.head ? juv.head.x : this.pos.x;
                 const deathY = juv.head ? juv.head.y : this.pos.y;
                 if (typeof game !== 'undefined' && game.debugLogger) {
                     game.debugLogger.logJuvenileDeath(juv, '被敌人咬死', game.gameTime);
+                }
+                // 创建灰色尸体下沉动画
+                if (juv.segments.length > 0 && typeof game !== 'undefined' && game.deadBodies) {
+                    const deadSegments = juv.segments.map(s => ({ x: s.x, y: s.y }));
+                    game.deadBodies.push(new DeadBody(deadSegments, juv.color));
                 }
                 juv.isAlive = false;
                 juv.segments = [];

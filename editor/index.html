@@ -1728,23 +1728,44 @@
             cpInfo.textContent = element.points ? `${element.points.length} 个控制点` : '无控制点';
             input.appendChild(cpInfo);
             
+            // 控制点编辑模式切换按钮
+            const cpEditMode = this.editor.controlPointEditMode;
+            const cpToggleBtn = document.createElement('button');
+            cpToggleBtn.textContent = cpEditMode ? '退出控制点编辑' : '编辑控制点';
+            cpToggleBtn.style.cssText = `
+              width:100%; padding:6px 12px; font-size:12px; font-weight:600;
+              background:${cpEditMode ? '#da3633' : '#238636'}; color:#fff;
+              border:1px solid ${cpEditMode ? '#f85149' : '#2ea043'}; border-radius:4px;
+              cursor:pointer; transition:all 0.2s;
+            `;
+            cpToggleBtn.addEventListener('click', () => {
+              if (typeof this.editor.toggleControlPointEditMode === 'function') {
+                this.editor.toggleControlPointEditMode();
+              }
+              this.updatePropertyPanel();
+            });
+            input.appendChild(cpToggleBtn);
+            
             const cpHint = document.createElement('div');
-            cpHint.style.cssText = 'font-size:10px; color:#58a6ff; background:#161b22; padding:6px 8px; border-radius:4px; border:1px solid #30363d;';
-            cpHint.innerHTML = '💡 <strong>编辑控制点</strong><br>• 点击画布上的控制点可拖拽移动<br>• 拖拽变换手柄可缩放/旋转<br>• 右键点击完成绘制新路径';
+            cpHint.style.cssText = 'font-size:10px; color:#8b949e; background:#161b22; padding:6px 8px; border-radius:4px; border:1px solid #30363d;';
+            const isPath = element.type === 'path';
+            cpHint.innerHTML = cpEditMode ?
+              `🎯 <strong>控制点编辑模式</strong><br>• 拖拽圆点移动控制点${isPath ? '<br>• 点击控制点后拖拽金色手柄<br>  可自由调整切线方向' : ''}<br>• 点击空白区域不做操作<br>• 点击上方按钮退出模式` :
+              `💡 <strong>普通模式</strong><br>• 点击上方按钮进入控制点编辑${isPath ? '<br>• 可拖拽切线手柄调整曲线' : ''}<br>• 可拖拽变换手柄缩放/旋转`;
             input.appendChild(cpHint);
             
             if (element.points && element.points.length > 0) {
               const cpList = document.createElement('div');
               cpList.style.cssText = 'display:flex; flex-direction:column; gap:2px; max-height:120px; overflow-y:auto;';
-              
+
               element.points.forEach((pt, idx) => {
                 const cpRow = document.createElement('div');
                 cpRow.style.cssText = 'display:flex; gap:4px; align-items:center; font-size:10px;';
-                
+
                 const cpLabel = document.createElement('span');
                 cpLabel.style.cssText = 'color:#8b949e; min-width:20px;';
                 cpLabel.textContent = `P${idx}`;
-                
+
                 const cpX = document.createElement('input');
                 cpX.type = 'number';
                 cpX.value = pt[0].toFixed(3);
@@ -1756,7 +1777,7 @@
                   element.points[idx][0] = parseFloat(cpX.value);
                   this.editor.markDirty();
                 });
-                
+
                 const cpY = document.createElement('input');
                 cpY.type = 'number';
                 cpY.value = pt[1].toFixed(3);
@@ -1768,13 +1789,49 @@
                   element.points[idx][1] = parseFloat(cpY.value);
                   this.editor.markDirty();
                 });
-                
+
                 cpRow.appendChild(cpLabel);
                 cpRow.appendChild(cpX);
                 cpRow.appendChild(cpY);
+
+                // 切线权重滑块（仅 path 类型）
+                if (element.type === 'path') {
+                  if (!element.tangentWeights) {
+                    element.tangentWeights = element.points.map(() => 0.5);
+                  }
+                  const tw = element.tangentWeights[idx] !== undefined ? element.tangentWeights[idx] : 0.5;
+
+                  const twLabel = document.createElement('span');
+                  twLabel.style.cssText = 'color:#ffd700; font-size:9px; min-width:12px;';
+                  twLabel.textContent = 'W';
+
+                  const twSlider = document.createElement('input');
+                  twSlider.type = 'range';
+                  twSlider.min = 0;
+                  twSlider.max = 2;
+                  twSlider.step = 0.05;
+                  twSlider.value = tw;
+                  twSlider.style.cssText = 'width:40px; height:12px; accent-color:#ffd700;';
+
+                  const twVal = document.createElement('span');
+                  twVal.style.cssText = 'color:#c9d1d9; font-size:9px; min-width:24px;';
+                  twVal.textContent = tw.toFixed(2);
+
+                  twSlider.addEventListener('input', () => {
+                    const val = parseFloat(twSlider.value);
+                    element.tangentWeights[idx] = val;
+                    twVal.textContent = val.toFixed(2);
+                    this.editor.markDirty();
+                  });
+
+                  cpRow.appendChild(twLabel);
+                  cpRow.appendChild(twSlider);
+                  cpRow.appendChild(twVal);
+                }
+
                 cpList.appendChild(cpRow);
               });
-              
+
               input.appendChild(cpList);
             }
             break;

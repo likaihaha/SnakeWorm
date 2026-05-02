@@ -62,6 +62,9 @@ class BackgroundEditor {
     this.lastTime = 0;
     this.transformState = null;
     this.controlPointState = null; // 控制点拖拽状态
+    this.tangentHandleState = null; // 切线手柄拖拽状态
+    this.controlPointEditMode = false; // 控制点编辑模式
+    this.selectedControlPointIndex = -1; // 选中的控制点索引
     this.drawMode = null; // null, 'polyline', 'path'
     this.drawPoints = []; // 正在绘制的点
     this.isDrawingPath = false;
@@ -177,7 +180,41 @@ class BackgroundEditor {
       const shapeId = this.selectedElement.replace('shape_', '');
       const shape = this.config.shapes?.find(s => s.id === shapeId);
       if (shape && !shape.locked) {
-        // 检查是否点击了控制点（polyline/path）
+        // 控制点编辑模式：只允许控制点和切线手柄交互
+        if (this.controlPointEditMode && (shape.type === 'polyline' || shape.type === 'path') && shape.points) {
+          // 先检查切线手柄（path 类型）
+          if (shape.type === 'path') {
+            const tangentHandle = this.bg.getTangentHandleAt(shape, x, y, this.selectedControlPointIndex);
+            if (tangentHandle) {
+              this.tangentHandleState = {
+                shapeId: shapeId,
+                pointIndex: tangentHandle.pointIndex,
+                handleType: tangentHandle.type,
+                startX: x
+              };
+              this.canvas.style.cursor = 'move';
+              return;
+            }
+          }
+          const cpIdx = this.bg.getControlPointAt(shape, x, y);
+          if (cpIdx >= 0) {
+            this.selectedControlPointIndex = cpIdx;
+            this.controlPointState = {
+              shapeId: shapeId,
+              pointIndex: cpIdx,
+              startX: x,
+              startY: y,
+              startPoint: [...shape.points[cpIdx]]
+            };
+            this.canvas.style.cursor = 'move';
+            this.markDirty();
+            return;
+          }
+          // 在控制点编辑模式下，点击非控制点区域不做任何操作
+          return;
+        }
+        
+        // 普通模式：检查控制点，然后检查变换手柄
         if ((shape.type === 'polyline' || shape.type === 'path') && shape.points) {
           const cpIdx = this.bg.getControlPointAt(shape, x, y);
           if (cpIdx >= 0) {
@@ -300,6 +337,37 @@ class BackgroundEditor {
       return;
     }
 
+    // 处理切线手柄拖拽（自由方向）
+    if (this.tangentHandleState) {
+      const shape = this.config.shapes?.find(s => s.id === this.tangentHandleState.shapeId);
+      if (shape && shape.points) {
+        const idx = this.tangentHandleState.pointIndex;
+        const pt = shape.points[idx];
+        const relX = x / this.canvas.width;
+        const relY = y / this.canvas.height;
+
+        // 鼠标相对于锚点的偏移
+        const dx = relX - pt[0];
+        const dy = relY - pt[1];
+
+        // 初始化 tangentHandles
+        if (!shape.tangentHandles) {
+          shape.tangentHandles = {};
+        }
+
+        if (this.tangentHandleState.handleType === 'outgoing') {
+          // 出射手柄：直接使用鼠标偏移
+          shape.tangentHandles[idx] = { dx, dy };
+        } else {
+          // 入射手柄：取反方向
+          shape.tangentHandles[idx] = { dx: -dx, dy: -dy };
+        }
+
+        this.rebuild();
+      }
+      return;
+    }
+
     // 处理控制点拖拽
     if (this.controlPointState) {
       const shape = this.config.shapes?.find(s => s.id === this.controlPointState.shapeId);
@@ -320,7 +388,19 @@ class BackgroundEditor {
       const shapeId = this.selectedElement.replace('shape_', '');
       const shape = this.config.shapes?.find(s => s.id === shapeId);
       if (shape && !shape.locked) {
-        // 检查是否悬停在控制点上
+        // 控制点编辑模式
+        if (this.controlPointEditMode && (shape.type === 'polyline' || shape.type === 'path') && shape.points) {
+          // 检查切线手柄
+          if (shape.type === 'path') {
+            const th = this.bg.getTangentHandleAt(shape, x, y, this.selectedControlPointIndex);
+            if (th) { this.canvas.style.cursor = 'move'; return; }
+          }
+          const cpIdx = this.bg.getControlPointAt(shape, x, y);
+          this.canvas.style.cursor = cpIdx >= 0 ? 'move' : 'crosshair';
+          return;
+        }
+        
+        // 普通模式：检查是否悬停在控制点上
         if ((shape.type === 'polyline' || shape.type === 'path') && shape.points) {
           const cpIdx = this.bg.getControlPointAt(shape, x, y);
           if (cpIdx >= 0) {
@@ -600,12 +680,17 @@ class BackgroundEditor {
     }
     if (this.controlPointState) {
       this.controlPointState = null;
-      this.canvas.style.cursor = 'crosshair';
+      this.canvas.style.cursor = this.controlPointEditMode ? 'crosshair' : 'default';
+      this.markDirty();
+    }
+    if (this.tangentHandleState) {
+      this.tangentHandleState = null;
+      this.canvas.style.cursor = this.controlPointEditMode ? 'crosshair' : 'default';
       this.markDirty();
     }
     if (this.transformState) {
       this.transformState = null;
-      this.canvas.style.cursor = 'crosshair';
+      this.canvas.style.cursor = this.controlPointEditMode ? 'crosshair' : 'default';
       this.markDirty();
     }
   }
@@ -616,9 +701,13 @@ class BackgroundEditor {
       if (this.drawPoints.length >= 2) {
         const type = this.drawMode;
         let points = [...this.drawPoints];
-        // 曲线模式：简化点数，保留形状
-        if (type === 'path' && points.length > 4) {
-          points = this._simplifyPoints(points, 0.015);
+        let tangentHandles = null;
+
+        // 曲线模式：Schneider 拟合，生成稀疏锚点 + 切线手柄
+        if (type === 'path' && points.length > 2) {
+          const fitted = this._fitCurveSchneider(points, 0.008);
+          points = fitted.points;
+          tangentHandles = fitted.tangentHandles;
         }
 
         // 检查起点和终点是否靠近（10像素内）
@@ -632,6 +721,7 @@ class BackgroundEditor {
         const createShape = (closed) => {
           const properties = {
             points: points,
+            tangentHandles: tangentHandles,
             fill: closed ? 'rgba(88, 166, 255, 0.2)' : 'none',
             stroke: 'rgba(255, 255, 255, 0.8)',
             strokeWidth: 2,
@@ -724,13 +814,13 @@ class BackgroundEditor {
   // Ramer-Douglas-Peucker 点简化算法
   _simplifyPoints(points, epsilon) {
     if (points.length <= 2) return points;
-    
+
     // 找到距离首尾连线最远的点
     let maxDist = 0;
     let maxIdx = 0;
     const start = points[0];
     const end = points[points.length - 1];
-    
+
     for (let i = 1; i < points.length - 1; i++) {
       const dist = this._pointLineDistance(points[i], start, end);
       if (dist > maxDist) {
@@ -738,16 +828,146 @@ class BackgroundEditor {
         maxIdx = i;
       }
     }
-    
+
     // 如果最大距离大于阈值，递归简化
     if (maxDist > epsilon) {
       const left = this._simplifyPoints(points.slice(0, maxIdx + 1), epsilon);
       const right = this._simplifyPoints(points.slice(maxIdx), epsilon);
       return [...left.slice(0, -1), ...right];
     }
-    
+
     // 否则只保留首尾
     return [start, end];
+  }
+
+  /**
+   * Schneider 曲线拟合：将手绘点转为稀疏锚点 + 切线手柄
+   * @param {Array} rawPoints - 手绘采样点 [[x,y], ...]
+   * @param {number} maxError - 最大允许拟合误差（归一化坐标）
+   * @returns {{ points: Array, tangentHandles: Object }}
+   */
+  _fitCurveSchneider(rawPoints, maxError = 0.008) {
+    if (rawPoints.length < 2) return { points: rawPoints, tangentHandles: {} };
+    if (rawPoints.length === 2) return { points: rawPoints, tangentHandles: {} };
+
+    // Step 1: RDP 找锚点
+    const anchors = this._simplifyPoints(rawPoints, maxError);
+    if (anchors.length < 2) return { points: rawPoints.slice(0, 2), tangentHandles: {} };
+
+    // Step 2: 为每段拟合 Bezier，计算切线手柄
+    const tangentHandles = {};
+    const w = this.canvas ? this.canvas.width : 960;
+    const h = this.canvas ? this.canvas.height : 540;
+
+    // 建立锚点到原始点的索引映射
+    const anchorIndices = anchors.map(a => {
+      let minDist = Infinity, minIdx = 0;
+      for (let i = 0; i < rawPoints.length; i++) {
+        const d = Math.hypot(rawPoints[i][0] - a[0], rawPoints[i][1] - a[1]);
+        if (d < minDist) { minDist = d; minIdx = i; }
+      }
+      return minIdx;
+    });
+
+    // 确保索引单调递增
+    for (let i = 1; i < anchorIndices.length; i++) {
+      if (anchorIndices[i] <= anchorIndices[i - 1]) {
+        anchorIndices[i] = Math.min(anchorIndices[i - 1] + 1, rawPoints.length - 1);
+      }
+    }
+
+    for (let seg = 0; seg < anchors.length - 1; seg++) {
+      const startIdx = anchorIndices[seg];
+      const endIdx = anchorIndices[seg + 1];
+      const segPoints = rawPoints.slice(startIdx, endIdx + 1);
+
+      if (segPoints.length < 2) continue;
+
+      // 最小二乘拟合这段 Bezier
+      const fit = this._fitBezierSegment(segPoints);
+      if (!fit) continue;
+
+      // 将控制点转为切线手柄（相对于锚点的偏移）
+      const P0 = segPoints[0];
+      const P3 = segPoints[segPoints.length - 1];
+
+      // 起点的出射手柄 = P1 - P0
+      if (!tangentHandles[seg]) {
+        tangentHandles[seg] = {
+          dx: fit.p1[0] - P0[0],
+          dy: fit.p1[1] - P0[1]
+        };
+      }
+
+      // 终点的入射手柄 = P3 - P2（取反方向存储）
+      if (!tangentHandles[seg + 1]) {
+        tangentHandles[seg + 1] = {
+          dx: P3[0] - fit.p2[0],
+          dy: P3[1] - fit.p2[1]
+        };
+      }
+    }
+
+    return { points: anchors, tangentHandles };
+  }
+
+  /**
+   * 最小二乘法拟合单段 Bezier 曲线（Schneider 算法核心）
+   * @param {Array} points - 该段的采样点
+   * @returns {{ p1: [x,y], p2: [x,y] }} 控制点
+   */
+  _fitBezierSegment(points) {
+    const n = points.length;
+    if (n < 2) return null;
+
+    const P0 = points[0];
+    const P3 = points[n - 1];
+
+    // 弦长参数化
+    const params = new Array(n);
+    params[0] = 0;
+    let totalLen = 0;
+    for (let i = 1; i < n; i++) {
+      totalLen += Math.hypot(points[i][0] - points[i - 1][0], points[i][1] - points[i - 1][1]);
+      params[i] = totalLen;
+    }
+    if (totalLen > 0) {
+      for (let i = 0; i < n; i++) params[i] /= totalLen;
+    }
+
+    // 最小二乘求解 P1, P2
+    // B(t) = (1-t)^3*P0 + 3(1-t)^2*t*P1 + 3(1-t)t^2*P2 + t^3*P3
+    // 令 A_i = 3(1-t)^2*t, B_i = 3(1-t)t^2
+    // C_i = Q_i - (1-t)^3*P0 - t^3*P3
+    // 求解 A_i*P1 + B_i*P2 = C_i
+
+    let A2 = 0, AB = 0, B2 = 0;
+    let ACx = 0, ACy = 0, BCx = 0, BCy = 0;
+
+    for (let i = 0; i < n; i++) {
+      const t = params[i];
+      const mt = 1 - t;
+      const Ai = 3 * mt * mt * t;
+      const Bi = 3 * mt * t * t;
+      const Cix = points[i][0] - mt * mt * mt * P0[0] - t * t * t * P3[0];
+      const Ciy = points[i][1] - mt * mt * mt * P0[1] - t * t * t * P3[1];
+
+      A2 += Ai * Ai;
+      AB += Ai * Bi;
+      B2 += Bi * Bi;
+      ACx += Ai * Cix;
+      ACy += Ai * Ciy;
+      BCx += Bi * Cix;
+      BCy += Bi * Ciy;
+    }
+
+    const det = A2 * B2 - AB * AB;
+    if (Math.abs(det) < 1e-10) return null;
+
+    return {
+      p1: [(B2 * ACx - AB * BCx) / det, (B2 * ACy - AB * BCy) / det],
+      p2: [(A2 * BCx - AB * ACx) / det, (A2 * BCy - AB * ACy) / det]
+    };
   }
 
   // 点到直线的距离
@@ -914,12 +1134,37 @@ class BackgroundEditor {
     }
   }
 
+  // 获取选中元素列表
+  getSelectedElements() {
+    return this.selectedElements || [];
+  }
+
   // 元素管理
   selectElement(elementId) {
     this.selectedElement = elementId;
     this.selectedElements = elementId ? [elementId] : [];
+    this.controlPointEditMode = false; // 切换元素时退出控制点编辑模式
+    this.selectedControlPointIndex = -1; // 重置选中的控制点
     this.updateUI();
     this.updatePropertyPanel();
+  }
+
+  // 切换控制点编辑模式
+  toggleControlPointEditMode() {
+    if (!this.selectedElement || !this.selectedElement.startsWith('shape_')) return;
+
+    const shapeId = this.selectedElement.replace('shape_', '');
+    const shape = this.config.shapes?.find(s => s.id === shapeId);
+
+    // 只有 polyline 和 path 类型支持控制点编辑
+    if (!shape || (shape.type !== 'polyline' && shape.type !== 'path')) return;
+
+    this.controlPointEditMode = !this.controlPointEditMode;
+    if (!this.controlPointEditMode) {
+      this.selectedControlPointIndex = -1; // 退出时重置选中
+    }
+    this.canvas.style.cursor = this.controlPointEditMode ? 'crosshair' : 'default';
+    this.markDirty();
   }
 
   // 多选元素（框选）
@@ -930,6 +1175,88 @@ class BackgroundEditor {
     this.selectedElement = elementIds[0];
     this.updateUI();
     this.updatePropertyPanel();
+  }
+
+  // 获取单个元素
+  getElement(elementId) {
+    if (!elementId) return null;
+    if (elementId === 'background') {
+      return { type: 'background', ...this.config.background };
+    }
+    if (elementId.startsWith('shape_')) {
+      const shapeId = elementId.replace('shape_', '');
+      return this.config.shapes?.find(s => s.id === shapeId) || null;
+    }
+    return null;
+  }
+
+  // 获取元素边界（委托给 elementFactory）
+  getElementBounds(elementId) {
+    if (this.elementFactory) {
+      return this.elementFactory.getElementBounds(elementId);
+    }
+    return null;
+  }
+
+  // 移动元素（相对偏移）
+  moveElement(elementId, dx, dy) {
+    if (!elementId || !elementId.startsWith('shape_')) return;
+    const shapeId = elementId.replace('shape_', '');
+    const shape = this.config.shapes?.find(s => s.id === shapeId);
+    if (!shape) return;
+    
+    if (shape.x !== undefined) shape.x += dx;
+    if (shape.y !== undefined) shape.y += dy;
+    if (shape.points) {
+      shape.points = shape.points.map(p => [p[0] + dx, p[1] + dy]);
+    }
+  }
+
+  // 全选元素
+  selectAllElements() {
+    const allIds = (this.config.layerOrder || []).filter(id => id !== 'background');
+    if (allIds.length > 0) {
+      this.selectMultipleElements(allIds);
+    }
+  }
+
+  // 按索引选择图层
+  selectLayerByIndex(index) {
+    const order = this.config.layerOrder || [];
+    if (index >= 0 && index < order.length) {
+      this.selectElement(order[index]);
+    }
+  }
+
+  // 切换工具（简易版）
+  setTool(tool) {
+    this.currentTool = tool;
+    // 绘制模式
+    if (tool === 'polyline' || tool === 'path') {
+      this.setDrawMode(tool);
+    } else {
+      this.setDrawMode(null);
+    }
+    // 更新鼠标样式
+    const cursorMap = {
+      select: 'default',
+      hand: 'grab',
+      zoom: 'zoom-in',
+      rectangle: 'crosshair',
+      circle: 'crosshair',
+      line: 'crosshair',
+      pen: 'crosshair'
+    };
+    this.canvas.style.cursor = cursorMap[tool] || 'default';
+  }
+
+  // 切换预览模式
+  togglePreview() {
+    // 简易实现：隐藏/显示UI面板
+    const sidebar = document.getElementById('sidebar');
+    if (sidebar) {
+      sidebar.style.display = sidebar.style.display === 'none' ? '' : 'none';
+    }
   }
   
   // 重命名选中的元素
@@ -1205,7 +1532,14 @@ class BackgroundEditor {
           const shapeId = this.selectedElement.replace('shape_', '');
           const shape = this.config.shapes?.find(s => s.id === shapeId);
           if (shape && shape.visible !== false && !shape.locked) {
-            this.bg.drawTransform(this.ctx, shape);
+            // 设置选中的控制点索引
+            shape._selectedPointIndex = this.controlPointEditMode ? this.selectedControlPointIndex : -1;
+            // 控制点编辑模式：只绘制控制点，不绘制变换框
+            if (this.controlPointEditMode && (shape.type === 'polyline' || shape.type === 'path')) {
+              this.bg.drawControlPoints(this.ctx, shape, this.selectedControlPointIndex);
+            } else {
+              this.bg.drawTransform(this.ctx, shape);
+            }
           }
         }
 

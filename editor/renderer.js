@@ -792,12 +792,126 @@ class EditableDynamicBG {
     return `rgb(${r}, ${g}, ${b})`;
   }
 
+  /**
+   * 计算贝塞尔曲线控制点
+   * 支持两种模式：
+   * 1. tangentHandles[i] = {dx, dy} - 自由方向控制
+   * 2. tangentWeights[i] = scalar - Catmull-Rom 方向 + 权重
+   */
+  _getBezierControlPoints(pts, tw, segIndex, w, h, tangentHandles) {
+    const i = segIndex;
+    const p0 = pts[i];
+    const p3 = pts[i + 1];
+
+    const handles = tangentHandles || (pts._tangentHandles);
+
+    let cp1, cp2;
+
+    if (handles && handles[i]) {
+      // 使用自由方向切线手柄
+      cp1 = { x: p0[0] * w + handles[i].dx * w, y: p0[1] * h + handles[i].dy * h };
+    } else {
+      // 回退到 Catmull-Rom + weight
+      const w1 = (tw && tw[i] !== undefined) ? tw[i] : 0.5;
+      let tdx, tdy;
+      if (i > 0) {
+        tdx = (p3[0] - pts[i - 1][0]) * w;
+        tdy = (p3[1] - pts[i - 1][1]) * h;
+      } else {
+        tdx = (p3[0] - p0[0]) * w;
+        tdy = (p3[1] - p0[1]) * h;
+      }
+      cp1 = { x: p0[0] * w + tdx * w1 / 2, y: p0[1] * h + tdy * w1 / 2 };
+    }
+
+    if (handles && handles[i + 1]) {
+      // 使用自由方向切线手柄
+      cp2 = { x: p3[0] * w - handles[i + 1].dx * w, y: p3[1] * h - handles[i + 1].dy * h };
+    } else {
+      // 回退到 Catmull-Rom + weight
+      const w2 = (tw && tw[i + 1] !== undefined) ? tw[i + 1] : 0.5;
+      let tdx, tdy;
+      if (i + 2 < pts.length) {
+        tdx = (pts[i + 2][0] - p0[0]) * w;
+        tdy = (pts[i + 2][1] - p0[1]) * h;
+      } else {
+        tdx = (p3[0] - p0[0]) * w;
+        tdy = (p3[1] - p0[1]) * h;
+      }
+      cp2 = { x: p3[0] * w - tdx * w2 / 2, y: p3[1] * h - tdy * w2 / 2 };
+    }
+
+    return { cp1, cp2 };
+  }
+
+  /**
+   * 获取指定控制点的切线手柄位置
+   * @param {Object} shape - 形状对象
+   * @param {number} pointIndex - 控制点索引，-1 表示不返回任何手柄
+   * @param {number} w - 画布宽度
+   * @param {number} h - 画布高度
+   * @returns {Array} 手柄数组
+   */
+  _getTangentHandles(shape, pointIndex, w, h) {
+    if (shape.type !== 'path' || !shape.points || pointIndex < 0 || pointIndex >= shape.points.length) return [];
+    const handles = [];
+    const pts = shape.points;
+    const th = shape.tangentHandles;
+
+    const i = pointIndex;
+    const px = pts[i][0] * w;
+    const py = pts[i][1] * h;
+
+    if (th && th[i]) {
+      // 使用自由方向切线手柄
+      handles.push({
+        pointIndex: i, type: 'outgoing',
+        x: px + th[i].dx * w, y: py + th[i].dy * h
+      });
+      handles.push({
+        pointIndex: i, type: 'incoming',
+        x: px - th[i].dx * w, y: py - th[i].dy * h
+      });
+    } else {
+      // 回退到 Catmull-Rom + weight
+      const tw = shape.tangentWeights;
+      const weight = (tw && tw[i] !== undefined) ? tw[i] : 0.5;
+
+      // 出射手柄
+      if (i < pts.length - 1) {
+        let tdx, tdy;
+        if (i > 0) {
+          tdx = (pts[i + 1][0] - pts[i - 1][0]) * w;
+          tdy = (pts[i + 1][1] - pts[i - 1][1]) * h;
+        } else {
+          tdx = (pts[i + 1][0] - pts[i][0]) * w;
+          tdy = (pts[i + 1][1] - pts[i][1]) * h;
+        }
+        handles.push({ pointIndex: i, type: 'outgoing', x: px + tdx * weight / 2, y: py + tdy * weight / 2 });
+      }
+      // 入射手柄
+      if (i > 0) {
+        let tdx, tdy;
+        if (i < pts.length - 1) {
+          tdx = (pts[i + 1][0] - pts[i - 1][0]) * w;
+          tdy = (pts[i + 1][1] - pts[i - 1][1]) * h;
+        } else {
+          tdx = (pts[i][0] - pts[i - 1][0]) * w;
+          tdy = (pts[i][1] - pts[i - 1][1]) * h;
+        }
+        handles.push({ pointIndex: i, type: 'incoming', x: px - tdx * weight / 2, y: py - tdy * weight / 2 });
+      }
+    }
+
+    return handles;
+  }
+
   _drawCurve(ctx, s, w, h, isHighlight) {
     if (!s.points || s.points.length < 2) return;
-    
+
     const hasTaper = (s.taperStart > 0 || s.taperEnd > 0) && !s.closed;
     const hasPathGradient = s.pathGradient && s.pathGradient.stops && s.pathGradient.stops.length >= 2;
-    
+
     if (hasTaper && !isHighlight) {
       // 绘制粗细渐变的曲线
       this._drawTaperedCurve(ctx, s, w, h);
@@ -805,15 +919,14 @@ class EditableDynamicBG {
       // 绘制路径渐变的曲线
       this._drawPathGradientCurve(ctx, s, w, h);
     } else {
-      const pts = s.points.map(p => ({ x: p[0] * w, y: p[1] * h }));
+      const pts = s.points;
+      const tw = s.tangentWeights;
+      const th = s.tangentHandles;
       ctx.beginPath();
-      ctx.moveTo(pts[0].x, pts[0].y);
+      ctx.moveTo(pts[0][0] * w, pts[0][1] * h);
       for (let i = 1; i < pts.length; i++) {
-        const cp1x = pts[i - 1].x + (pts[i].x - pts[i - 1].x) * 0.5;
-        const cp1y = pts[i - 1].y;
-        const cp2x = pts[i].x - (pts[i].x - pts[i - 1].x) * 0.5;
-        const cp2y = pts[i].y;
-        ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, pts[i].x, pts[i].y);
+        const { cp1, cp2 } = this._getBezierControlPoints(pts, tw, i - 1, w, h, th);
+        ctx.bezierCurveTo(cp1.x, cp1.y, cp2.x, cp2.y, pts[i][0] * w, pts[i][1] * h);
       }
       if (s.closed) ctx.closePath();
       if (!isHighlight && s.fill && s.fill !== 'none' && s.closed) ctx.fill();
@@ -837,29 +950,30 @@ class EditableDynamicBG {
 
   _drawPathGradientCurve(ctx, s, w, h) {
     if (s.strokeWidth === 0) return;
-    const pts = s.points.map(p => ({ x: p[0] * w, y: p[1] * h }));
+    const rawPts = s.points;
+    const tw = s.tangentWeights;
+    const th = s.tangentHandles;
     const gradient = s.pathGradient;
     const stops = gradient.stops;
     const baseWidth = s.strokeWidth || 2;
-    
+
     // 使用贝塞尔曲线细分（与 _drawCurve 相同的逻辑）
     const numSegments = 20;
     const curvePoints = [];
-    
-    for (let i = 0; i < pts.length - 1; i++) {
-      const p0 = pts[i];
-      const p1 = pts[i + 1];
-      // 贝塞尔控制点（与 _drawCurve 相同）
-      const cp1 = { x: p0.x + (p1.x - p0.x) * 0.5, y: p0.y };
-      const cp2 = { x: p1.x - (p1.x - p0.x) * 0.5, y: p1.y };
-      
+
+    for (let i = 0; i < rawPts.length - 1; i++) {
+      const p0 = { x: rawPts[i][0] * w, y: rawPts[i][1] * h };
+      const p1 = { x: rawPts[i + 1][0] * w, y: rawPts[i + 1][1] * h };
+      const { cp1, cp2 } = this._getBezierControlPoints(rawPts, tw, i, w, h, th);
+
       for (let t = 0; t < numSegments; t++) {
         const ratio = t / numSegments;
         const pt = this._getPointOnBezier(p0, cp1, cp2, p1, ratio);
         curvePoints.push(pt);
       }
     }
-    curvePoints.push(pts[pts.length - 1]);
+    const lastPt = rawPts[rawPts.length - 1];
+    curvePoints.push({ x: lastPt[0] * w, y: lastPt[1] * h });
     
     // 计算总长度
     let totalLength = 0;
@@ -904,31 +1018,32 @@ class EditableDynamicBG {
   
   _drawTaperedCurve(ctx, s, w, h) {
     if (s.strokeWidth === 0) return;
-    const pts = s.points.map(p => ({ x: p[0] * w, y: p[1] * h }));
+    const rawPts = s.points;
+    const tw = s.tangentWeights;
+    const th = s.tangentHandles;
     const baseWidth = s.strokeWidth || 2;
     const startWidth = (s.startWidth || 1) * baseWidth;
     const endWidth = (s.endWidth || 1) * baseWidth;
     const taperStart = s.taperStart || 0;
     const taperEnd = s.taperEnd || 0;
-    
+
     // 使用贝塞尔曲线细分（与 _drawCurve 相同的逻辑）
     const numSegments = 20;
     const curvePoints = [];
-    
-    for (let i = 0; i < pts.length - 1; i++) {
-      const p0 = pts[i];
-      const p1 = pts[i + 1];
-      // 贝塞尔控制点（与 _drawCurve 相同）
-      const cp1 = { x: p0.x + (p1.x - p0.x) * 0.5, y: p0.y };
-      const cp2 = { x: p1.x - (p1.x - p0.x) * 0.5, y: p1.y };
-      
+
+    for (let i = 0; i < rawPts.length - 1; i++) {
+      const p0 = { x: rawPts[i][0] * w, y: rawPts[i][1] * h };
+      const p1 = { x: rawPts[i + 1][0] * w, y: rawPts[i + 1][1] * h };
+      const { cp1, cp2 } = this._getBezierControlPoints(rawPts, tw, i, w, h, th);
+
       for (let t = 0; t < numSegments; t++) {
         const ratio = t / numSegments;
         const pt = this._getPointOnBezier(p0, cp1, cp2, p1, ratio);
         curvePoints.push(pt);
       }
     }
-    curvePoints.push(pts[pts.length - 1]);
+    const lastPt = rawPts[rawPts.length - 1];
+    curvePoints.push({ x: lastPt[0] * w, y: lastPt[1] * h });
     
     // 计算总长度
     let totalLength = 0;
@@ -1373,21 +1488,21 @@ class EditableDynamicBG {
     
     // 为polyline/path形状绘制控制点
     if (shape.type === 'polyline' || shape.type === 'path') {
-      this.drawControlPoints(ctx, shape);
+      this.drawControlPoints(ctx, shape, shape._selectedPointIndex);
     }
   }
   
   /**
    * 绘制polyline/path形状的控制点
    */
-  drawControlPoints(ctx, shape) {
+  drawControlPoints(ctx, shape, selectedPointIndex = -1) {
     if (!shape.points || shape.points.length === 0) return;
-    
+
     const cw = this.canvas ? this.canvas.width : ctx.canvas.width;
     const ch = this.canvas ? this.canvas.height : ctx.canvas.height;
-    
+
     ctx.save();
-    
+
     // 应用旋转变换
     const bounds = this.getShapeBounds(shape);
     const rotation = shape.rotation || 0;
@@ -1398,13 +1513,40 @@ class EditableDynamicBG {
       ctx.rotate(rotation * Math.PI / 180);
       ctx.translate(-cx, -cy);
     }
-    
+
     const handleSize = 8;
-    
+
+    // 绘制切线手柄（仅 path 类型，且仅选中的控制点）
+    if (shape.type === 'path' && selectedPointIndex >= 0) {
+      const handles = this._getTangentHandles(shape, selectedPointIndex, cw, ch);
+      for (const h of handles) {
+        const anchor = shape.points[h.pointIndex];
+        const ax = anchor[0] * cw;
+        const ay = anchor[1] * ch;
+
+        // 绘制手柄连线
+        ctx.beginPath();
+        ctx.moveTo(ax, ay);
+        ctx.lineTo(h.x, h.y);
+        ctx.strokeStyle = 'rgba(255, 215, 0, 0.6)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        // 绘制手柄圆点
+        ctx.beginPath();
+        ctx.arc(h.x, h.y, 3.5, 0, Math.PI * 2);
+        ctx.fillStyle = '#ffd700';
+        ctx.fill();
+        ctx.strokeStyle = '#58a6ff';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      }
+    }
+
     shape.points.forEach((pt, idx) => {
       const px = pt[0] * cw;
       const py = pt[1] * ch;
-      
+
       // 绘制控制点
       ctx.beginPath();
       ctx.arc(px, py, handleSize / 2, 0, Math.PI * 2);
@@ -1413,7 +1555,7 @@ class EditableDynamicBG {
       ctx.strokeStyle = '#58a6ff';
       ctx.lineWidth = 1.5;
       ctx.stroke();
-      
+
       // 绘制点序号
       ctx.fillStyle = '#000';
       ctx.font = '9px monospace';
@@ -1421,7 +1563,7 @@ class EditableDynamicBG {
       ctx.textBaseline = 'middle';
       ctx.fillText(idx.toString(), px, py);
     });
-    
+
     ctx.restore();
   }
   
@@ -1430,39 +1572,73 @@ class EditableDynamicBG {
    */
   getControlPointAt(shape, x, y) {
     if (!shape.points || shape.points.length === 0) return -1;
-    
-    const cw = this.canvas ? this.canvas.width : 1;
-    const ch = this.canvas ? this.canvas.height : 1;
+
+    const cw = this.w;
+    const ch = this.h;
     const handleSize = 10; // 命中区域稍大
     
     // 应用旋转变换
     const bounds = this.getShapeBounds(shape);
     const rotation = shape.rotation || 0;
     
+    // 如果有旋转，需要将点击坐标转换到旋转后的空间
+    let testX = x, testY = y;
+    if (rotation !== 0) {
+      const cx = bounds.x + bounds.width / 2;
+      const cy = bounds.y + bounds.height / 2;
+      const rad = -rotation * Math.PI / 180;
+      const dx = x - cx;
+      const dy = y - cy;
+      testX = dx * Math.cos(rad) - dy * Math.sin(rad) + cx;
+      testY = dx * Math.sin(rad) + dy * Math.cos(rad) + cy;
+    }
+    
     for (let i = 0; i < shape.points.length; i++) {
-      let px = shape.points[i][0] * cw;
-      let py = shape.points[i][1] * ch;
+      const px = shape.points[i][0] * cw;
+      const py = shape.points[i][1] * ch;
       
-      // 如果有旋转，需要将点击坐标转换到旋转后的空间
-      if (rotation !== 0) {
-        const cx = bounds.x + bounds.width / 2;
-        const cy = bounds.y + bounds.height / 2;
-        const rad = -rotation * Math.PI / 180;
-        const dx = x - cx;
-        const dy = y - cy;
-        const rx = dx * Math.cos(rad) - dy * Math.sin(rad) + cx;
-        const ry = dx * Math.sin(rad) + dy * Math.cos(rad) + cy;
-        x = rx;
-        y = ry;
-      }
-      
-      const dist = Math.sqrt((x - px) ** 2 + (y - py) ** 2);
+      const dist = Math.sqrt((testX - px) ** 2 + (testY - py) ** 2);
       if (dist <= handleSize) {
         return i;
       }
     }
     
     return -1;
+  }
+
+  /**
+   * 获取切线手柄命中测试（仅检测选中点的手柄）
+   * @returns {{pointIndex: number, type: 'incoming'|'outgoing'} | null}
+   */
+  getTangentHandleAt(shape, x, y, selectedPointIndex = -1) {
+    if (shape.type !== 'path' || !shape.points || selectedPointIndex < 0) return null;
+
+    const cw = this.w;
+    const ch = this.h;
+    const handleSize = 10;
+
+    const handles = this._getTangentHandles(shape, selectedPointIndex, cw, ch);
+
+    // 应用旋转变换
+    const bounds = this.getShapeBounds(shape);
+    const rotation = shape.rotation || 0;
+    let testX = x, testY = y;
+    if (rotation !== 0) {
+      const cx = bounds.x + bounds.width / 2;
+      const cy = bounds.y + bounds.height / 2;
+      const rad = -rotation * Math.PI / 180;
+      const dx = x - cx, dy = y - cy;
+      testX = dx * Math.cos(rad) - dy * Math.sin(rad) + cx;
+      testY = dx * Math.sin(rad) + dy * Math.cos(rad) + cy;
+    }
+
+    for (const h of handles) {
+      const dist = Math.sqrt((testX - h.x) ** 2 + (testY - h.y) ** 2);
+      if (dist <= handleSize) {
+        return { pointIndex: h.pointIndex, type: h.type };
+      }
+    }
+    return null;
   }
 
   _renderDynamicLayer(ctx, id) {
