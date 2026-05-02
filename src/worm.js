@@ -111,6 +111,7 @@ export class Worm {
         this.adultHitCount = 0;  // 成年体被击中次数
         this.juvenileFearTimer = 0;  // 幼体害怕状态计时器
         this.juvenileFollowTarget = null;  // 幼体跟随目标
+        this.juvenileOrbitPhase = Math.random() * Math.PI * 2;  // 幼体环绕尾部的角度
         this.bittenSegments = new Set();  // 被敌人咬住的段索引集合
         this.isStruggling = false;  // 是否在挣扎
         this.feedCooldown = 0;  // 吃食物冷却（吃一节后游出去一圈再吃下一节）
@@ -892,18 +893,11 @@ export class Worm {
             return this.head;
         }
 
-        // 1.5 冷却期间跳过食物寻觅，直接去跟随或游荡
+        // 1.5 冷却期间跳过食物寻觅，直接去环绕父代尾部或游荡
         if (this.feedCooldown > 0) {
-            // 跟随父代
-            if (this.parentWorm && this.parentWorm.isAlive && this.parentWorm.segments.length > 0) {
-                const parentHead = this.parentWorm.segments[0];
-                const distToParent = this.head.dist(parentHead);
-                if (distToParent > CONFIG.FAMILY.JUVENILE_FOLLOW_RADIUS * 0.3) {
-                    const followIdx = Math.min(2, this.parentWorm.segments.length - 1);
-                    return this.parentWorm.segments[followIdx];
-                }
-            }
-            // 随机游荡
+            const orbitTarget = this._juvenileGetOrbitTarget();
+            if (orbitTarget) return orbitTarget;
+            // 无父代，随机游荡
             this.aiWanderTimer -= dt;
             if (this.aiWanderTimer <= 0) {
                 this.aiWanderTimer = CONFIG.AI_WANDER_CHANGE + Math.random() * 2;
@@ -949,24 +943,42 @@ export class Worm {
             }
         }
 
-        // 3. 跟随父代（平滑跟随，目标点在父代头部后方偏移）
-        if (this.parentWorm && this.parentWorm.isAlive && this.parentWorm.segments.length > 0) {
-            const parentHead = this.parentWorm.segments[0];
-            const distToParent = this.head.dist(parentHead);
-            if (distToParent > CONFIG.FAMILY.JUVENILE_FOLLOW_RADIUS * 0.3) {
-                // 使用父代身体第3段作为跟随目标，更平滑
-                const followIdx = Math.min(2, this.parentWorm.segments.length - 1);
-                return this.parentWorm.segments[followIdx];
-            }
-        }
+        // 3. 环绕父代尾部（幼体默认行为：围着尾巴打转，等着吃下沉的灰色尾巴）
+        const orbitTarget = this._juvenileGetOrbitTarget();
+        if (orbitTarget) return orbitTarget;
 
-        // 4. 默认：随机游荡
+        // 4. 无父代时：随机游荡
         this.aiWanderTimer -= dt;
         if (this.aiWanderTimer <= 0) {
             this.aiWanderTimer = CONFIG.AI_WANDER_CHANGE + Math.random() * 2;
             this.aiWanderDir = Vector.randomDir();
         }
         return this._juvenileAvoidWalls(this.head.add(this.aiWanderDir.mult(50)));
+    }
+
+    /**
+     * 幼体环绕父代尾部的逻辑
+     * 距离 1-2 个身段半径（8~16px），围着尾巴打转
+     */
+    _juvenileGetOrbitTarget() {
+        if (!this.parentWorm || !this.parentWorm.isAlive || this.parentWorm.segments.length < 3) {
+            return null;
+        }
+        const parent = this.parentWorm;
+        const tailIdx = parent.segments.length - 1;
+        const tailPos = parent.segments[tailIdx];
+
+        // 环绕距离：1~2 个身段半径 + 一点随机
+        const orbitDist = CONFIG.SEGMENT_RADIUS * (1.5 + Math.sin(this.juvenileOrbitPhase * 0.3) * 0.5);
+
+        // 缓慢更新环绕角度（让幼体绕着尾巴打转）
+        this.juvenileOrbitPhase += 0.015; // 慢速旋转，每帧约0.86度
+
+        const angle = this.juvenileOrbitPhase;
+        const targetX = tailPos.x + Math.cos(angle) * orbitDist;
+        const targetY = tailPos.y + Math.sin(angle) * orbitDist;
+
+        return this._juvenileAvoidWalls(new Vector(targetX, targetY));
     }
 
     // 幼体边界避让：目标靠近边缘时推向中心
