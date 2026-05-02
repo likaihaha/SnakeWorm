@@ -1749,7 +1749,109 @@ class EditableDynamicBG {
       this.drawControlPoints(ctx, shape, shape._selectedPointIndex);
     }
   }
-  
+
+  // ===== 多选变换控制器 =====
+
+  getGroupBounds(shapes) {
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const s of shapes) {
+      const b = this.getShapeBounds(s);
+      if (b.width <= 0 && b.height <= 0) continue;
+      minX = Math.min(minX, b.x);
+      minY = Math.min(minY, b.y);
+      maxX = Math.max(maxX, b.x + b.width);
+      maxY = Math.max(maxY, b.y + b.height);
+    }
+    if (minX === Infinity) return { x: 0, y: 0, width: 0, height: 0 };
+    return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+  }
+
+  drawGroupTransform(ctx, shapes) {
+    const bounds = this.getGroupBounds(shapes);
+    if (bounds.width <= 0 && bounds.height <= 0) return;
+
+    ctx.save();
+
+    // 外框（绿色虚线区分多选）
+    ctx.strokeStyle = '#3fb950';
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([6, 3]);
+    ctx.strokeRect(bounds.x, bounds.y, bounds.width, bounds.height);
+    ctx.setLineDash([]);
+
+    // 8个缩放手柄
+    const handleSize = 8;
+    const handles = [
+      { x: bounds.x, y: bounds.y },
+      { x: bounds.x + bounds.width / 2, y: bounds.y },
+      { x: bounds.x + bounds.width, y: bounds.y },
+      { x: bounds.x + bounds.width, y: bounds.y + bounds.height / 2 },
+      { x: bounds.x + bounds.width, y: bounds.y + bounds.height },
+      { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height },
+      { x: bounds.x, y: bounds.y + bounds.height },
+      { x: bounds.x, y: bounds.y + bounds.height / 2 },
+    ];
+
+    ctx.fillStyle = '#fff';
+    ctx.strokeStyle = '#3fb950';
+    ctx.lineWidth = 1;
+    handles.forEach(h => {
+      ctx.fillRect(h.x - handleSize / 2, h.y - handleSize / 2, handleSize, handleSize);
+      ctx.strokeRect(h.x - handleSize / 2, h.y - handleSize / 2, handleSize, handleSize);
+    });
+
+    // 旋转手柄
+    const rotX = bounds.x + bounds.width / 2;
+    const rotY = bounds.y - 25;
+    ctx.beginPath();
+    ctx.moveTo(bounds.x + bounds.width / 2, bounds.y);
+    ctx.lineTo(rotX, rotY);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(rotX, rotY, 5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.restore();
+  }
+
+  getGroupTransformHandle(mx, my, shapes) {
+    const bounds = this.getGroupBounds(shapes);
+    if (bounds.width <= 0 && bounds.height <= 0) return null;
+    const handleSize = 12;
+
+    // 旋转手柄
+    const rotX = bounds.x + bounds.width / 2;
+    const rotY = bounds.y - 25;
+    if (Math.abs(mx - rotX) <= handleSize / 2 + 2 && Math.abs(my - rotY) <= handleSize / 2 + 2) {
+      return 'rotate';
+    }
+
+    // 8个缩放手柄
+    const hs = [
+      { x: bounds.x, y: bounds.y, name: 'resize-nw' },
+      { x: bounds.x + bounds.width / 2, y: bounds.y, name: 'resize-n' },
+      { x: bounds.x + bounds.width, y: bounds.y, name: 'resize-ne' },
+      { x: bounds.x + bounds.width, y: bounds.y + bounds.height / 2, name: 'resize-e' },
+      { x: bounds.x + bounds.width, y: bounds.y + bounds.height, name: 'resize-se' },
+      { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height, name: 'resize-s' },
+      { x: bounds.x, y: bounds.y + bounds.height, name: 'resize-sw' },
+      { x: bounds.x, y: bounds.y + bounds.height / 2, name: 'resize-w' },
+    ];
+    for (const h of hs) {
+      if (Math.abs(mx - h.x) <= handleSize / 2 && Math.abs(my - h.y) <= handleSize / 2) {
+        return h.name;
+      }
+    }
+
+    // 内部 = 移动
+    if (mx >= bounds.x && mx <= bounds.x + bounds.width &&
+        my >= bounds.y && my <= bounds.y + bounds.height) {
+      return 'move';
+    }
+
+    return null;
+  }
   /**
    * 绘制polyline/path形状的控制点
    */
