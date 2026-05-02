@@ -1,0 +1,2685 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DynamicBG 编辑器 v2.3</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    background: #0f1115;
+    color: #c9d1d9;
+    overflow: hidden;
+    width: 100vw;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* 顶部工具栏 */
+  .toolbar {
+    height: 48px;
+    background: #161b22;
+    border-bottom: 1px solid #30363d;
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    gap: 8px;
+    flex-shrink: 0;
+    z-index: 20;
+  }
+  .toolbar h1 {
+    font-size: 15px;
+    font-weight: 600;
+    color: #58a6ff;
+    margin-right: auto;
+    letter-spacing: 1px;
+  }
+  .toolbar-group {
+    display: flex;
+    gap: 4px;
+    padding: 0 8px;
+    border-right: 1px solid #30363d;
+  }
+  .toolbar-group:last-child {
+    border-right: none;
+  }
+  .btn {
+    padding: 6px 12px;
+    border: 1px solid #30363d;
+    background: #21262d;
+    color: #c9d1d9;
+    border-radius: 6px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .btn:hover { background: #30363d; border-color: #8b949e; }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  select.btn {
+    appearance: auto;
+    background: #21262d;
+    color: #c9d1d9;
+    padding: 6px 8px;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  select.btn:hover { background: #30363d; }
+  .btn.primary { background: #1f6feb; border-color: #1f6feb; color: #fff; }
+  .btn.primary:hover { background: #388bfd; }
+  .btn.danger { background: #da3633; border-color: #da3633; color: #fff; }
+  .btn.danger:hover { background: #f85149; }
+  .btn.success { background: #238636; border-color: #238636; color: #fff; }
+  .btn.success:hover { background: #2ea043; }
+  .btn-icon {
+    padding: 6px 8px;
+    min-width: 32px;
+    justify-content: center;
+  }
+
+  /* 主体 */
+  .main {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+  }
+
+  /* 左侧面板 */
+  .left-panel {
+    width: 280px;
+    background: #161b22;
+    border-right: 1px solid #30363d;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .panel-tabs {
+    display: flex;
+    background: #0d1117;
+    border-bottom: 1px solid #30363d;
+  }
+  .panel-tab {
+    flex: 1;
+    padding: 8px;
+    text-align: center;
+    font-size: 12px;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+  }
+  .panel-tab:hover { background: #161b22; }
+  .panel-tab.active { 
+    border-bottom-color: #58a6ff; 
+    color: #58a6ff;
+    background: #161b22;
+  }
+  .panel-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px;
+  }
+  .panel-content::-webkit-scrollbar { width: 6px; }
+  .panel-content::-webkit-scrollbar-thumb { background: #30363d; border-radius: 3px; }
+
+  /* 图层列表 */
+  .layer-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.15s;
+    border: 1px solid transparent;
+    margin-bottom: 2px;
+  }
+  .layer-item:hover { background: #21262d; }
+  .layer-item.selected { 
+    background: rgba(31, 111, 235, 0.15); 
+    border-color: #1f6feb; 
+  }
+  .layer-item .layer-icon { font-size: 14px; width: 20px; text-align: center; }
+  .layer-item .layer-name { flex: 1; font-size: 12px; }
+  .layer-item .layer-visibility { 
+    font-size: 12px; 
+    cursor: pointer; 
+    opacity: 0.6;
+    transition: opacity 0.2s;
+  }
+  .layer-item .layer-visibility:hover { opacity: 1; }
+  .layer-item .layer-lock { 
+    font-size: 12px; 
+    cursor: pointer; 
+    opacity: 0.4;
+    transition: opacity 0.2s;
+    width: 16px;
+    text-align: center;
+  }
+  .layer-item .layer-lock:hover { opacity: 1; }
+  .layer-item .layer-lock.locked { opacity: 0.9; color: #f0883e; }
+  .layer-item.locked { opacity: 0.6; }
+  .layer-item.locked .layer-name { text-decoration: line-through; color: #8b949e; }
+  .layer-item.dragging { opacity: 0.4; background: #21262d; }
+  .layer-item.drag-over { border-top: 2px solid #58a6ff; }
+  .layer-item.drag-over-bottom { border-bottom: 2px solid #58a6ff; }
+
+  /* 元素面板 */
+  .element-category {
+    margin-bottom: 12px;
+  }
+  .category-title {
+    font-size: 11px;
+    color: #8b949e;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 4px 8px;
+    margin-bottom: 4px;
+  }
+  .element-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 4px;
+  }
+  .element-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 8px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.15s;
+    border: 1px solid #30363d;
+  }
+  .element-item:hover { 
+    background: #21262d; 
+    border-color: #58a6ff; 
+  }
+  .element-item .element-icon { font-size: 20px; }
+  .element-item .element-name { font-size: 10px; color: #8b949e; }
+
+  /* 画布区域 */
+  .canvas-wrap {
+    flex: 1;
+    position: relative;
+    background: #000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+  canvas {
+    box-shadow: 0 0 30px rgba(0,0,0,0.8);
+    cursor: crosshair;
+  }
+  .canvas-info {
+    position: absolute;
+    bottom: 10px;
+    left: 10px;
+    font-size: 11px;
+    color: rgba(255,255,255,0.3);
+    pointer-events: none;
+  }
+  .zoom-controls {
+    position: absolute;
+    bottom: 10px;
+    right: 10px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    background: rgba(22, 27, 34, 0.9);
+    padding: 4px 8px;
+    border-radius: 6px;
+    border: 1px solid #30363d;
+  }
+  .zoom-btn {
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #21262d;
+    border: 1px solid #30363d;
+    border-radius: 4px;
+    color: #c9d1d9;
+    cursor: pointer;
+    font-size: 12px;
+  }
+  .zoom-btn:hover { background: #30363d; }
+  .zoom-level {
+    font-size: 11px;
+    color: #8b949e;
+    min-width: 40px;
+    text-align: center;
+  }
+
+  /* 右侧属性面板 */
+  .right-panel {
+    width: 300px;
+    background: #161b22;
+    border-left: 1px solid #30363d;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .property-header {
+    padding: 12px;
+    border-bottom: 1px solid #30363d;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .property-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: #58a6ff;
+  }
+  .property-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px;
+  }
+  .property-content::-webkit-scrollbar { width: 6px; }
+  .property-content::-webkit-scrollbar-thumb { background: #30363d; border-radius: 3px; }
+
+  /* 属性字段 */
+  .field {
+    margin-bottom: 12px;
+  }
+  .field label {
+    display: block;
+    font-size: 11px;
+    color: #8b949e;
+    margin-bottom: 4px;
+  }
+  .field-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  .field input[type="range"] {
+    flex: 1;
+    accent-color: #58a6ff;
+  }
+  .field input[type="color"] {
+    width: 32px;
+    height: 24px;
+    border: 1px solid #30363d;
+    border-radius: 4px;
+    background: none;
+    cursor: pointer;
+  }
+  .field input[type="number"],
+  .field input[type="text"] {
+    flex: 1;
+    background: #0d1117;
+    border: 1px solid #30363d;
+    color: #c9d1d9;
+    border-radius: 4px;
+    padding: 4px 8px;
+    font-size: 12px;
+  }
+  .field select {
+    flex: 1;
+    background: #0d1117;
+    border: 1px solid #30363d;
+    color: #c9d1d9;
+    border-radius: 4px;
+    padding: 4px 8px;
+    font-size: 12px;
+  }
+  .val {
+    font-size: 11px;
+    color: #58a6ff;
+    min-width: 28px;
+    text-align: right;
+    font-family: monospace;
+  }
+
+  /* AI 面板 */
+  .ai-panel {
+    padding: 12px;
+    border-top: 1px solid #30363d;
+  }
+  .ai-input-wrap {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  .ai-input {
+    flex: 1;
+    background: #0d1117;
+    border: 1px solid #30363d;
+    color: #c9d1d9;
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-size: 12px;
+  }
+  .ai-input:focus {
+    outline: none;
+    border-color: #58a6ff;
+  }
+  .ai-suggestions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+  .ai-suggestion {
+    padding: 4px 8px;
+    background: #21262d;
+    border: 1px solid #30363d;
+    border-radius: 4px;
+    font-size: 10px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .ai-suggestion:hover {
+    background: #30363d;
+    border-color: #58a6ff;
+  }
+
+  /* 弹窗 */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+  }
+  .modal-overlay.active { display: flex; }
+  .modal {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 12px;
+    width: 600px;
+    max-width: 90vw;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+  }
+  .modal-header {
+    padding: 14px 18px;
+    border-bottom: 1px solid #30363d;
+    font-size: 14px;
+    font-weight: 600;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .modal-body {
+    padding: 14px 18px;
+    flex: 1;
+    overflow: auto;
+  }
+  .modal-body textarea {
+    width: 100%;
+    height: 300px;
+    background: #0d1117;
+    border: 1px solid #30363d;
+    color: #c9d1d9;
+    border-radius: 6px;
+    padding: 10px;
+    font-family: 'Consolas', monospace;
+    font-size: 12px;
+    resize: none;
+  }
+  .modal-footer {
+    padding: 12px 18px;
+    border-top: 1px solid #30363d;
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+
+  /* 快捷键帮助 */
+  .shortcuts-help {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(22, 27, 34, 0.95);
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    padding: 12px 16px;
+    font-size: 11px;
+    color: #8b949e;
+    z-index: 50;
+    display: none;
+  }
+  .shortcuts-help.visible { display: block; }
+  .shortcuts-help kbd {
+    background: #21262d;
+    border: 1px solid #30363d;
+    border-radius: 3px;
+    padding: 1px 4px;
+    font-family: monospace;
+    font-size: 10px;
+  }
+
+  /* 状态栏 */
+  .status-bar {
+    height: 24px;
+    background: #161b22;
+    border-top: 1px solid #30363d;
+    display: flex;
+    align-items: center;
+    padding: 0 12px;
+    font-size: 11px;
+    color: #8b949e;
+    gap: 16px;
+  }
+  .status-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #238636;
+  }
+  .status-dot.dirty { background: #d29922; }
+</style>
+</head>
+<body>
+
+<!-- 顶部工具栏 -->
+<div class="toolbar">
+  <h1>DynamicBG 编辑器 <span style="color:#8b949e;font-size:12px;font-weight:normal;">v2.3</span></h1>
+  
+  <div class="toolbar-group">
+    <button class="btn" id="new-btn" title="新建空白画布 (Ctrl+N)">📄 新建</button>
+    <button class="btn" id="open-btn" title="打开配置 (Ctrl+O)">📂 打开</button>
+    <button class="btn primary" id="save-btn" title="保存配置 (Ctrl+S)">💾 保存</button>
+  </div>
+  
+  <div class="toolbar-group">
+    <button class="btn btn-icon" id="undo-btn" title="撤销 (Ctrl+Z)" disabled>↩</button>
+    <button class="btn btn-icon" id="redo-btn" title="重做 (Ctrl+Shift+Z)" disabled>↪</button>
+  </div>
+  
+  <div class="toolbar-group">
+    <button class="btn" id="export-png-btn" title="导出PNG (Ctrl+Shift+E)">🖼️ PNG</button>
+    <button class="btn" id="export-json-btn" title="导出JSON (Ctrl+Shift+J)">📋 JSON</button>
+    <button class="btn" id="export-code-btn" title="导出代码">💻 代码</button>
+  </div>
+  
+  <div class="toolbar-group">
+    <button class="btn btn-icon" id="grid-btn" title="切换网格 (Ctrl+')">⊞</button>
+    <button class="btn btn-icon" id="guides-btn" title="切换参考线 (Ctrl+;)">┆</button>
+  </div>
+  
+  <div class="toolbar-group">
+    <select id="canvas-size-preset" class="btn" title="画布尺寸预设">
+      <option value="">📐 尺寸预设</option>
+      <option value="960x540">960×540 (16:9)</option>
+      <option value="1280x720">1280×720 (HD)</option>
+      <option value="1920x1080">1920×1080 (FHD)</option>
+      <option value="1080x1920">1080×1920 (竖屏)</option>
+      <option value="1024x1024">1024×1024 (1:1)</option>
+      <option value="800x600">800×600 (4:3)</option>
+      <option value="640x480">640×480 (VGA)</option>
+      <option value="375x667">375×667 (iPhone)</option>
+      <option value="414x896">414×896 (iPhone XR)</option>
+    </select>
+  </div>
+  
+  <div class="toolbar-group">
+    <button class="btn" id="help-btn" title="快捷键帮助 (F1)">❓ 帮助</button>
+  </div>
+</div>
+
+<!-- 主体 -->
+<div class="main">
+  <!-- 左侧面板 -->
+  <div class="left-panel">
+    <div class="panel-tabs">
+      <div class="panel-tab active" data-tab="layers">📑 图层</div>
+      <div class="panel-tab" data-tab="elements">🎨 元素</div>
+      <div class="panel-tab" data-tab="presets">📦 预设</div>
+    </div>
+    
+    <div class="panel-content" id="panel-content">
+      <!-- 内容由JavaScript动态生成 -->
+    </div>
+    
+    <!-- AI 面板 -->
+    <div class="ai-panel">
+      <div class="ai-input-wrap">
+        <input type="text" class="ai-input" id="ai-input" placeholder="输入AI指令，如：添加一个矩形">
+        <button class="btn primary" id="ai-send-btn">发送</button>
+        <button class="btn" id="ai-settings-btn" title="AI模型设置" style="padding:8px;">⚙️</button>
+      </div>
+      <div class="ai-suggestions" id="ai-suggestions">
+        <!-- 建议由JavaScript动态生成 -->
+      </div>
+    </div>
+  </div>
+  
+  <!-- 画布区域 -->
+  <div class="canvas-wrap" id="canvas-container">
+    <!-- canvas 由 JavaScript 动态创建 -->
+    <div class="canvas-info" id="canvas-info">960×540 @ 100%</div>
+    <div class="zoom-controls">
+      <button class="zoom-btn" id="zoom-in">+</button>
+      <span class="zoom-level" id="zoom-level">100%</span>
+      <button class="zoom-btn" id="zoom-out">-</button>
+      <button class="zoom-btn" id="zoom-fit">适应</button>
+      <button class="zoom-btn" id="zoom-reset">重置</button>
+    </div>
+  </div>
+  
+  <!-- 右侧属性面板 -->
+  <div class="right-panel">
+    <div class="property-header">
+      <span class="property-title" id="property-title">属性</span>
+      <button class="btn btn-icon" id="close-property" title="关闭">✕</button>
+    </div>
+    <div class="property-content" id="property-content">
+      <div style="text-align: center; color: #8b949e; padding: 20px;">
+        选择一个元素以编辑其属性
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 状态栏 -->
+<div class="status-bar">
+  <div class="status-item">
+    <span class="status-dot" id="status-dot"></span>
+    <span id="status-text">就绪</span>
+  </div>
+  <div class="status-item">
+    <span>元素: <span id="element-count">0</span></span>
+  </div>
+  <div class="status-item">
+    <span>选中: <span id="selected-count">0</span></span>
+  </div>
+  <div class="status-item">
+    <span>缩放: <span id="zoom-percent">100%</span></span>
+  </div>
+</div>
+
+<!-- 快捷键帮助 -->
+<div class="shortcuts-help" id="shortcuts-help">
+  <div><kbd>Ctrl+Z</kbd> 撤销 &nbsp; <kbd>Ctrl+Shift+Z</kbd> 重做</div>
+  <div><kbd>Ctrl+C</kbd> 复制 &nbsp; <kbd>Ctrl+V</kbd> 粘贴 &nbsp; <kbd>Delete</kbd> 删除</div>
+  <div><kbd>Ctrl+S</kbd> 保存 &nbsp; <kbd>Ctrl+Shift+E</kbd> 导出PNG</div>
+  <div><kbd>Ctrl+=</kbd> 放大 &nbsp; <kbd>Ctrl+-</kbd> 缩小 &nbsp; <kbd>Ctrl+0</kbd> 适应</div>
+  <div><kbd>Alt+拖拽</kbd> 平移 &nbsp; <kbd>Shift+拖拽</kbd> 框选</div>
+</div>
+
+<!-- 弹窗 -->
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <div class="modal-header">
+      <span id="modal-title">导出</span>
+      <span style="cursor:pointer;color:#8b949e;" onclick="closeModal()">✕</span>
+    </div>
+    <div class="modal-body">
+      <textarea id="modal-text" readonly></textarea>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="copyModal()">复制</button>
+      <button class="btn primary" onclick="closeModal()">关闭</button>
+    </div>
+  </div>
+</div>
+
+<!-- 隐藏文件输入 -->
+<input type="file" id="file-input" accept=".json" style="display:none">
+
+<script type="module">
+  // 导入模块
+  import { BackgroundEditor } from './core.js';
+  import { CanvasManager } from './canvas.js';
+  import { ElementFactory, ELEMENT_TYPES, ELEMENT_CATEGORIES } from './elements.js';
+  import { HistoryManager } from './history.js';
+  import { ExportManager } from './export.js';
+  import { KeyboardManager } from './keyboard.js';
+  import { AIInterface } from './ai.js';
+
+  // 初始化编辑器
+  class EditorApp {
+    constructor() {
+      this.editor = null;
+      this.canvasManager = null;
+      this.elementFactory = null;
+      this.historyManager = null;
+      this.exportManager = null;
+      this.keyboardManager = null;
+      this.aiInterface = null;
+      
+      this.currentTab = 'layers';
+      this.selectedElement = null;
+      
+      this.init();
+    }
+
+    async init() {
+      // 创建编辑器实例
+      this.editor = new BackgroundEditor('canvas-container');
+      
+      // 初始化各个管理器
+      this.canvasManager = new CanvasManager(this.editor);
+      this.elementFactory = new ElementFactory(this.editor);
+      this.historyManager = new HistoryManager(this.editor);
+      this.exportManager = new ExportManager(this.editor);
+      this.keyboardManager = new KeyboardManager(this.editor);
+      this.aiInterface = new AIInterface(this.editor);
+      
+      // 设置编辑器引用
+      this.editor.canvasManager = this.canvasManager;
+      this.editor.elementFactory = this.elementFactory;
+      this.editor.historyManager = this.historyManager;
+      this.editor.exportManager = this.exportManager;
+      this.editor.keyboardManager = this.keyboardManager;
+      this.editor.aiInterface = this.aiInterface;
+      
+      // 设置UI更新回调
+      this.editor.updateUI = () => this.updateUI();
+      
+      // 设置重命名回调
+      this.editor.triggerRename = (shape) => {
+        // 找到对应的图层名称元素并触发重命名
+        const layerItems = document.querySelectorAll('.layer-item');
+        layerItems.forEach(item => {
+          const nameSpan = item.querySelector('.layer-name');
+          if (nameSpan && nameSpan.textContent === (shape.name || shape.type)) {
+            this.startInlineRename(nameSpan, shape);
+          }
+        });
+      };
+      this.editor.updatePropertyPanel = () => this.updatePropertyPanel();
+      
+      // 加载保存的LLM配置
+      try {
+        const savedConfig = localStorage.getItem('editor_llm_config');
+        if (savedConfig) {
+          this.aiInterface.configureLLM(JSON.parse(savedConfig));
+        }
+      } catch (e) {
+        console.warn('加载LLM配置失败:', e);
+      }
+      
+      // 初始化UI
+      this.setupUI();
+      this.updateUI();
+      
+      // 启用自动保存
+      this.historyManager.enableAutoSave(30000);
+      
+      console.log('编辑器初始化完成');
+    }
+
+    setupUI() {
+      // 工具栏按钮
+      document.getElementById('new-btn').addEventListener('click', () => this.editor.resetConfig());
+      document.getElementById('open-btn').addEventListener('click', () => this.editor.loadFromFile());
+      document.getElementById('save-btn').addEventListener('click', () => this.editor.saveConfig());
+      document.getElementById('undo-btn').addEventListener('click', () => this.editor.undo());
+      document.getElementById('redo-btn').addEventListener('click', () => this.editor.redo());
+      document.getElementById('export-png-btn').addEventListener('click', () => this.exportManager.exportPNG());
+      document.getElementById('export-json-btn').addEventListener('click', () => this.exportManager.exportJSON());
+      document.getElementById('export-code-btn').addEventListener('click', () => this.showExportCode());
+      document.getElementById('grid-btn').addEventListener('click', () => this.canvasManager.toggleGrid());
+      document.getElementById('guides-btn').addEventListener('click', () => this.canvasManager.toggleGuides());
+      document.getElementById('help-btn').addEventListener('click', () => this.showHelp());
+      
+      // 画布尺寸预设
+      document.getElementById('canvas-size-preset').addEventListener('change', (e) => {
+        const value = e.target.value;
+        if (value) {
+          const [width, height] = value.split('x').map(Number);
+          this.editor.setCanvasSize(width, height);
+          e.target.value = ''; // 重置选择
+        }
+      });
+      
+      // 面板标签
+      document.querySelectorAll('.panel-tab').forEach(tab => {
+        tab.addEventListener('click', () => this.switchTab(tab.dataset.tab));
+      });
+      
+      // AI输入
+      document.getElementById('ai-input').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') this.sendAICommand();
+      });
+      document.getElementById('ai-send-btn').addEventListener('click', () => this.sendAICommand());
+      document.getElementById('ai-settings-btn').addEventListener('click', () => this.showLLMSettings());
+      
+      // 文件输入
+      document.getElementById('file-input').addEventListener('change', (e) => this.handleFileLoad(e));
+      
+      // 关闭属性面板
+      document.getElementById('close-property').addEventListener('click', () => {
+        this.editor.selectElement(null);
+      });
+    }
+
+    switchTab(tabName) {
+      this.currentTab = tabName;
+      
+      // 更新标签样式
+      document.querySelectorAll('.panel-tab').forEach(tab => {
+        tab.classList.toggle('active', tab.dataset.tab === tabName);
+      });
+      
+      // 更新内容
+      this.updatePanelContent();
+    }
+
+    updatePanelContent() {
+      const container = document.getElementById('panel-content');
+      container.innerHTML = '';
+      
+      switch (this.currentTab) {
+        case 'layers':
+          this.renderLayersPanel(container);
+          break;
+        case 'elements':
+          this.renderElementsPanel(container);
+          break;
+        case 'presets':
+          this.renderPresetsPanel(container);
+          break;
+      }
+    }
+
+    // 内联重命名方法
+    startInlineRename(nameSpan, shape) {
+      const currentName = shape.name || shape.type;
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.value = currentName;
+      input.className = 'inline-rename-input';
+      input.style.cssText = `
+        background: #0d1117;
+        border: 1px solid #58a6ff;
+        color: #c9d1d9;
+        font-size: 12px;
+        padding: 2px 4px;
+        border-radius: 3px;
+        width: 100%;
+        outline: none;
+      `;
+      
+      // 替换文本为输入框
+      nameSpan.textContent = '';
+      nameSpan.appendChild(input);
+      input.focus();
+      input.select();
+      
+      // 完成重命名
+      const finishRename = () => {
+        const newName = input.value.trim();
+        if (newName && newName !== currentName) {
+          shape.name = newName;
+          this.editor.rebuild();
+          this.editor.markDirty();
+        }
+        this.updateUI();
+      };
+      
+      input.addEventListener('blur', finishRename);
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          input.blur();
+        } else if (e.key === 'Escape') {
+          input.value = currentName;
+          input.blur();
+        }
+      });
+    }
+
+    renderLayersPanel(container) {
+      const layers = this.editor.config.layerOrder || [];
+      const shapes = this.editor.config.shapes || [];
+      
+      if (layers.length === 0) {
+        container.innerHTML = `
+          <div style="text-align: center; color: #8b949e; padding: 20px;">
+            暂无图层<br>
+            <small>点击"元素"标签添加元素</small>
+          </div>
+        `;
+        return;
+      }
+      
+      // 打组/取消打组按钮
+      const groupBtnWrap = document.createElement('div');
+      groupBtnWrap.style.cssText = 'display:flex; gap:4px; margin-bottom:8px;';
+      
+      const groupBtn = document.createElement('button');
+      groupBtn.className = 'btn';
+      groupBtn.textContent = '📦 打组';
+      groupBtn.style.cssText = 'flex:1; font-size:11px;';
+      groupBtn.addEventListener('click', () => {
+        const selected = this.editor.selectedElements || [];
+        const shapeIds = selected.filter(id => id.startsWith('shape_'));
+        if (shapeIds.length >= 2) {
+          this.editor.groupElements(shapeIds);
+          this.showNotification(`已将 ${shapeIds.length} 个元素打组`, 'success');
+        } else if (shapeIds.length === 1) {
+          this.showNotification('请使用框选(Shift+拖拽)选择2个以上元素后再打组', 'info');
+        } else {
+          this.showNotification('请先选择多个元素（Shift+拖拽框选）', 'info');
+        }
+      });
+      
+      const ungroupBtn = document.createElement('button');
+      ungroupBtn.className = 'btn';
+      ungroupBtn.textContent = '📤 取消组';
+      ungroupBtn.style.cssText = 'flex:1; font-size:11px;';
+      ungroupBtn.addEventListener('click', () => {
+        if (this.editor.selectedElement && this.editor.selectedElement.startsWith('group_')) {
+          this.editor.ungroupElements(this.editor.selectedElement);
+          this.showNotification('已取消打组', 'success');
+        } else {
+          this.showNotification('请先选中一个组', 'info');
+        }
+      });
+      
+      groupBtnWrap.appendChild(groupBtn);
+      groupBtnWrap.appendChild(ungroupBtn);
+      container.appendChild(groupBtnWrap);
+      
+      [...layers].reverse().forEach((layerId, reverseIdx) => {
+        const isGroup = layerId.startsWith('group_');
+        const shape = isGroup ? null : shapes.find(s => `shape_${s.id}` === layerId);
+        const group = isGroup ? (this.editor.config.groups || []).find(g => g.id === layerId) : null;
+        
+        if (!shape && !group) return;
+        
+        const isLocked = shape ? shape.locked === true : false;
+        const item = document.createElement('div');
+        item.className = `layer-item ${this.editor.selectedElement === layerId ? 'selected' : ''} ${isLocked ? 'locked' : ''}`;
+        item.draggable = true;
+        item.dataset.layerId = layerId;
+        
+        const icon = isGroup ? '📦' : this.getLayerIcon(shape.type);
+        const name = isGroup ? (group.name || '组') : (shape.name || shape.type);
+        const visible = isGroup ? true : (shape.visible !== false);
+        
+        item.innerHTML = `
+          <span class="layer-icon">${icon}</span>
+          <span class="layer-name">${name}</span>
+          <span class="layer-move-btns" style="display:flex; gap:1px;">
+            <span class="layer-move-up" title="上移一层" style="font-size:10px; cursor:pointer; opacity:0.5; padding:0 2px;">▲</span>
+            <span class="layer-move-down" title="下移一层" style="font-size:10px; cursor:pointer; opacity:0.5; padding:0 2px;">▼</span>
+          </span>
+          ${!isGroup ? `
+            <span class="layer-lock ${isLocked ? 'locked' : ''}" title="${isLocked ? '解锁' : '锁定'}">
+              ${isLocked ? '🔒' : '🔓'}
+            </span>
+            <span class="layer-visibility" title="${visible ? '隐藏' : '显示'}">
+              ${visible ? '👁' : '◌'}
+            </span>
+          ` : ''}
+        `;
+        
+        item.addEventListener('click', (e) => {
+          if (!isLocked) {
+            if (e.shiftKey) {
+              // Shift+点击：多选/取消选择
+              const idx = this.editor.selectedElements.indexOf(layerId);
+              if (idx >= 0) {
+                // 已选中，取消选择
+                this.editor.selectedElements.splice(idx, 1);
+                if (this.editor.selectedElement === layerId) {
+                  this.editor.selectedElement = this.editor.selectedElements[0] || null;
+                }
+              } else {
+                // 未选中，添加到选择
+                this.editor.selectedElements.push(layerId);
+                this.editor.selectedElement = layerId;
+              }
+              this.editor.updateUI();
+              this.editor.updatePropertyPanel();
+            } else {
+              this.editor.selectElement(layerId);
+            }
+          }
+        });
+        
+        // 双击图层名称进行重命名
+        const nameSpan = item.querySelector('.layer-name');
+        nameSpan.addEventListener('dblclick', (e) => {
+          e.stopPropagation();
+          if (!isLocked && shape) {
+            this.startInlineRename(nameSpan, shape);
+          }
+        });
+        
+        // 上移按钮
+        item.querySelector('.layer-move-up').addEventListener('click', (e) => {
+          e.stopPropagation();
+          this.editor.moveElementUp(layerId);
+          this.updateUI();
+        });
+        
+        // 下移按钮
+        item.querySelector('.layer-move-down').addEventListener('click', (e) => {
+          e.stopPropagation();
+          this.editor.moveElementDown(layerId);
+          this.updateUI();
+        });
+        
+        if (!isGroup) {
+          item.querySelector('.layer-lock').addEventListener('click', (e) => {
+            e.stopPropagation();
+            shape.locked = !shape.locked;
+            // 锁定时取消选中
+            if (shape.locked && this.editor.selectedElement === layerId) {
+              this.editor.selectElement(null);
+            }
+            this.editor.rebuild();
+            this.updateUI();
+          });
+          
+          item.querySelector('.layer-visibility').addEventListener('click', (e) => {
+            e.stopPropagation();
+            shape.visible = shape.visible === false ? true : false;
+            this.editor.rebuild();
+            this.updateUI();
+          });
+        }
+        
+        // 拖拽排序事件
+        item.addEventListener('dragstart', (e) => {
+          e.dataTransfer.setData('text/plain', layerId);
+          item.classList.add('dragging');
+          // 设置拖拽图像
+          const ghost = item.cloneNode(true);
+          ghost.style.position = 'absolute';
+          ghost.style.top = '-1000px';
+          document.body.appendChild(ghost);
+          e.dataTransfer.setDragImage(ghost, 0, 0);
+          setTimeout(() => document.body.removeChild(ghost), 0);
+        });
+        
+        item.addEventListener('dragend', () => {
+          item.classList.remove('dragging');
+          // 清除所有drag-over样式
+          container.querySelectorAll('.layer-item').forEach(el => {
+            el.classList.remove('drag-over', 'drag-over-bottom');
+          });
+        });
+        
+        item.addEventListener('dragover', (e) => {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'move';
+          const rect = item.getBoundingClientRect();
+          const midY = rect.top + rect.height / 2;
+          
+          // 清除其他项的样式
+          container.querySelectorAll('.layer-item').forEach(el => {
+            el.classList.remove('drag-over', 'drag-over-bottom');
+          });
+          
+          // 根据鼠标位置决定插入位置
+          if (e.clientY < midY) {
+            item.classList.add('drag-over');
+          } else {
+            item.classList.add('drag-over-bottom');
+          }
+        });
+        
+        item.addEventListener('dragleave', () => {
+          item.classList.remove('drag-over', 'drag-over-bottom');
+        });
+        
+        item.addEventListener('drop', (e) => {
+          e.preventDefault();
+          const draggedId = e.dataTransfer.getData('text/plain');
+          if (draggedId === layerId) return;
+          
+          const rect = item.getBoundingClientRect();
+          const midY = rect.top + rect.height / 2;
+          const insertBefore = e.clientY < midY;
+          
+          // 获取当前图层顺序（显示是反转的，但存储是正序的）
+          const layers = this.editor.config.layerOrder;
+          const draggedIdx = layers.indexOf(draggedId);
+          const targetIdx = layers.indexOf(layerId);
+          
+          if (draggedIdx === -1 || targetIdx === -1) return;
+          
+          // 移除拖拽的图层
+          layers.splice(draggedIdx, 1);
+          
+          // 计算新的插入位置
+          let newIdx = layers.indexOf(layerId);
+          if (!insertBefore) {
+            newIdx += 1;
+          }
+          
+          // 插入到新位置
+          layers.splice(newIdx, 0, draggedId);
+          
+          this.editor.rebuild();
+          this.updateUI();
+          this.showNotification('图层顺序已更新', 'success');
+        });
+
+        container.appendChild(item);
+      });
+    }
+
+    renderElementsPanel(container) {
+      Object.entries(ELEMENT_CATEGORIES).forEach(([categoryKey, category]) => {
+        const categoryDiv = document.createElement('div');
+        categoryDiv.className = 'element-category';
+
+        const title = document.createElement('div');
+        title.className = 'category-title';
+        title.textContent = `${category.icon} ${category.name}`;
+        categoryDiv.appendChild(title);
+
+        const grid = document.createElement('div');
+        grid.className = 'element-grid';
+
+        Object.entries(ELEMENT_TYPES)
+          .filter(([_, type]) => type.category === categoryKey)
+          .forEach(([typeKey, type]) => {
+            const item = document.createElement('div');
+            item.className = 'element-item';
+            item.innerHTML = `
+              <span class="element-icon">${type.icon}</span>
+              <span class="element-name">${type.name}</span>
+            `;
+            item.addEventListener('click', () => {
+              if (typeKey === 'polyline') {
+                this.editor.setDrawMode('polyline');
+                this.showNotification('折线绘制模式：点击画布添加点，右键完成', 'info');
+              } else if (typeKey === 'path') {
+                this.editor.setDrawMode('path');
+                this.showNotification('曲线绘制模式：按住左键拖动绘制，右键完成', 'info');
+              } else {
+                this.elementFactory.createElement(typeKey);
+              }
+            });
+            grid.appendChild(item);
+          });
+
+        categoryDiv.appendChild(grid);
+        container.appendChild(categoryDiv);
+      });
+    }
+
+    renderPresetsPanel(container) {
+      const presets = [
+        { id: 'basicBackground', name: '基础背景', icon: '🌈' },
+        { id: 'deepSeaScene', name: '深海场景', icon: '🌊' },
+        { id: 'forestScene', name: '森林场景', icon: '🌲' },
+        { id: 'spaceScene', name: '太空场景', icon: '🌌' }
+      ];
+      
+      presets.forEach(preset => {
+        const item = document.createElement('div');
+        item.className = 'element-item';
+        item.style.marginBottom = '8px';
+        item.innerHTML = `
+          <span class="element-icon">${preset.icon}</span>
+          <span class="element-name">${preset.name}</span>
+        `;
+        item.addEventListener('click', () => {
+          this.elementFactory.createPreset(preset.id);
+        });
+        container.appendChild(item);
+      });
+    }
+
+    getLayerIcon(type) {
+      const icons = {
+        rectangle: '⬜',
+        circle: '⭕',
+        polygon: '⬟',
+        polyline: '⌇',
+        path: '∿',
+        mountain: '⛰️',
+        rock: '🪨',
+        particles: '✨'
+      };
+      return icons[type] || '❓';
+    }
+
+    updateUI() {
+      // 更新图层面板
+      this.updatePanelContent();
+      
+      // 更新属性面板
+      this.updatePropertyPanel();
+      
+      // 更新状态栏
+      this.updateStatusBar();
+      
+      // 更新撤销/重做按钮（使用编辑器自身的history状态）
+      document.getElementById('undo-btn').disabled = this.editor.historyIndex <= 0;
+      document.getElementById('redo-btn').disabled = this.editor.historyIndex >= this.editor.history.length - 1;
+      
+      // 更新AI建议
+      this.updateAISuggestions();
+    }
+
+    updatePropertyPanel() {
+      const container = document.getElementById('property-content');
+      const title = document.getElementById('property-title');
+      
+      if (!this.editor.selectedElement) {
+        title.textContent = '属性';
+        container.innerHTML = `
+          <div style="text-align: center; color: #8b949e; padding: 20px;">
+            选择一个元素以编辑其属性
+          </div>
+        `;
+        return;
+      }
+      
+      const elementId = this.editor.selectedElement;
+      title.textContent = `属性 - ${elementId}`;
+      
+      // 获取元素
+      let element;
+      if (elementId === 'background') {
+        // 背景元素
+        element = {
+          type: 'background',
+          name: '背景',
+          ...this.editor.config.background
+        };
+      } else if (elementId.startsWith('group_')) {
+        // 组元素：显示组信息和子元素列表
+        const group = (this.editor.config.groups || []).find(g => g.id === elementId);
+        if (!group) {
+          container.innerHTML = '<div style="color: #f85149;">组不存在</div>';
+          return;
+        }
+        container.innerHTML = '';
+        this.renderGroupPropertyPanel(container, group);
+        return;
+      } else if (elementId.startsWith('shape_')) {
+        const shapeId = elementId.replace('shape_', '');
+        element = this.editor.config.shapes.find(s => s.id === shapeId);
+      }
+      
+      if (!element) {
+        container.innerHTML = '<div style="color: #f85149;">元素不存在</div>';
+        return;
+      }
+      
+      // 渲染属性编辑器
+      container.innerHTML = '';
+      this.renderPropertyEditor(container, element);
+    }
+
+    renderPropertyEditor(container, element) {
+      // 通用属性
+      const commonFields = [
+        { key: 'name', label: '名称', type: 'text' },
+        { key: 'visible', label: '可见', type: 'checkbox' },
+        { key: 'locked', label: '锁定', type: 'checkbox' }
+      ];
+      
+      // 非背景元素添加透明度
+      if (element.type !== 'background') {
+        commonFields.push({ key: 'opacity', label: '透明度', type: 'range', min: 0, max: 1, step: 0.05 });
+      }
+      
+      // 根据元素类型添加特定属性
+      const typeFields = this.getElementFields(element.type);
+      
+      const allFields = [...commonFields, ...typeFields];
+      
+      // 跟踪分组折叠状态
+      let currentGroupCollapsed = false;
+      if (!this._groupStates) this._groupStates = {};
+      
+      allFields.forEach(field => {
+        // 处理分组折叠逻辑
+        if (field.type === 'group') {
+          const groupKey = `${element.id || 'bg'}_${field.label}`;
+          if (this._groupStates[groupKey] === undefined) this._groupStates[groupKey] = true;
+          currentGroupCollapsed = !this._groupStates[groupKey];
+          // 分组头部始终渲染
+        } else if (currentGroupCollapsed) {
+          // 当前分组折叠，跳过此字段
+          return;
+        }
+        
+        const fieldDiv = document.createElement('div');
+        fieldDiv.className = 'field';
+        
+        const label = document.createElement('label');
+        label.textContent = field.label;
+        fieldDiv.appendChild(label);
+        
+        const inputWrap = document.createElement('div');
+        inputWrap.className = 'field-row';
+        
+        let input;
+        
+        switch (field.type) {
+          case 'text':
+            input = document.createElement('input');
+            input.type = 'text';
+            input.value = element[field.key] || '';
+            input.addEventListener('change', () => {
+              element[field.key] = input.value;
+              this.editor.markDirty();
+            });
+            break;
+            
+          case 'number':
+            input = document.createElement('input');
+            input.type = 'number';
+            input.value = element[field.key] || 0;
+            input.min = field.min;
+            input.max = field.max;
+            input.step = field.step || 1;
+            input.addEventListener('input', () => {
+              element[field.key] = parseFloat(input.value);
+              this.editor.markDirty();
+            });
+            input.addEventListener('change', () => {
+              element[field.key] = parseFloat(input.value);
+              this.editor.markDirty();
+            });
+            break;
+            
+          case 'range':
+            input = document.createElement('input');
+            input.type = 'range';
+            input.min = field.min;
+            input.max = field.max;
+            input.step = field.step || 0.01;
+            input.value = element[field.key] || 0;
+            // 可编辑数值显示
+            const valueSpan = document.createElement('span');
+            valueSpan.className = 'val editable-val';
+            valueSpan.textContent = input.value;
+            valueSpan.title = '点击编辑数值';
+            valueSpan.style.cursor = 'text';
+            valueSpan.style.userSelect = 'text';
+            valueSpan.style.minWidth = '30px';
+            valueSpan.style.textAlign = 'center';
+            // 点击切换为输入框
+            valueSpan.addEventListener('click', () => {
+              const editInput = document.createElement('input');
+              editInput.type = 'number';
+              editInput.value = input.value;
+              editInput.min = field.min;
+              editInput.max = field.max;
+              editInput.step = field.step || 0.01;
+              editInput.style.cssText = 'width:45px; background:#0d1117; color:#c9d1d9; border:1px solid #58a6ff; border-radius:3px; padding:1px 4px; font-size:11px; text-align:center;';
+              valueSpan.replaceWith(editInput);
+              editInput.focus();
+              editInput.select();
+              const finishEdit = () => {
+                const val = parseFloat(editInput.value);
+                if (!isNaN(val)) {
+                  const clamped = Math.max(parseFloat(field.min), Math.min(parseFloat(field.max), val));
+                  input.value = clamped;
+                  element[field.key] = clamped;
+                  this.editor.markDirty();
+                }
+                valueSpan.textContent = input.value;
+                editInput.replaceWith(valueSpan);
+              };
+              editInput.addEventListener('blur', finishEdit);
+              editInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') { e.preventDefault(); finishEdit(); }
+                if (e.key === 'Escape') { editInput.replaceWith(valueSpan); }
+              });
+              // 支持复制粘贴
+              editInput.addEventListener('paste', (e) => {
+                e.stopPropagation();
+              });
+            });
+            input.addEventListener('input', () => {
+              valueSpan.textContent = input.value;
+              element[field.key] = parseFloat(input.value);
+              this.editor.markDirty();
+            });
+            input.addEventListener('change', () => {
+              this.editor.markDirty();
+            });
+            inputWrap.appendChild(input);
+            inputWrap.appendChild(valueSpan);
+            break;
+            
+          case 'color':
+            input = document.createElement('input');
+            input.type = 'color';
+            input.value = element[field.key] || '#000000';
+            input.addEventListener('input', () => {
+              element[field.key] = input.value;
+              // 不调用 rebuild()，避免打断颜色选择器交互
+              this.editor.markDirty();
+            });
+            input.addEventListener('change', () => {
+              element[field.key] = input.value;
+              this.editor.markDirty();
+            });
+            break;
+            
+          case 'checkbox':
+            input = document.createElement('input');
+            input.type = 'checkbox';
+            input.checked = element[field.key] !== false;
+            input.addEventListener('change', () => {
+              element[field.key] = input.checked;
+              this.editor.markDirty();
+              // 锁定/可见性变化时更新图层面板
+              if (field.key === 'locked' || field.key === 'visible') {
+                this.editor.updateUI();
+              }
+            });
+            break;
+            
+          case 'select':
+            input = document.createElement('select');
+            field.options.forEach(option => {
+              const opt = document.createElement('option');
+              opt.value = option.value;
+              opt.textContent = option.label;
+              input.appendChild(opt);
+            });
+            input.value = element[field.key] || field.options[0].value;
+            input.addEventListener('change', () => {
+              element[field.key] = input.value;
+              this.editor.markDirty();
+            });
+            break;
+
+          case 'texture':
+            input = document.createElement('div');
+            input.style.cssText = 'display:flex; gap:4px; align-items:center; flex-wrap:wrap;';
+            const texBtn = document.createElement('button');
+            texBtn.className = 'btn';
+            texBtn.textContent = element[field.key] ? '更换贴图' : '加载贴图';
+            texBtn.style.fontSize = '11px';
+            const texPreview = document.createElement('span');
+            texPreview.style.cssText = 'font-size:10px; color:#8b949e; max-width:100px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;';
+            if (element[field.key]) {
+              texPreview.textContent = element[field.key].split('/').pop();
+            }
+            const texClear = document.createElement('button');
+            texClear.className = 'btn';
+            texClear.textContent = '清除';
+            texClear.style.fontSize = '11px';
+            texClear.style.display = element[field.key] ? '' : 'none';
+            const fileInput = document.createElement('input');
+            fileInput.type = 'file';
+            fileInput.accept = 'image/*';
+            fileInput.style.display = 'none';
+            fileInput.addEventListener('change', () => {
+              const file = fileInput.files[0];
+              if (file) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                  element[field.key] = e.target.result;
+                  texPreview.textContent = file.name;
+                  texClear.style.display = '';
+                  texBtn.textContent = '更换贴图';
+                  this.editor.markDirty();
+                };
+                reader.readAsDataURL(file);
+              }
+            });
+            texBtn.addEventListener('click', () => fileInput.click());
+            texClear.addEventListener('click', () => {
+              element[field.key] = '';
+              texPreview.textContent = '';
+              texClear.style.display = 'none';
+              texBtn.textContent = '加载贴图';
+              this.editor.markDirty();
+            });
+            input.appendChild(texBtn);
+            input.appendChild(texPreview);
+            input.appendChild(texClear);
+            input.appendChild(fileInput);
+            break;
+
+          case 'gradient':
+            input = document.createElement('div');
+            input.style.cssText = 'display:flex; flex-direction:column; gap:4px;';
+            const gradVal = element[field.key];
+            const gradModeWrap = document.createElement('div');
+            gradModeWrap.style.cssText = 'display:flex; gap:4px; align-items:center;';
+            const gradModeLabel = document.createElement('span');
+            gradModeLabel.style.cssText = 'font-size:10px; color:#8b949e; min-width:30px;';
+            gradModeLabel.textContent = '类型';
+            const gradModeSelect = document.createElement('select');
+            gradModeSelect.style.cssText = 'flex:1; background:#0d1117; color:#c9d1d9; border:1px solid #30363d; border-radius:3px; padding:2px 4px; font-size:11px;';
+            ['none', 'linear', 'radial'].forEach(m => {
+              const opt = document.createElement('option');
+              opt.value = m;
+              opt.textContent = m === 'none' ? '无' : m === 'linear' ? '线性' : '径向';
+              gradModeSelect.appendChild(opt);
+            });
+            gradModeSelect.value = gradVal ? gradVal.mode : 'none';
+            gradModeWrap.appendChild(gradModeLabel);
+            gradModeWrap.appendChild(gradModeSelect);
+            input.appendChild(gradModeWrap);
+
+            const gradStopsWrap = document.createElement('div');
+            gradStopsWrap.style.cssText = 'display:flex; flex-direction:column; gap:2px;';
+            const stops = (gradVal && gradVal.stops) ? gradVal.stops : [{ pos: 0, color: '#ffffff' }, { pos: 1, color: '#000000' }];
+
+            const renderStops = () => {
+              gradStopsWrap.innerHTML = '';
+              stops.forEach((stop, idx) => {
+                const row = document.createElement('div');
+                row.style.cssText = 'display:flex; gap:3px; align-items:center;';
+                const colorIn = document.createElement('input');
+                colorIn.type = 'color';
+                colorIn.value = stop.color;
+                colorIn.style.cssText = 'width:24px; height:20px; border:none; cursor:pointer;';
+                colorIn.addEventListener('input', () => { stop.color = colorIn.value; updateGradient(); });
+                const posIn = document.createElement('input');
+                posIn.type = 'range';
+                posIn.min = 0; posIn.max = 1; posIn.step = 0.01;
+                posIn.value = stop.pos;
+                posIn.style.cssText = 'flex:1; height:14px;';
+                posIn.addEventListener('input', () => { stop.pos = parseFloat(posIn.value); updateGradient(); });
+                const posLabel = document.createElement('span');
+                posLabel.style.cssText = 'font-size:9px; color:#8b949e; min-width:24px; text-align:center;';
+                posLabel.textContent = stop.pos.toFixed(2);
+                posIn.addEventListener('input', () => { posLabel.textContent = parseFloat(posIn.value).toFixed(2); });
+                row.appendChild(colorIn);
+                row.appendChild(posIn);
+                row.appendChild(posLabel);
+                if (stops.length > 2) {
+                  const delBtn = document.createElement('button');
+                  delBtn.textContent = '×';
+                  delBtn.style.cssText = 'width:16px; height:20px; background:#21262d; border:1px solid #30363d; color:#f85149; border-radius:3px; cursor:pointer; font-size:10px;';
+                  delBtn.addEventListener('click', () => { stops.splice(idx, 1); renderStops(); updateGradient(); });
+                  row.appendChild(delBtn);
+                }
+                gradStopsWrap.appendChild(row);
+              });
+              const addBtn = document.createElement('button');
+              addBtn.textContent = '+ 添加色标';
+              addBtn.style.cssText = 'font-size:10px; padding:2px 6px; background:#21262d; border:1px solid #30363d; color:#8b949e; border-radius:3px; cursor:pointer; align-self:flex-start;';
+              addBtn.addEventListener('click', () => {
+                stops.push({ pos: 0.5, color: '#888888' });
+                renderStops();
+                updateGradient();
+              });
+              gradStopsWrap.appendChild(addBtn);
+            };
+
+            const updateGradient = () => {
+              if (gradModeSelect.value === 'none') {
+                element[field.key] = null;
+              } else {
+                element[field.key] = {
+                  mode: gradModeSelect.value,
+                  stops: stops.map(s => ({ ...s })),
+                  angle: 0
+                };
+              }
+              this.editor.markDirty();
+            };
+
+            gradModeSelect.addEventListener('change', () => {
+              if (gradModeSelect.value === 'none') {
+                gradStopsWrap.style.display = 'none';
+              } else {
+                gradStopsWrap.style.display = '';
+              }
+              updateGradient();
+            });
+
+            renderStops();
+            if (!gradVal || gradVal.mode === 'none') gradStopsWrap.style.display = 'none';
+            input.appendChild(gradStopsWrap);
+            break;
+
+          case 'effects':
+            input = document.createElement('div');
+            input.style.cssText = 'display:flex; flex-direction:column; gap:4px;';
+            const effects = element[field.key] || [];
+            
+            const renderEffects = () => {
+              input.innerHTML = '';
+              
+              effects.forEach((effect, idx) => {
+                const effectRow = document.createElement('div');
+                effectRow.style.cssText = 'display:flex; gap:4px; align-items:center; background:#21262d; padding:4px 6px; border-radius:4px;';
+                
+                const typeSelect = document.createElement('select');
+                typeSelect.style.cssText = 'flex:1; background:#0d1117; color:#c9d1d9; border:1px solid #30363d; border-radius:3px; padding:2px 4px; font-size:11px;';
+                [
+                  { value: 'glow', label: '发光' },
+                  { value: 'shadow', label: '阴影' },
+                  { value: 'outerGlow', label: '外发光' },
+                  { value: 'innerShadow', label: '内阴影' }
+                ].forEach(opt => {
+                  const option = document.createElement('option');
+                  option.value = opt.value;
+                  option.textContent = opt.label;
+                  typeSelect.appendChild(option);
+                });
+                typeSelect.value = effect.type || 'glow';
+                typeSelect.addEventListener('change', () => {
+                  effect.type = typeSelect.value;
+                  this.editor.markDirty();
+                });
+                
+                const colorIn = document.createElement('input');
+                colorIn.type = 'color';
+                colorIn.value = effect.color || '#58a6ff';
+                colorIn.style.cssText = 'width:24px; height:20px; border:none; cursor:pointer;';
+                colorIn.addEventListener('input', () => {
+                  effect.color = colorIn.value;
+                  this.editor.markDirty();
+                });
+                
+                const blurIn = document.createElement('input');
+                blurIn.type = 'range';
+                blurIn.min = 0; blurIn.max = 50; blurIn.step = 1;
+                blurIn.value = effect.blur || 10;
+                blurIn.style.cssText = 'flex:1; height:14px;';
+                blurIn.addEventListener('input', () => {
+                  effect.blur = parseInt(blurIn.value);
+                  this.editor.markDirty();
+                });
+                
+                const delBtn = document.createElement('button');
+                delBtn.textContent = '×';
+                delBtn.style.cssText = 'width:16px; height:20px; background:#21262d; border:1px solid #30363d; color:#f85149; border-radius:3px; cursor:pointer; font-size:10px;';
+                delBtn.addEventListener('click', () => {
+                  effects.splice(idx, 1);
+                  element[field.key] = effects;
+                  renderEffects();
+                  this.editor.markDirty();
+                });
+                
+                effectRow.appendChild(typeSelect);
+                effectRow.appendChild(colorIn);
+                effectRow.appendChild(blurIn);
+                effectRow.appendChild(delBtn);
+                input.appendChild(effectRow);
+              });
+              
+              const addBtn = document.createElement('button');
+              addBtn.textContent = '+ 添加特效';
+              addBtn.style.cssText = 'font-size:10px; padding:4px 8px; background:#21262d; border:1px solid #30363d; color:#8b949e; border-radius:3px; cursor:pointer; align-self:flex-start;';
+              addBtn.addEventListener('click', () => {
+                effects.push({ type: 'glow', color: '#58a6ff', blur: 10 });
+                element[field.key] = effects;
+                renderEffects();
+                this.editor.markDirty();
+              });
+              input.appendChild(addBtn);
+            };
+            
+            renderEffects();
+            break;
+
+          case 'colors':
+            input = document.createElement('div');
+            input.style.cssText = 'display:flex; flex-direction:column; gap:4px;';
+            
+            const colors = element[field.key] || ['#4de8d6'];
+            
+            const renderColors = () => {
+              input.innerHTML = '';
+              
+              colors.forEach((color, idx) => {
+                const colorRow = document.createElement('div');
+                colorRow.style.cssText = 'display:flex; gap:4px; align-items:center;';
+                
+                const colorInput = document.createElement('input');
+                colorInput.type = 'color';
+                colorInput.value = color;
+                colorInput.style.cssText = 'width:30px; height:24px; border:1px solid #30363d; border-radius:3px; cursor:pointer;';
+                colorInput.addEventListener('input', () => {
+                  colors[idx] = colorInput.value;
+                  element[field.key] = colors;
+                  this.editor.markDirty();
+                });
+                
+                const colorText = document.createElement('input');
+                colorText.type = 'text';
+                colorText.value = color;
+                colorText.style.cssText = 'flex:1; background:#0d1117; color:#c9d1d9; border:1px solid #30363d; border-radius:3px; padding:2px 6px; font-size:11px; font-family:monospace;';
+                colorText.addEventListener('change', () => {
+                  colors[idx] = colorText.value;
+                  element[field.key] = colors;
+                  this.editor.markDirty();
+                });
+                
+                const delBtn = document.createElement('button');
+                delBtn.textContent = '×';
+                delBtn.style.cssText = 'width:20px; height:24px; background:#21262d; border:1px solid #30363d; color:#f85149; border-radius:3px; cursor:pointer; font-size:10px;';
+                delBtn.addEventListener('click', () => {
+                  colors.splice(idx, 1);
+                  element[field.key] = colors;
+                  renderColors();
+                  this.editor.markDirty();
+                });
+                
+                colorRow.appendChild(colorInput);
+                colorRow.appendChild(colorText);
+                if (colors.length > 1) colorRow.appendChild(delBtn);
+                input.appendChild(colorRow);
+              });
+              
+              const addBtn = document.createElement('button');
+              addBtn.textContent = '+ 添加颜色';
+              addBtn.style.cssText = 'font-size:10px; padding:4px 8px; background:#21262d; border:1px solid #30363d; color:#8b949e; border-radius:3px; cursor:pointer; align-self:flex-start;';
+              addBtn.addEventListener('click', () => {
+                colors.push('#ffffff');
+                element[field.key] = colors;
+                renderColors();
+                this.editor.markDirty();
+              });
+              input.appendChild(addBtn);
+            };
+            
+            renderColors();
+            break;
+
+          case 'group':
+            input = document.createElement('div');
+            input.style.cssText = 'display:flex; align-items:center; gap:8px; padding:6px 0; margin-top:8px; border-top:1px solid #30363d; cursor:pointer;';
+            
+            const groupIcon = document.createElement('span');
+            groupIcon.textContent = '▼';
+            groupIcon.style.cssText = 'font-size:10px; color:#8b949e; transition:transform 0.2s;';
+            
+            const groupLabel = document.createElement('span');
+            groupLabel.textContent = field.label;
+            groupLabel.style.cssText = 'font-size:12px; font-weight:600; color:#58a6ff;';
+            
+            input.appendChild(groupIcon);
+            input.appendChild(groupLabel);
+            
+            // 使用已初始化的分组状态
+            const groupKey = `${element.id || 'bg'}_${field.label}`;
+            
+            input.addEventListener('click', () => {
+              this._groupStates[groupKey] = !this._groupStates[groupKey];
+              groupIcon.style.transform = this._groupStates[groupKey] ? '' : 'rotate(-90deg)';
+              // 触发属性面板重新渲染
+              this.updatePropertyPanel();
+            });
+            
+            groupIcon.style.transform = this._groupStates[groupKey] ? '' : 'rotate(-90deg)';
+            break;
+
+          case 'controlPoints':
+            input = document.createElement('div');
+            input.style.cssText = 'display:flex; flex-direction:column; gap:4px;';
+            
+            const cpInfo = document.createElement('div');
+            cpInfo.style.cssText = 'font-size:11px; color:#8b949e; padding:4px 0;';
+            cpInfo.textContent = element.points ? `${element.points.length} 个控制点` : '无控制点';
+            input.appendChild(cpInfo);
+            
+            const cpHint = document.createElement('div');
+            cpHint.style.cssText = 'font-size:10px; color:#58a6ff; background:#161b22; padding:6px 8px; border-radius:4px; border:1px solid #30363d;';
+            cpHint.innerHTML = '💡 <strong>编辑控制点</strong><br>• 点击画布上的控制点可拖拽移动<br>• 拖拽变换手柄可缩放/旋转<br>• 右键点击完成绘制新路径';
+            input.appendChild(cpHint);
+            
+            if (element.points && element.points.length > 0) {
+              const cpList = document.createElement('div');
+              cpList.style.cssText = 'display:flex; flex-direction:column; gap:2px; max-height:120px; overflow-y:auto;';
+              
+              element.points.forEach((pt, idx) => {
+                const cpRow = document.createElement('div');
+                cpRow.style.cssText = 'display:flex; gap:4px; align-items:center; font-size:10px;';
+                
+                const cpLabel = document.createElement('span');
+                cpLabel.style.cssText = 'color:#8b949e; min-width:20px;';
+                cpLabel.textContent = `P${idx}`;
+                
+                const cpX = document.createElement('input');
+                cpX.type = 'number';
+                cpX.value = pt[0].toFixed(3);
+                cpX.step = 0.01;
+                cpX.min = 0;
+                cpX.max = 1;
+                cpX.style.cssText = 'width:50px; background:#0d1117; color:#c9d1d9; border:1px solid #30363d; border-radius:3px; padding:1px 4px; font-size:10px;';
+                cpX.addEventListener('change', () => {
+                  element.points[idx][0] = parseFloat(cpX.value);
+                  this.editor.markDirty();
+                });
+                
+                const cpY = document.createElement('input');
+                cpY.type = 'number';
+                cpY.value = pt[1].toFixed(3);
+                cpY.step = 0.01;
+                cpY.min = 0;
+                cpY.max = 1;
+                cpY.style.cssText = 'width:50px; background:#0d1117; color:#c9d1d9; border:1px solid #30363d; border-radius:3px; padding:1px 4px; font-size:10px;';
+                cpY.addEventListener('change', () => {
+                  element.points[idx][1] = parseFloat(cpY.value);
+                  this.editor.markDirty();
+                });
+                
+                cpRow.appendChild(cpLabel);
+                cpRow.appendChild(cpX);
+                cpRow.appendChild(cpY);
+                cpList.appendChild(cpRow);
+              });
+              
+              input.appendChild(cpList);
+            }
+            break;
+
+          case 'forceFields':
+            input = document.createElement('div');
+            input.style.cssText = 'display:flex; flex-direction:column; gap:4px;';
+            const forceFields = element[field.key] || [];
+            
+            const renderForceFields = () => {
+              input.innerHTML = '';
+              
+              forceFields.forEach((ff, idx) => {
+                const ffRow = document.createElement('div');
+                ffRow.style.cssText = 'display:flex; flex-direction:column; gap:4px; background:#21262d; padding:6px 8px; border-radius:4px; border:1px solid #30363d;';
+                
+                // 力场类型和删除按钮
+                const headerRow = document.createElement('div');
+                headerRow.style.cssText = 'display:flex; gap:4px; align-items:center;';
+                
+                const typeSelect = document.createElement('select');
+                typeSelect.style.cssText = 'flex:1; background:#0d1117; color:#c9d1d9; border:1px solid #30363d; border-radius:3px; padding:2px 4px; font-size:11px;';
+                [
+                  { value: 'radial', label: '径向力场' },
+                  { value: 'directional', label: '方向力场(风)' },
+                  { value: 'vortex', label: '漩涡力场' },
+                  { value: 'turbulence', label: '湍流力场' }
+                ].forEach(opt => {
+                  const option = document.createElement('option');
+                  option.value = opt.value;
+                  option.textContent = opt.label;
+                  typeSelect.appendChild(option);
+                });
+                typeSelect.value = ff.type || 'radial';
+                typeSelect.addEventListener('change', () => {
+                  ff.type = typeSelect.value;
+                  this.editor.markDirty();
+                  renderForceFields();
+                });
+                
+                const delBtn = document.createElement('button');
+                delBtn.textContent = '×';
+                delBtn.style.cssText = 'width:18px; height:18px; background:#21262d; border:1px solid #30363d; color:#f85149; border-radius:3px; cursor:pointer; font-size:10px;';
+                delBtn.addEventListener('click', () => {
+                  forceFields.splice(idx, 1);
+                  element[field.key] = forceFields;
+                  renderForceFields();
+                  this.editor.markDirty();
+                });
+                
+                headerRow.appendChild(typeSelect);
+                headerRow.appendChild(delBtn);
+                ffRow.appendChild(headerRow);
+                
+                // 力场参数
+                const paramsDiv = document.createElement('div');
+                paramsDiv.style.cssText = 'display:flex; flex-direction:column; gap:2px;';
+                
+                const addParam = (label, key, min, max, step, defVal) => {
+                  const row = document.createElement('div');
+                  row.style.cssText = 'display:flex; gap:4px; align-items:center;';
+                  const lbl = document.createElement('span');
+                  lbl.style.cssText = 'font-size:10px; color:#8b949e; min-width:50px;';
+                  lbl.textContent = label;
+                  const inp = document.createElement('input');
+                  inp.type = 'range';
+                  inp.min = min; inp.max = max; inp.step = step;
+                  inp.value = ff[key] !== undefined ? ff[key] : defVal;
+                  inp.style.cssText = 'flex:1; height:12px;';
+                  const valSpan = document.createElement('span');
+                  valSpan.style.cssText = 'font-size:9px; color:#58a6ff; min-width:28px; text-align:right; font-family:monospace;';
+                  valSpan.textContent = inp.value;
+                  inp.addEventListener('input', () => {
+                    ff[key] = parseFloat(inp.value);
+                    valSpan.textContent = inp.value;
+                    this.editor.markDirty();
+                  });
+                  row.appendChild(lbl);
+                  row.appendChild(inp);
+                  row.appendChild(valSpan);
+                  paramsDiv.appendChild(row);
+                };
+                
+                switch (ff.type || 'radial') {
+                  case 'radial':
+                    addParam('强度', 'strength', -10, 10, 0.1, 1);
+                    addParam('衰减', 'falloff', 1, 4, 0.1, 2);
+                    addParam('中心X', 'x', 0, 1, 0.01, 0.5);
+                    addParam('中心Y', 'y', 0, 1, 0.01, 0.5);
+                    break;
+                  case 'directional':
+                    addParam('X力', 'forceX', -5, 5, 0.1, 0);
+                    addParam('Y力', 'forceY', -5, 5, 0.1, -1);
+                    break;
+                  case 'vortex':
+                    addParam('强度', 'strength', -10, 10, 0.1, 2);
+                    addParam('中心X', 'x', 0, 1, 0.01, 0.5);
+                    addParam('中心Y', 'y', 0, 1, 0.01, 0.5);
+                    break;
+                  case 'turbulence':
+                    addParam('强度', 'strength', 0, 10, 0.1, 1);
+                    addParam('缩放', 'scale', 0.001, 0.1, 0.001, 0.01);
+                    break;
+                }
+                
+                ffRow.appendChild(paramsDiv);
+                input.appendChild(ffRow);
+              });
+              
+              const addBtn = document.createElement('button');
+              addBtn.textContent = '+ 添加力场';
+              addBtn.style.cssText = 'font-size:10px; padding:4px 8px; background:#21262d; border:1px solid #30363d; color:#8b949e; border-radius:3px; cursor:pointer; align-self:flex-start;';
+              addBtn.addEventListener('click', () => {
+                forceFields.push({ type: 'radial', strength: 1, falloff: 2, x: 0.5, y: 0.5 });
+                element[field.key] = forceFields;
+                renderForceFields();
+                this.editor.markDirty();
+              });
+              input.appendChild(addBtn);
+            };
+            
+            renderForceFields();
+            break;
+
+          case 'pathGradient':
+            input = document.createElement('div');
+            input.style.cssText = 'display:flex; flex-direction:column; gap:4px;';
+            const pathGradVal = element[field.key];
+            const pathGradEnabled = pathGradVal && pathGradVal.stops && pathGradVal.stops.length >= 2;
+            
+            const pathGradToggle = document.createElement('div');
+            pathGradToggle.style.cssText = 'display:flex; gap:4px; align-items:center;';
+            const pathGradCheckbox = document.createElement('input');
+            pathGradCheckbox.type = 'checkbox';
+            pathGradCheckbox.checked = pathGradEnabled;
+            const pathGradLabel = document.createElement('span');
+            pathGradLabel.style.cssText = 'font-size:11px; color:#c9d1d9;';
+            pathGradLabel.textContent = '启用路径渐变';
+            pathGradToggle.appendChild(pathGradCheckbox);
+            pathGradToggle.appendChild(pathGradLabel);
+            input.appendChild(pathGradToggle);
+            
+            const pathGradStopsWrap = document.createElement('div');
+            pathGradStopsWrap.style.cssText = 'display:flex; flex-direction:column; gap:2px;';
+            const pathStops = pathGradEnabled ? [...pathGradVal.stops] : [{ pos: 0, color: '#ff6b2c' }, { pos: 1, color: '#4de8d6' }];
+            
+            const renderPathStops = () => {
+              pathGradStopsWrap.innerHTML = '';
+              pathStops.forEach((stop, idx) => {
+                const row = document.createElement('div');
+                row.style.cssText = 'display:flex; gap:3px; align-items:center;';
+                const colorIn = document.createElement('input');
+                colorIn.type = 'color';
+                colorIn.value = stop.color;
+                colorIn.style.cssText = 'width:24px; height:20px; border:none; cursor:pointer;';
+                colorIn.addEventListener('input', () => { stop.color = colorIn.value; updatePathGradient(); });
+                const posIn = document.createElement('input');
+                posIn.type = 'range';
+                posIn.min = 0; posIn.max = 1; posIn.step = 0.01;
+                posIn.value = stop.pos;
+                posIn.style.cssText = 'flex:1; height:14px;';
+                posIn.addEventListener('input', () => { stop.pos = parseFloat(posIn.value); updatePathGradient(); });
+                const posLabel = document.createElement('span');
+                posLabel.style.cssText = 'font-size:9px; color:#8b949e; min-width:24px; text-align:center;';
+                posLabel.textContent = stop.pos.toFixed(2);
+                posIn.addEventListener('input', () => { posLabel.textContent = parseFloat(posIn.value).toFixed(2); });
+                row.appendChild(colorIn);
+                row.appendChild(posIn);
+                row.appendChild(posLabel);
+                if (pathStops.length > 2) {
+                  const delBtn = document.createElement('button');
+                  delBtn.textContent = '×';
+                  delBtn.style.cssText = 'width:16px; height:20px; background:#21262d; border:1px solid #30363d; color:#f85149; border-radius:3px; cursor:pointer; font-size:10px;';
+                  delBtn.addEventListener('click', () => { pathStops.splice(idx, 1); renderPathStops(); updatePathGradient(); });
+                  row.appendChild(delBtn);
+                }
+                pathGradStopsWrap.appendChild(row);
+              });
+              const addBtn = document.createElement('button');
+              addBtn.textContent = '+ 添加色标';
+              addBtn.style.cssText = 'font-size:10px; padding:2px 6px; background:#21262d; border:1px solid #30363d; color:#8b949e; border-radius:3px; cursor:pointer; align-self:flex-start;';
+              addBtn.addEventListener('click', () => {
+                pathStops.push({ pos: 0.5, color: '#888888' });
+                renderPathStops();
+                updatePathGradient();
+              });
+              pathGradStopsWrap.appendChild(addBtn);
+            };
+            
+            const updatePathGradient = () => {
+              if (pathGradCheckbox.checked) {
+                element[field.key] = {
+                  stops: pathStops.map(s => ({ ...s }))
+                };
+              } else {
+                element[field.key] = null;
+              }
+              this.editor.markDirty();
+            };
+            
+            pathGradCheckbox.addEventListener('change', () => {
+              if (pathGradCheckbox.checked) {
+                pathGradStopsWrap.style.display = '';
+              } else {
+                pathGradStopsWrap.style.display = 'none';
+              }
+              updatePathGradient();
+            });
+            
+            renderPathStops();
+            if (!pathGradEnabled) pathGradStopsWrap.style.display = 'none';
+            input.appendChild(pathGradStopsWrap);
+            break;
+        }
+        
+        if (input) {
+          inputWrap.appendChild(input);
+        }
+        
+        fieldDiv.appendChild(inputWrap);
+        container.appendChild(fieldDiv);
+      });
+    }
+
+    renderGroupPropertyPanel(container, group) {
+      // 组名称
+      const nameField = document.createElement('div');
+      nameField.className = 'field';
+      nameField.innerHTML = `<label>组名称</label>`;
+      const nameInput = document.createElement('input');
+      nameInput.type = 'text';
+      nameInput.value = group.name || '组';
+      nameInput.addEventListener('change', () => {
+        group.name = nameInput.value;
+        this.editor.markDirty();
+        this.updateUI();
+      });
+      nameField.appendChild(nameInput);
+      container.appendChild(nameField);
+
+      // 多选提示
+      const multiInfo = document.createElement('div');
+      multiInfo.style.cssText = 'font-size:11px; color:#8b949e; margin-bottom:12px;';
+      multiInfo.textContent = `包含 ${group.children.length} 个元素`;
+      container.appendChild(multiInfo);
+
+      // 子元素列表
+      const childrenTitle = document.createElement('div');
+      childrenTitle.style.cssText = 'font-size:11px; color:#58a6ff; margin-bottom:8px; font-weight:600;';
+      childrenTitle.textContent = '子元素（点击编辑）';
+      container.appendChild(childrenTitle);
+
+      group.children.forEach(childId => {
+        const shapeId = childId.replace('shape_', '');
+        const shape = this.editor.config.shapes?.find(s => s.id === shapeId);
+        if (!shape) return;
+
+        const item = document.createElement('div');
+        item.className = 'layer-item';
+        item.style.cssText = 'margin-bottom:4px;';
+        item.innerHTML = `
+          <span class="layer-icon">${this.getLayerIcon(shape.type)}</span>
+          <span class="layer-name">${shape.name || shape.type}</span>
+        `;
+        item.addEventListener('click', () => {
+          this.editor.selectElement(childId);
+        });
+        container.appendChild(item);
+      });
+
+      // 取消打组按钮
+      const ungroupBtn = document.createElement('button');
+      ungroupBtn.className = 'btn danger';
+      ungroupBtn.textContent = '📤 取消打组';
+      ungroupBtn.style.cssText = 'width:100%; margin-top:16px;';
+      ungroupBtn.addEventListener('click', () => {
+        this.editor.ungroupElements(group.id);
+        this.showNotification('已取消打组', 'success');
+      });
+      container.appendChild(ungroupBtn);
+    }
+
+    getElementFields(type) {
+      const commonShape = [
+        { key: 'fill', label: '填充', type: 'color' },
+        { key: 'fillGradient', label: '渐变填充', type: 'gradient' },
+        { key: 'stroke', label: '描边', type: 'color' },
+        { key: 'strokeWidth', label: '描边宽度', type: 'range', min: 0, max: 20, step: 0.5 },
+        { key: 'rotation', label: '旋转', type: 'range', min: 0, max: 360, step: 1 },
+        { key: 'blendMode', label: '混合模式', type: 'select', options: [
+          { value: 'source-over', label: '正常' },
+          { value: 'screen', label: '滤色(光晕)' },
+          { value: 'multiply', label: '正片叠底' },
+          { value: 'overlay', label: '叠加' },
+          { value: 'soft-light', label: '柔光' },
+          { value: 'hard-light', label: '强光' },
+          { value: 'color-dodge', label: '颜色减淡' },
+          { value: 'color-burn', label: '颜色加深' },
+          { value: 'difference', label: '差值' },
+          { value: 'exclusion', label: '排除' },
+          { value: 'hue', label: '色相' },
+          { value: 'saturation', label: '饱和度' },
+          { value: 'luminosity', label: '明度' }
+        ]},
+        { key: 'effects', label: '特效', type: 'effects' }
+      ];
+
+      const fields = {
+        background: [
+          { key: 'gradientType', label: '渐变类型', type: 'select', options: [
+            { value: 'solid', label: '纯色' },
+            { value: 'linear', label: '线性渐变' },
+            { value: 'radial', label: '径向渐变' }
+          ]},
+          { key: 'color0', label: '颜色1', type: 'color' },
+          { key: 'color1', label: '颜色2', type: 'color' },
+          { key: 'color2', label: '颜色3', type: 'color' },
+          { key: 'angle', label: '角度', type: 'range', min: 0, max: 360, step: 1 },
+          { key: 'radius', label: '半径', type: 'range', min: 0.1, max: 2, step: 0.01 }
+        ],
+        rectangle: [
+          { key: 'x', label: 'X', type: 'range', min: 0, max: 1, step: 0.01 },
+          { key: 'y', label: 'Y', type: 'range', min: 0, max: 1, step: 0.01 },
+          { key: 'width', label: '宽度', type: 'range', min: 0.01, max: 1, step: 0.01 },
+          { key: 'height', label: '高度', type: 'range', min: 0.01, max: 1, step: 0.01 },
+          { key: 'cornerRadius', label: '圆角', type: 'range', min: 0, max: 50, step: 1 },
+          { key: 'texture', label: '贴图', type: 'texture' },
+          { key: 'textureScaleX', label: '贴图缩放X', type: 'range', min: 0.1, max: 5, step: 0.1 },
+          { key: 'textureScaleY', label: '贴图缩放Y', type: 'range', min: 0.1, max: 5, step: 0.1 },
+          ...commonShape
+        ],
+        circle: [
+          { key: 'x', label: '中心X', type: 'range', min: 0, max: 1, step: 0.01 },
+          { key: 'y', label: '中心Y', type: 'range', min: 0, max: 1, step: 0.01 },
+          { key: 'radiusX', label: '半径X', type: 'range', min: 0.01, max: 0.5, step: 0.01 },
+          { key: 'radiusY', label: '半径Y', type: 'range', min: 0.01, max: 0.5, step: 0.01 },
+          { key: 'texture', label: '贴图', type: 'texture' },
+          { key: 'textureScaleX', label: '贴图缩放X', type: 'range', min: 0.1, max: 5, step: 0.1 },
+          { key: 'textureScaleY', label: '贴图缩放Y', type: 'range', min: 0.1, max: 5, step: 0.1 },
+          ...commonShape
+        ],
+        polygon: [
+          { key: 'x', label: '中心X', type: 'range', min: 0, max: 1, step: 0.01 },
+          { key: 'y', label: '中心Y', type: 'range', min: 0, max: 1, step: 0.01 },
+          { key: 'sides', label: '边数', type: 'range', min: 3, max: 20, step: 1 },
+          { key: 'radius', label: '半径', type: 'range', min: 0.01, max: 0.5, step: 0.01 },
+          { key: 'texture', label: '贴图', type: 'texture' },
+          { key: 'textureScaleX', label: '贴图缩放X', type: 'range', min: 0.1, max: 5, step: 0.1 },
+          { key: 'textureScaleY', label: '贴图缩放Y', type: 'range', min: 0.1, max: 5, step: 0.1 },
+          ...commonShape
+        ],
+        polyline: [
+          { key: '_controlPoints', label: '控制点', type: 'controlPoints' },
+          { key: 'stroke', label: '颜色', type: 'color' },
+          { key: 'strokeWidth', label: '宽度', type: 'range', min: 0, max: 20, step: 0.5 },
+          { key: 'startWidth', label: '起点粗细', type: 'range', min: 0.1, max: 3, step: 0.1 },
+          { key: 'endWidth', label: '终点粗细', type: 'range', min: 0.1, max: 3, step: 0.1 },
+          { key: 'taperStart', label: '起点渐变%', type: 'range', min: 0, max: 0.5, step: 0.01 },
+          { key: 'taperEnd', label: '终点渐变%', type: 'range', min: 0, max: 0.5, step: 0.01 },
+          { key: 'pathGradient', label: '路径渐变', type: 'pathGradient' },
+          { key: 'closed', label: '闭合', type: 'checkbox' },
+          { key: 'fill', label: '填充', type: 'color' },
+          { key: 'fillGradient', label: '渐变填充', type: 'gradient' },
+          { key: 'texture', label: '贴图', type: 'texture' },
+          { key: 'textureScaleX', label: '贴图缩放X', type: 'range', min: 0.1, max: 5, step: 0.1 },
+          { key: 'textureScaleY', label: '贴图缩放Y', type: 'range', min: 0.1, max: 5, step: 0.1 },
+          { key: 'rotation', label: '旋转', type: 'range', min: 0, max: 360, step: 1 },
+          { key: 'blendMode', label: '混合模式', type: 'select', options: [
+            { value: 'source-over', label: '正常' },
+            { value: 'screen', label: '滤色(光晕)' },
+            { value: 'multiply', label: '正片叠底' },
+            { value: 'overlay', label: '叠加' },
+            { value: 'soft-light', label: '柔光' },
+            { value: 'hard-light', label: '强光' },
+            { value: 'color-dodge', label: '颜色减淡' },
+            { value: 'color-burn', label: '颜色加深' },
+            { value: 'difference', label: '差值' },
+            { value: 'exclusion', label: '排除' },
+            { value: 'hue', label: '色相' },
+            { value: 'saturation', label: '饱和度' },
+            { value: 'luminosity', label: '明度' }
+          ]},
+          { key: 'effects', label: '特效', type: 'effects' }
+        ],
+        path: [
+          { key: '_controlPoints', label: '控制点', type: 'controlPoints' },
+          { key: 'stroke', label: '颜色', type: 'color' },
+          { key: 'strokeWidth', label: '宽度', type: 'range', min: 0, max: 20, step: 0.5 },
+          { key: 'startWidth', label: '起点粗细', type: 'range', min: 0.1, max: 3, step: 0.1 },
+          { key: 'endWidth', label: '终点粗细', type: 'range', min: 0.1, max: 3, step: 0.1 },
+          { key: 'taperStart', label: '起点渐变%', type: 'range', min: 0, max: 0.5, step: 0.01 },
+          { key: 'taperEnd', label: '终点渐变%', type: 'range', min: 0, max: 0.5, step: 0.01 },
+          { key: 'pathGradient', label: '路径渐变', type: 'pathGradient' },
+          { key: 'closed', label: '闭合', type: 'checkbox' },
+          { key: 'fill', label: '填充', type: 'color' },
+          { key: 'fillGradient', label: '渐变填充', type: 'gradient' },
+          { key: 'texture', label: '贴图', type: 'texture' },
+          { key: 'textureScaleX', label: '贴图缩放X', type: 'range', min: 0.1, max: 5, step: 0.1 },
+          { key: 'textureScaleY', label: '贴图缩放Y', type: 'range', min: 0.1, max: 5, step: 0.1 },
+          { key: 'rotation', label: '旋转', type: 'range', min: 0, max: 360, step: 1 },
+          { key: 'blendMode', label: '混合模式', type: 'select', options: [
+            { value: 'source-over', label: '正常' },
+            { value: 'screen', label: '滤色(光晕)' },
+            { value: 'multiply', label: '正片叠底' },
+            { value: 'overlay', label: '叠加' },
+            { value: 'soft-light', label: '柔光' },
+            { value: 'hard-light', label: '强光' },
+            { value: 'color-dodge', label: '颜色减淡' },
+            { value: 'color-burn', label: '颜色加深' },
+            { value: 'difference', label: '差值' },
+            { value: 'exclusion', label: '排除' },
+            { value: 'hue', label: '色相' },
+            { value: 'saturation', label: '饱和度' },
+            { value: 'luminosity', label: '明度' }
+          ]},
+          { key: 'effects', label: '特效', type: 'effects' }
+        ],
+        mountain: [
+          { key: 'fill', label: '填充', type: 'color' },
+          { key: 'opacity', label: '透明度', type: 'range', min: 0, max: 1, step: 0.05 }
+        ],
+        rock: [
+          { key: 'fill', label: '填充', type: 'color' },
+          { key: 'stroke', label: '描边', type: 'color' },
+          { key: 'strokeWidth', label: '描边宽度', type: 'range', min: 0, max: 20, step: 0.5 }
+        ],
+        particles: [
+          // 基础属性
+          { key: 'x', label: '中心X', type: 'range', min: 0, max: 1, step: 0.01 },
+          { key: 'y', label: '中心Y', type: 'range', min: 0, max: 1, step: 0.01 },
+          { key: 'spread', label: '扩散', type: 'range', min: 0.1, max: 1, step: 0.01 },
+          { key: 'count', label: '数量', type: 'range', min: 1, max: 200, step: 1 },
+          { key: 'colors', label: '颜色', type: 'colors' },
+          { key: 'blendMode', label: '混合模式', type: 'select', options: [
+            { value: 'source-over', label: '正常' },
+            { value: 'screen', label: '滤色(光晕)' },
+            { value: 'multiply', label: '正片叠底' },
+            { value: 'overlay', label: '叠加' },
+            { value: 'lighter', label: '变亮' }
+          ]},
+          // 发射器属性
+          { key: '_emitterGroup', label: '发射器', type: 'group' },
+          { key: 'emitterEnabled', label: '启用发射器', type: 'checkbox' },
+          { key: 'emitterRate', label: '发射速率(/秒)', type: 'range', min: 1, max: 100, step: 1 },
+          { key: 'emitterLifetime', label: '粒子寿命(秒)', type: 'range', min: 0.1, max: 10, step: 0.1 },
+          { key: 'emitterSize', label: '发射器大小', type: 'range', min: 0.001, max: 0.2, step: 0.001 },
+          // 粒子外观
+          { key: '_appearanceGroup', label: '粒子外观', type: 'group' },
+          { key: 'particleSizeMin', label: '最小尺寸(px)', type: 'range', min: 0.5, max: 20, step: 0.5 },
+          { key: 'particleSizeMax', label: '最大尺寸(px)', type: 'range', min: 0.5, max: 20, step: 0.5 },
+          { key: 'particleAlphaMin', label: '最小透明度', type: 'range', min: 0, max: 1, step: 0.05 },
+          { key: 'particleAlphaMax', label: '最大透明度', type: 'range', min: 0, max: 1, step: 0.05 },
+          // 速度范围
+          { key: '_velocityGroup', label: '速度范围', type: 'group' },
+          { key: 'vxMin', label: 'X速度最小', type: 'range', min: -3, max: 0, step: 0.1 },
+          { key: 'vxMax', label: 'X速度最大', type: 'range', min: 0, max: 3, step: 0.1 },
+          { key: 'vyMin', label: 'Y速度最小', type: 'range', min: -3, max: 0, step: 0.1 },
+          { key: 'vyMax', label: 'Y速度最大', type: 'range', min: 0, max: 3, step: 0.1 },
+          // 物理属性
+          { key: '_physicsGroup', label: '物理属性', type: 'group' },
+          { key: 'gravity', label: '重力', type: 'range', min: -5, max: 5, step: 0.1 },
+          { key: 'drag', label: '空气阻力', type: 'range', min: 0, max: 1, step: 0.01 },
+          // 力场
+          { key: '_forceGroup', label: '力场', type: 'group' },
+          { key: 'forceFields', label: '力场配置', type: 'forceFields' }
+        ]
+      };
+
+      return fields[type] || [];
+    }
+
+    updateStatusBar() {
+      const shapes = this.editor.config.shapes || [];
+      const selected = this.editor.selectedElements?.length || (this.editor.selectedElement ? 1 : 0);
+      const zoom = Math.round(this.canvasManager.zoom * 100);
+      
+      document.getElementById('element-count').textContent = shapes.length;
+      document.getElementById('selected-count').textContent = selected;
+      document.getElementById('zoom-percent').textContent = `${zoom}%`;
+      
+      // 更新状态点
+      const statusDot = document.getElementById('status-dot');
+      statusDot.className = `status-dot ${this.editor.isDirty ? 'dirty' : ''}`;
+      
+      document.getElementById('status-text').textContent = 
+        this.editor.isDirty ? '未保存' : '已保存';
+    }
+
+    updateAISuggestions() {
+      const suggestions = this.aiInterface.getCommandSuggestions();
+      const container = document.getElementById('ai-suggestions');
+      
+      container.innerHTML = '';
+      suggestions.slice(0, 5).forEach(suggestion => {
+        const item = document.createElement('div');
+        item.className = 'ai-suggestion';
+        item.textContent = suggestion.command;
+        item.title = suggestion.description;
+        item.addEventListener('click', () => {
+          document.getElementById('ai-input').value = suggestion.command;
+          this.sendAICommand();
+        });
+        container.appendChild(item);
+      });
+    }
+
+    async sendAICommand() {
+      const input = document.getElementById('ai-input');
+      const command = input.value.trim();
+      
+      if (!command) return;
+      
+      // 显示处理中状态
+      const sendBtn = document.getElementById('ai-send');
+      const originalText = sendBtn.textContent;
+      sendBtn.textContent = '处理中...';
+      sendBtn.disabled = true;
+      
+      try {
+        const llmConfig = this.aiInterface.llmConfig;
+        const isLLMEnabled = llmConfig.enabled && llmConfig.apiKey;
+        
+        // 显示是否使用LLM
+        if (isLLMEnabled) {
+          console.log(`[AI] 使用LLM: ${llmConfig.model} @ ${llmConfig.endpoint}`);
+        } else {
+          console.log('[AI] LLM未配置，使用本地匹配');
+        }
+        
+        const result = await this.aiInterface.processNaturalLanguage(command);
+        
+        if (result.success) {
+          const source = result.source === 'llm' ? ' (AI)' : ' (本地)';
+          this.showNotification(`命令执行成功${source}`, 'success');
+        } else if (result.llmError) {
+          // LLM错误，显示详细对话框
+          this.showLLMErrorDialog(command, result.error, result.llmResponse);
+        } else {
+          // 本地匹配失败，显示建议
+          const suggestions = result.suggestions ? 
+            `\n建议: ${result.suggestions.slice(0, 3).join(', ')}` : '';
+          this.showNotification(`命令执行失败: ${result.error}${suggestions}`, 'error');
+        }
+        
+        input.value = '';
+        this.updateUI();
+        
+      } catch (error) {
+        this.showNotification(`错误: ${error.message}`, 'error');
+      } finally {
+        sendBtn.textContent = originalText;
+        sendBtn.disabled = false;
+      }
+    }
+    
+    showLLMErrorDialog(command, errorMessage, llmResponse) {
+      const overlay = document.createElement('div');
+      overlay.style.cssText = `
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0,0,0,0.7); z-index: 10000;
+        display: flex; align-items: center; justify-content: center;
+      `;
+      overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+      
+      const panel = document.createElement('div');
+      panel.style.cssText = `
+        background: #161b22; border: 1px solid #30363d; border-radius: 8px;
+        padding: 24px; width: 500px; color: #e6edf3;
+      `;
+      
+      panel.innerHTML = `
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 16px;">
+          <span style="font-size: 24px;">⚠️</span>
+          <div>
+            <div style="font-size: 16px; font-weight: 600; color: #f85149;">AI 命令执行失败</div>
+            <div style="font-size: 12px; color: #8b949e; margin-top: 4px;">LLM 无法正确处理您的请求</div>
+          </div>
+        </div>
+        
+        <div style="background: #1c2128; border: 1px solid #30363d; border-radius: 6px; padding: 12px; margin-bottom: 16px;">
+          <div style="font-size: 11px; color: #8b949e; margin-bottom: 6px;">您的命令：</div>
+          <div style="color: #c9d1d9; font-family: monospace; word-break: break-all;">${command}</div>
+        </div>
+        
+        <div style="background: #1c2128; border: 1px solid #da3633; border-radius: 6px; padding: 12px; margin-bottom: 16px;">
+          <div style="font-size: 11px; color: #f85149; margin-bottom: 6px;">错误信息：</div>
+          <div style="color: #f85149; font-size: 12px;">${errorMessage}</div>
+        </div>
+        
+        ${llmResponse ? `
+        <div style="background: #1c2128; border: 1px solid #30363d; border-radius: 6px; padding: 12px; margin-bottom: 16px;">
+          <div style="font-size: 11px; color: #8b949e; margin-bottom: 6px;">LLM 返回内容：</div>
+          <div style="color: #c9d1d9; font-size: 12px; font-family: monospace; max-height: 150px; overflow-y: auto; white-space: pre-wrap;">${llmResponse}</div>
+        </div>
+        ` : ''}
+        
+        <div style="font-size: 12px; color: #8b949e; margin-bottom: 16px;">
+          <strong>建议：</strong>
+          <ul style="margin: 6px 0 0 0; padding-left: 20px;">
+            <li>检查 LLM API 配置是否正确</li>
+            <li>尝试使用更简单的命令描述</li>
+            <li>使用本地命令（如"添加矩形"、"创建深海场景"）</li>
+          </ul>
+        </div>
+        
+        <div style="display: flex; justify-content: flex-end; gap: 8px;">
+          <button id="llm-error-close" class="btn primary" style="padding: 8px 16px;">确定</button>
+        </div>
+      `;
+      
+      overlay.appendChild(panel);
+      document.body.appendChild(overlay);
+      
+      document.getElementById('llm-error-close').addEventListener('click', () => overlay.remove());
+    }
+
+    showNotification(message, type = 'info') {
+      // 简单的通知实现
+      const notification = document.createElement('div');
+      notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        padding: 12px 16px;
+        background: ${type === 'success' ? '#238636' : type === 'error' ? '#da3633' : '#1f6feb'};
+        color: white;
+        border-radius: 6px;
+        font-size: 12px;
+        z-index: 1000;
+        animation: fadeInOut 3s ease-in-out;
+      `;
+      notification.textContent = message;
+      document.body.appendChild(notification);
+      
+      setTimeout(() => {
+        notification.remove();
+      }, 3000);
+    }
+
+    showExportCode() {
+      const code = this.exportManager.exportJavaScript();
+      document.getElementById('modal-title').textContent = '导出代码';
+      document.getElementById('modal-text').value = code;
+      document.getElementById('modal').classList.add('active');
+    }
+
+    showHelp() {
+      const overlay = document.createElement('div');
+      overlay.style.cssText = `
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0,0,0,0.7); z-index: 10000;
+        display: flex; align-items: center; justify-content: center;
+      `;
+      overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+      
+      const panel = document.createElement('div');
+      panel.style.cssText = `
+        background: #161b22; border: 1px solid #30363d; border-radius: 12px;
+        padding: 0; width: 680px; max-height: 85vh; color: #e6edf3;
+        display: flex; flex-direction: column; overflow: hidden;
+      `;
+      
+      // 标题栏
+      const header = document.createElement('div');
+      header.style.cssText = `
+        padding: 16px 20px; border-bottom: 1px solid #30363d;
+        display: flex; align-items: center; justify-content: space-between;
+        background: #1c2128;
+      `;
+      header.innerHTML = `
+        <div style="font-size: 16px; font-weight: 600; color: #58a6ff;">📖 编辑器使用指南</div>
+        <button id="help-close-btn" style="background: none; border: none; color: #8b949e; font-size: 18px; cursor: pointer;">✕</button>
+      `;
+      
+      // 内容区域
+      const content = document.createElement('div');
+      content.style.cssText = `
+        padding: 20px; overflow-y: auto; flex: 1;
+        font-size: 13px; line-height: 1.6;
+      `;
+      content.innerHTML = `
+        <div style="margin-bottom: 20px;">
+          <h3 style="color: #58a6ff; margin: 0 0 10px 0; font-size: 15px;">🚀 快速开始</h3>
+          <p style="margin: 0 0 8px 0; color: #c9d1d9;">
+            这是一个强大的动态背景编辑器，可以创建各种精美的视觉效果。
+            通过左侧工具栏选择形状类型，然后在画布上点击或拖拽来创建图形。
+          </p>
+        </div>
+        
+        <div style="margin-bottom: 20px;">
+          <h3 style="color: #58a6ff; margin: 0 0 10px 0; font-size: 15px;">🎨 创建图形</h3>
+          <ul style="margin: 0; padding-left: 20px; color: #c9d1d9;">
+            <li><strong>基础形状</strong>：选择矩形、圆形、多边形，在画布上点击放置</li>
+            <li><strong>折线/曲线</strong>：选择后在画布上点击添加点，右键完成绘制</li>
+            <li><strong>粒子系统</strong>：选择粒子类型，点击放置粒子发射器</li>
+            <li><strong>预设场景</strong>：使用AI命令快速创建深海、森林等场景</li>
+          </ul>
+        </div>
+        
+        <div style="margin-bottom: 20px;">
+          <h3 style="color: #58a6ff; margin: 0 0 10px 0; font-size: 15px;">✏️ 编辑图形</h3>
+          <ul style="margin: 0; padding-left: 20px; color: #c9d1d9;">
+            <li><strong>选择</strong>：点击图形选中，Shift+点击多选，拖拽框选</li>
+            <li><strong>移动</strong>：选中后拖拽图形移动位置</li>
+            <li><strong>缩放</strong>：拖拽控制点调整大小</li>
+            <li><strong>旋转</strong>：拖拽顶部旋转手柄旋转图形</li>
+            <li><strong>控制点</strong>：折线/曲线可拖拽单个控制点调整形状</li>
+          </ul>
+        </div>
+        
+        <div style="margin-bottom: 20px;">
+          <h3 style="color: #58a6ff; margin: 0 0 10px 0; font-size: 15px;">📚 图层管理</h3>
+          <ul style="margin: 0; padding-left: 20px; color: #c9d1d9;">
+            <li><strong>图层面板</strong>：右侧图层面板显示所有图层，可拖拽排序</li>
+            <li><strong>可见性</strong>：点击眼睛图标切换图层可见性</li>
+            <li><strong>锁定</strong>：点击锁图标锁定图层防止误操作</li>
+            <li><strong>打组</strong>：选中多个图形后点击"打组"按钮组合</li>
+            <li><strong>图层顺序</strong>：使用上下箭头调整图层层次</li>
+          </ul>
+        </div>
+        
+        <div style="margin-bottom: 20px;">
+          <h3 style="color: #58a6ff; margin: 0 0 10px 0; font-size: 15px;">🤖 AI 助手</h3>
+          <ul style="margin: 0; padding-left: 20px; color: #c9d1d9;">
+            <li><strong>自然语言命令</strong>：在AI输入框中输入自然语言描述</li>
+            <li><strong>示例命令</strong>：
+              <ul style="margin-top: 4px;">
+                <li>"添加一个蓝色矩形"</li>
+                <li>"创建深海场景"</li>
+                <li>"把背景改成渐变色"</li>
+                <li>"添加粒子效果"</li>
+              </ul>
+            </li>
+            <li><strong>LLM配置</strong>：点击设置按钮配置大模型API</li>
+          </ul>
+        </div>
+        
+        <div style="margin-bottom: 20px;">
+          <h3 style="color: #58a6ff; margin: 0 0 10px 0; font-size: 15px;">⌨️ 快捷键</h3>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; color: #c9d1d9;">
+            <div><kbd style="background: #21262d; border: 1px solid #30363d; border-radius: 3px; padding: 1px 4px; font-family: monospace;">Ctrl+Z</kbd> 撤销</div>
+            <div><kbd style="background: #21262d; border: 1px solid #30363d; border-radius: 3px; padding: 1px 4px; font-family: monospace;">Ctrl+Shift+Z</kbd> 重做</div>
+            <div><kbd style="background: #21262d; border: 1px solid #30363d; border-radius: 3px; padding: 1px 4px; font-family: monospace;">Ctrl+C</kbd> 复制</div>
+            <div><kbd style="background: #21262d; border: 1px solid #30363d; border-radius: 3px; padding: 1px 4px; font-family: monospace;">Ctrl+V</kbd> 粘贴</div>
+            <div><kbd style="background: #21262d; border: 1px solid #30363d; border-radius: 3px; padding: 1px 4px; font-family: monospace;">Delete</kbd> 删除</div>
+            <div><kbd style="background: #21262d; border: 1px solid #30363d; border-radius: 3px; padding: 1px 4px; font-family: monospace;">Ctrl+S</kbd> 保存</div>
+            <div><kbd style="background: #21262d; border: 1px solid #30363d; border-radius: 3px; padding: 1px 4px; font-family: monospace;">Alt+拖拽</kbd> 平移画布</div>
+            <div><kbd style="background: #21262d; border: 1px solid #30363d; border-radius: 3px; padding: 1px 4px; font-family: monospace;">Shift+拖拽</kbd> 框选</div>
+            <div><kbd style="background: #21262d; border: 1px solid #30363d; border-radius: 3px; padding: 1px 4px; font-family: monospace;">Shift+点击</kbd> 多选</div>
+            <div><kbd style="background: #21262d; border: 1px solid #30363d; border-radius: 3px; padding: 1px 4px; font-family: monospace;">Escape</kbd> 取消选择</div>
+          </div>
+        </div>
+        
+        <div style="margin-bottom: 10px;">
+          <h3 style="color: #58a6ff; margin: 0 0 10px 0; font-size: 15px;">💡 提示</h3>
+          <ul style="margin: 0; padding-left: 20px; color: #c9d1d9;">
+            <li>使用属性面板精细调整选中图形的各项参数</li>
+            <li>支持渐变色、贴图、特效等多种视觉效果</li>
+            <li>可以导出为PNG图片或JSON配置文件</li>
+            <li>配置LLM后可以使用自然语言快速创建复杂场景</li>
+          </ul>
+        </div>
+      `;
+      
+      panel.appendChild(header);
+      panel.appendChild(content);
+      overlay.appendChild(panel);
+      document.body.appendChild(overlay);
+      
+      // 关闭按钮事件
+      document.getElementById('help-close-btn').addEventListener('click', () => overlay.remove());
+    }
+
+    showLLMSettings() {
+      const config = this.aiInterface.llmConfig;
+      const isConfigured = config.enabled && config.apiKey;
+      
+      const overlay = document.createElement('div');
+      overlay.style.cssText = `
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0,0,0,0.7); z-index: 10000;
+        display: flex; align-items: center; justify-content: center;
+      `;
+      overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+      
+      const panel = document.createElement('div');
+      panel.style.cssText = `
+        background: #161b22; border: 1px solid #30363d; border-radius: 8px;
+        padding: 24px; width: 420px; color: #e6edf3;
+      `;
+      panel.innerHTML = `
+        <h3 style="margin:0 0 16px; color:#58a6ff;">🤖 AI 模型设置</h3>
+        
+        <div style="background:${isConfigured ? '#1a3a2a' : '#3a1a1a'}; border:1px solid ${isConfigured ? '#2ea043' : '#da3633'}; border-radius:6px; padding:10px; margin-bottom:16px;">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="font-size:16px;">${isConfigured ? '✅' : '⚠️'}</span>
+            <span style="font-size:13px; color:${isConfigured ? '#3fb950' : '#f85149'};">
+              ${isConfigured ? 'AI 模型已配置' : 'AI 模型未配置'}
+            </span>
+          </div>
+          <div style="font-size:11px; color:#8b949e; margin-top:6px;">
+            ${isConfigured ? 
+              `当前模型: ${config.model} | 状态: 可用` : 
+              '请配置 API Key 以启用 AI 功能，或使用本地命令（如"添加矩形"、"创建深海场景"）'}
+          </div>
+        </div>
+        
+        <div style="margin-bottom:12px;">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+            <input type="checkbox" id="llm-enabled" ${config.enabled ? 'checked' : ''}>
+            <span>启用 LLM 模式（需要API Key）</span>
+          </label>
+        </div>
+        <div style="margin-bottom:12px;">
+          <label style="display:block;margin-bottom:4px;font-size:12px;color:#8b949e;">API Endpoint</label>
+          <input type="text" id="llm-endpoint" value="${config.endpoint}" 
+            style="width:100%;background:#0d1117;border:1px solid #30363d;border-radius:4px;padding:8px;color:#e6edf3;font-size:12px;box-sizing:border-box;">
+        </div>
+        <div style="margin-bottom:12px;">
+          <label style="display:block;margin-bottom:4px;font-size:12px;color:#8b949e;">API Key</label>
+          <input type="password" id="llm-apikey" value="${config.apiKey}" placeholder="sk-..."
+            style="width:100%;background:#0d1117;border:1px solid #30363d;border-radius:4px;padding:8px;color:#e6edf3;font-size:12px;box-sizing:border-box;">
+        </div>
+        <div style="margin-bottom:16px;">
+          <label style="display:block;margin-bottom:4px;font-size:12px;color:#8b949e;">模型名称</label>
+          <input type="text" id="llm-model" value="${config.model}"
+            style="width:100%;background:#0d1117;border:1px solid #30363d;border-radius:4px;padding:8px;color:#e6edf3;font-size:12px;box-sizing:border-box;">
+        </div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;">
+          <button id="llm-cancel" class="btn">取消</button>
+          <button id="llm-save" class="btn primary">保存</button>
+        </div>
+        <p style="margin:12px 0 0;font-size:11px;color:#8b949e;">
+          支持 OpenAI 兼容 API（OpenAI、DeepSeek、Moonshot 等）<br>
+          本地命令：添加矩形/圆形/粒子、创建深海/森林/太空场景、设置背景颜色
+        </p>
+      `;
+      
+      overlay.appendChild(panel);
+      document.body.appendChild(overlay);
+      
+      panel.querySelector('#llm-cancel').onclick = () => overlay.remove();
+      panel.querySelector('#llm-save').onclick = () => {
+        this.aiInterface.configureLLM({
+          enabled: panel.querySelector('#llm-enabled').checked,
+          endpoint: panel.querySelector('#llm-endpoint').value,
+          apiKey: panel.querySelector('#llm-apikey').value,
+          model: panel.querySelector('#llm-model').value
+        });
+        
+        // 保存到 localStorage
+        localStorage.setItem('editor_llm_config', JSON.stringify({
+          enabled: this.aiInterface.llmConfig.enabled,
+          endpoint: this.aiInterface.llmConfig.endpoint,
+          apiKey: this.aiInterface.llmConfig.apiKey,
+          model: this.aiInterface.llmConfig.model
+        }));
+        
+        overlay.remove();
+        this.showNotification('AI模型设置已保存', 'success');
+      };
+    }
+
+    handleFileLoad(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        try {
+          const config = JSON.parse(ev.target.result);
+          this.editor.loadConfig(config);
+          this.showNotification('配置加载成功', 'success');
+        } catch (err) {
+          this.showNotification(`JSON 解析失败: ${err.message}`, 'error');
+        }
+      };
+      reader.readAsText(file);
+    }
+  }
+
+  // 全局函数
+  window.closeModal = () => {
+    document.getElementById('modal').classList.remove('active');
+  };
+
+  window.copyModal = () => {
+    const textarea = document.getElementById('modal-text');
+    textarea.select();
+    document.execCommand('copy');
+    window.closeModal();
+  };
+
+  // 启动应用 (init已在构造函数中调用，无需重复调用)
+  const app = new EditorApp();
+</script>
+
+<style>
+  @keyframes fadeInOut {
+    0% { opacity: 0; transform: translateY(-10px); }
+    10% { opacity: 1; transform: translateY(0); }
+    90% { opacity: 1; transform: translateY(0); }
+    100% { opacity: 0; transform: translateY(-10px); }
+  }
+</style>
+
+</body>
+</html>

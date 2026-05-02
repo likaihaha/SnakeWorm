@@ -1,0 +1,1174 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Melody Worm — 关卡主题展示</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    background: #111;
+    color: #fff;
+    overflow: hidden;
+    width: 100vw;
+    height: 100vh;
+    display: flex;
+  }
+
+  /* 侧边导航 */
+  .sidebar {
+    width: 260px;
+    background: rgba(20,20,25,0.95);
+    border-right: 1px solid rgba(255,255,255,0.08);
+    display: flex;
+    flex-direction: column;
+    padding: 24px 0;
+    z-index: 10;
+    backdrop-filter: blur(10px);
+  }
+  .sidebar h1 {
+    font-size: 20px;
+    font-weight: 700;
+    text-align: center;
+    margin-bottom: 8px;
+    background: linear-gradient(90deg, #7ec8e3, #c9a0dc);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    letter-spacing: 2px;
+  }
+  .sidebar .subtitle {
+    font-size: 11px;
+    color: rgba(255,255,255,0.35);
+    text-align: center;
+    margin-bottom: 28px;
+    letter-spacing: 1px;
+  }
+  .theme-btn {
+    position: relative;
+    padding: 16px 24px;
+    margin: 4px 12px;
+    border: none;
+    background: transparent;
+    color: rgba(255,255,255,0.5);
+    font-size: 14px;
+    cursor: pointer;
+    border-radius: 10px;
+    text-align: left;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .theme-btn:hover {
+    background: rgba(255,255,255,0.05);
+    color: rgba(255,255,255,0.85);
+  }
+  .theme-btn.active {
+    background: rgba(255,255,255,0.1);
+    color: #fff;
+    box-shadow: inset 2px 0 0 currentColor;
+  }
+  .theme-btn .icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+  }
+  .theme-btn .info { display: flex; flex-direction: column; }
+  .theme-btn .name { font-weight: 600; font-size: 14px; }
+  .theme-btn .desc { font-size: 11px; color: rgba(255,255,255,0.35); margin-top: 2px; }
+
+  /* 主画布区域 */
+  .main {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+  }
+  canvas {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+  }
+
+  /* 信息面板 */
+  .info-panel {
+    position: absolute;
+    bottom: 28px;
+    right: 28px;
+    width: 360px;
+    background: rgba(10,10,15,0.85);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 16px;
+    padding: 24px;
+    backdrop-filter: blur(20px);
+    z-index: 10;
+    transition: all 0.5s ease;
+    transform: translateY(0);
+    opacity: 1;
+  }
+  .info-panel.hidden {
+    transform: translateY(20px);
+    opacity: 0;
+    pointer-events: none;
+  }
+  .info-panel h2 {
+    font-size: 22px;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .info-panel .tag {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+    margin-bottom: 14px;
+  }
+  .info-panel p {
+    font-size: 13px;
+    line-height: 1.7;
+    color: rgba(255,255,255,0.7);
+    margin-bottom: 16px;
+  }
+  .features {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .feature-tag {
+    padding: 5px 12px;
+    border-radius: 8px;
+    font-size: 12px;
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.1);
+    color: rgba(255,255,255,0.7);
+  }
+
+  /* 顶部装饰条 */
+  .top-bar {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    z-index: 20;
+    transition: background 0.5s ease;
+  }
+
+  /* 提示 */
+  .hint {
+    position: absolute;
+    bottom: 28px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 12px;
+    color: rgba(255,255,255,0.3);
+    z-index: 10;
+    pointer-events: none;
+    letter-spacing: 1px;
+  }
+
+  /* 加载 */
+  .loading {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 14px;
+    color: rgba(255,255,255,0.4);
+    z-index: 5;
+    transition: opacity 0.3s;
+  }
+</style>
+</head>
+<body>
+
+<nav class="sidebar">
+  <h1>MELODY WORM</h1>
+  <div class="subtitle">关卡主题设计展示</div>
+  <button class="theme-btn active" data-theme="0">
+    <span class="icon" style="background:#2a3a52;">🧫</span>
+    <span class="info"><span class="name">微观培养皿</span><span class="desc">浮力 · 圆形边界 · 气泡</span></span>
+  </button>
+  <button class="theme-btn" data-theme="1">
+    <span class="icon" style="background:#4a3028;">🪸</span>
+    <span class="info"><span class="name">珊瑚花园</span><span class="desc">亲子庇护 · 阳光光柱</span></span>
+  </button>
+  <button class="theme-btn" data-theme="2">
+    <span class="icon" style="background:#0a1a2a;">🌊</span>
+    <span class="info"><span class="name">深海裂谷</span><span class="desc">全场水流 · 荧光深海</span></span>
+  </button>
+  <button class="theme-btn" data-theme="3">
+    <span class="icon" style="background:#1a0a2a;">💾</span>
+    <span class="info"><span class="name">霓虹数据域</span><span class="desc">防火墙 · 电磁干扰</span></span>
+  </button>
+  <button class="theme-btn" data-theme="4">
+    <span class="icon" style="background:#0a0a1a;">🌌</span>
+    <span class="info"><span class="name">古老星渊</span><span class="desc">零重力 · 引力井</span></span>
+  </button>
+</nav>
+
+<div class="main">
+  <div class="top-bar" id="topBar"></div>
+  <div class="loading" id="loading">加载动画资源...</div>
+  <canvas id="canvas"></canvas>
+  <div class="hint">移动鼠标与场景互动 · 点击切换预览</div>
+
+  <div class="info-panel" id="infoPanel">
+    <h2 id="panelTitle">🧫 微观培养皿</h2>
+    <span class="tag" id="panelTag" style="background:rgba(126,200,227,0.2);color:#7ec8e3;">新手教学关</span>
+    <p id="panelDesc">在淡蓝紫色的培养液中，你是实验室里第一条人工培育的旋律虫虫。柔软的圆形边界包裹着你，气泡不断从底部升起，所有宝珠都受到浮力影响缓缓上浮。没有敌人的威胁，这里是学习基本操作的理想场所。</p>
+    <div class="features" id="panelFeatures">
+      <span class="feature-tag">🫧 气泡上升系统</span>
+      <span class="feature-tag">⭕ 圆形软边界</span>
+      <span class="feature-tag">🎈 浮力物理</span>
+      <span class="feature-tag">🧪 玻璃器皿反光</span>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ============ 通用工具 ============ */
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+let W, H, DPR;
+let mouse = { x: -1000, y: -1000 };
+let currentTheme = 0;
+let time = 0;
+
+function resize() {
+  DPR = window.devicePixelRatio || 1;
+  W = canvas.parentElement.clientWidth;
+  H = canvas.parentElement.clientHeight;
+  canvas.width = W * DPR;
+  canvas.height = H * DPR;
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+}
+window.addEventListener('resize', resize);
+resize();
+
+canvas.addEventListener('mousemove', e => {
+  const rect = canvas.getBoundingClientRect();
+  mouse.x = e.clientX - rect.left;
+  mouse.y = e.clientY - rect.top;
+});
+
+canvas.addEventListener('mouseleave', () => {
+  mouse.x = -1000; mouse.y = -1000;
+});
+
+function rand(a, b) { return a + Math.random() * (b - a); }
+function dist(x1,y1,x2,y2) { return Math.hypot(x2-x1, y2-y1); }
+
+/* ============ 主题数据 ============ */
+const themes = [
+  {
+    name: '🧫 微观培养皿',
+    tag: '新手教学关',
+    tagColor: '#7ec8e3',
+    tagBg: 'rgba(126,200,227,0.2)',
+    desc: '在淡蓝紫色的培养液中，你是实验室里第一条人工培育的旋律虫虫。柔软的圆形边界包裹着你，气泡不断从底部升起，所有宝珠都受到浮力影响缓缓上浮。没有敌人的威胁，这里是学习基本操作的理想场所。',
+    features: ['🫧 气泡上升系统','⭕ 圆形软边界','🎈 浮力物理','🧪 玻璃器皿反光'],
+    topColor: '#7ec8e3'
+  },
+  {
+    name: '🪸 珊瑚花园',
+    tag: '亲子机制教学',
+    tagColor: '#f4a261',
+    tagBg: 'rgba(244,162,97,0.2)',
+    desc: '温暖的粉橙色调海洋，阳光透过水面洒下金色光柱。珊瑚礁的角落是幼体最安全的天堂——进入庇护所即可获得短暂无敌。在这里，保护后代是你的首要使命。',
+    features: ['☀️ 动态阳光光柱','🛡️ 珊瑚庇护所','👶 幼体成长加速','🌸 漂浮花粉粒子'],
+    topColor: '#f4a261'
+  },
+  {
+    name: '🌊 深海裂谷',
+    tag: '环境威胁教学',
+    tagColor: '#48cae4',
+    tagBg: 'rgba(72,202,228,0.2)',
+    desc: '潜入深海裂谷，周围是绝对的黑暗与神秘的荧光。巨大水母在远处缓缓脉动，热液喷口不断喷涌着滚烫的矿物质。每10秒，全场水流会突然改变方向，将一切推向未知的深渊。',
+    features: ['🌊 周期性全场水流','🪼 巨大荧光水母','♨️ 热液喷口陷阱','✨ 深海荧光粒子'],
+    topColor: '#48cae4'
+  },
+  {
+    name: '💾 霓虹数据域',
+    tag: '节奏压力教学',
+    tagColor: '#ff006e',
+    tagBg: 'rgba(255,0,110,0.2)',
+    desc: '你进入了赛博空间的核心地带。数字雨从上方倾泻而下，防火墙边界正在周期性收缩。电磁脉冲每隔一段时间会干扰你的控制系统，让你短暂失控。在数据洪流中保持清醒！',
+    features: ['🔥 防火墙边界收缩','📡 电磁脉冲干扰','💻 数字雨背景','⚡ 故障艺术特效'],
+    topColor: '#ff006e'
+  },
+  {
+    name: '🌌 古老星渊',
+    tag: '终极综合挑战',
+    tagColor: '#b388eb',
+    tagBg: 'rgba(179,136,235,0.2)',
+    desc: '宇宙最深处的古老星渊，多层视差星空在四周缓缓流转。中心是一个强大的引力视界，越靠近中心引力越强。零重力环境下宝珠自由漂浮，但你需要小心突如其来的流星雨。',
+    features: ['🌠 多层视差星空','🌀 中心引力井','☄️ 随机流星雨','🌑 零重力宝珠漂浮'],
+    topColor: '#b388eb'
+  }
+];
+
+/* ============ 粒子系统 ============ */
+class Particle {
+  constructor(x, y, vx, vy, life, color, size) {
+    this.x = x; this.y = y;
+    this.vx = vx; this.vy = vy;
+    this.life = life; this.maxLife = life;
+    this.color = color;
+    this.size = size;
+  }
+  update() {
+    this.x += this.vx;
+    this.y += this.vy;
+    this.life--;
+    return this.life > 0;
+  }
+  draw(ctx) {
+    const a = this.life / this.maxLife;
+    ctx.globalAlpha = a;
+    ctx.fillStyle = this.color;
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.size * a, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+}
+let particles = [];
+function spawnParticles(x, y, count, color, speed, size) {
+  for (let i = 0; i < count; i++) {
+    const a = Math.random() * Math.PI * 2;
+    const s = rand(0.5, speed);
+    particles.push(new Particle(x, y, Math.cos(a)*s, Math.sin(a)*s, rand(30,80), color, rand(1, size)));
+  }
+}
+
+/* ============ 虫子绘制 ============ */
+function drawWorm(ctx, x, y, segments, angle, color, glow, time) {
+  // 身体
+  const segLen = 14;
+  let px = x, py = y;
+  for (let i = 0; i < segments; i++) {
+    const wave = Math.sin(time * 3 + i * 0.5) * 3;
+    const size = 10 - i * 0.6;
+    const bx = px - Math.cos(angle) * segLen * i + Math.sin(angle) * wave;
+    const by = py - Math.sin(angle) * segLen * i - Math.cos(angle) * wave;
+    ctx.shadowBlur = glow ? 15 : 0;
+    ctx.shadowColor = color;
+    ctx.fillStyle = color;
+    ctx.globalAlpha = 1 - i / (segments + 2);
+    ctx.beginPath();
+    ctx.arc(bx, by, Math.max(2, size), 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  ctx.shadowBlur = 0;
+  // 眼睛
+  ctx.fillStyle = '#fff';
+  ctx.beginPath();
+  ctx.arc(px + Math.cos(angle + 0.4) * 5, py + Math.sin(angle + 0.4) * 5, 3, 0, Math.PI * 2);
+  ctx.arc(px + Math.cos(angle - 0.4) * 5, py + Math.sin(angle - 0.4) * 5, 3, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#000';
+  ctx.beginPath();
+  ctx.arc(px + Math.cos(angle + 0.4) * 6, py + Math.sin(angle + 0.4) * 6, 1.5, 0, Math.PI * 2);
+  ctx.arc(px + Math.cos(angle - 0.4) * 6, py + Math.sin(angle - 0.4) * 6, 1.5, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+/* ============ 三叶虫敌人 ============ */
+function drawTrilobite(ctx, x, y, angle, time, color) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(angle);
+  ctx.shadowBlur = 10;
+  ctx.shadowColor = color;
+  ctx.fillStyle = color;
+  // 身体三段
+  ctx.beginPath(); ctx.ellipse(-8, 0, 10, 7, 0, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(6, 0, 8, 6, 0, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(18, 0, 6, 5, 0, 0, Math.PI*2); ctx.fill();
+  // 刺
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1.5;
+  for (let i = 0; i < 3; i++) {
+    const sx = -4 + i * 10;
+    ctx.beginPath();
+    ctx.moveTo(sx, -5);
+    ctx.lineTo(sx - 3, -12);
+    ctx.moveTo(sx, 5);
+    ctx.lineTo(sx - 3, 12);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+/* ============ 宝珠 ============ */
+function drawOrb(ctx, x, y, type, time, themeIndex) {
+  const pulse = Math.sin(time * 4) * 0.2 + 0.8;
+  const colors = [
+    ['#7ec8e3','#c9a0dc','#ffd700'], // 培养皿
+    ['#f4a261','#e76f51','#2a9d8f'], // 珊瑚
+    ['#48cae4','#ff006e','#ffd700'], // 深海
+    ['#00f5ff','#ff006e','#39ff14'], // 霓虹
+    ['#b388eb','#ffd700','#ff6b6b']  // 星渊
+  ];
+  const c = colors[themeIndex][type % 3];
+  ctx.shadowBlur = 20 * pulse;
+  ctx.shadowColor = c;
+  ctx.fillStyle = c;
+  ctx.beginPath();
+  ctx.arc(x, y, 8 * pulse, 0, Math.PI * 2);
+  ctx.fill();
+  // 内核
+  ctx.fillStyle = '#fff';
+  ctx.beginPath();
+  ctx.arc(x - 2, y - 2, 3, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.shadowBlur = 0;
+}
+
+/* ============ 主题1: 微观培养皿 ============ */
+const petriBubbles = [];
+for (let i = 0; i < 40; i++) petriBubbles.push({ x: rand(0,2000), y: rand(0,2000), r: rand(2,8), s: rand(0.3,1.2), w: rand(0,Math.PI*2) });
+
+function drawPetriDish(t) {
+  // 背景渐变
+  const grd = ctx.createRadialGradient(W/2, H/2, 0, W/2, H/2, Math.max(W,H)*0.7);
+  grd.addColorStop(0, '#1a2a3a');
+  grd.addColorStop(0.5, '#162232');
+  grd.addColorStop(1, '#0f1a25');
+  ctx.fillStyle = grd;
+  ctx.fillRect(0, 0, W, H);
+
+  const cx = W/2, cy = H/2;
+  const radius = Math.min(W, H) * 0.38;
+
+  // 圆形边界 - 玻璃效果
+  ctx.strokeStyle = 'rgba(126,200,227,0.25)';
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.strokeStyle = 'rgba(126,200,227,0.1)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.arc(cx, cy, radius + 8, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // 内部液体光泽
+  const shine = ctx.createLinearGradient(cx - radius*0.5, cy - radius*0.5, cx + radius*0.3, cy + radius*0.3);
+  shine.addColorStop(0, 'rgba(126,200,227,0.08)');
+  shine.addColorStop(1, 'rgba(126,200,227,0)');
+  ctx.fillStyle = shine;
+  ctx.beginPath();
+  ctx.arc(cx, cy, radius - 4, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 气泡
+  for (const b of petriBubbles) {
+    b.y -= b.s;
+    b.x += Math.sin(t * 2 + b.w) * 0.3;
+    if (b.y < cy - radius) { b.y = cy + radius; b.x = rand(cx - radius + 10, cx + radius - 10); }
+    if (dist(b.x, b.y, cx, cy) > radius - 5) continue;
+    ctx.globalAlpha = 0.25;
+    ctx.strokeStyle = '#7ec8e3';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.globalAlpha = 0.15;
+    ctx.fillStyle = '#7ec8e3';
+    ctx.fill();
+    // 高光
+    ctx.globalAlpha = 0.4;
+    ctx.fillStyle = '#fff';
+    ctx.beginPath();
+    ctx.arc(b.x - b.r*0.3, b.y - b.r*0.3, b.r*0.3, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+
+  // 网格
+  ctx.strokeStyle = 'rgba(126,200,227,0.06)';
+  ctx.lineWidth = 1;
+  const gs = 40;
+  for (let x = cx - radius; x <= cx + radius; x += gs) {
+    ctx.beginPath();
+    for (let y = cy - radius; y <= cy + radius; y += 5) {
+      if (dist(x,y,cx,cy) > radius - 2) continue;
+      if (y === cy - radius) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+  }
+  for (let y = cy - radius; y <= cy + radius; y += gs) {
+    ctx.beginPath();
+    for (let x = cx - radius; x <= cx + radius; x += 5) {
+      if (dist(x,y,cx,cy) > radius - 2) continue;
+      if (x === cx - radius) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+  }
+
+  // 宝珠 (浮力效果 - 缓缓上浮)
+  for (let i = 0; i < 6; i++) {
+    const ox = cx + Math.sin(t * 0.5 + i * 1.2) * (radius * 0.5);
+    const oy = cy + Math.cos(t * 0.3 + i * 0.8) * (radius * 0.3) - Math.sin(t + i) * 10;
+    if (dist(ox, oy, cx, cy) < radius - 10) drawOrb(ctx, ox, oy, i, t, 0);
+  }
+
+  // 虫子
+  const wx = cx + Math.sin(t * 0.8) * (radius * 0.3);
+  const wy = cy + Math.cos(t * 0.6) * (radius * 0.25);
+  const wAngle = Math.atan2(Math.cos(t*0.6)*0.3, Math.cos(t*0.8));
+  drawWorm(ctx, wx, wy, 12, wAngle, '#7ec8e3', true, t);
+
+  // 幼体 (跟随)
+  for (let i = 0; i < 3; i++) {
+    const jx = wx - Math.cos(wAngle) * 40 - i * 15 + Math.sin(t*2+i)*3;
+    const jy = wy - Math.sin(wAngle) * 40 - i * 15 + Math.cos(t*2+i)*3;
+    drawWorm(ctx, jx, jy, 5, wAngle + 0.1, '#c9a0dc', false, t + i);
+  }
+
+  // 鼠标互动 - 培养液涟漪
+  if (mouse.x > 0) {
+    const md = dist(mouse.x, mouse.y, cx, cy);
+    if (md < radius) {
+      ctx.strokeStyle = 'rgba(126,200,227,0.3)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(mouse.x, mouse.y, 20 + Math.sin(t*5)*5, 0, Math.PI*2);
+      ctx.stroke();
+    }
+  }
+}
+
+/* ============ 主题2: 珊瑚花园 ============ */
+const pollen = [];
+for (let i = 0; i < 60; i++) pollen.push({ x: rand(0,2000), y: rand(0,2000), s: rand(0.2,0.8), a: rand(0,Math.PI*2), r: rand(1,3) });
+
+function drawCoralGarden(t) {
+  // 背景
+  const grd = ctx.createLinearGradient(0, 0, 0, H);
+  grd.addColorStop(0, '#2a1a12');
+  grd.addColorStop(0.4, '#1e120d');
+  grd.addColorStop(1, '#0f0907');
+  ctx.fillStyle = grd;
+  ctx.fillRect(0, 0, W, H);
+
+  // 阳光光柱 (God Rays)
+  for (let i = 0; i < 4; i++) {
+    const sx = W * (0.2 + i * 0.2) + Math.sin(t * 0.3 + i) * 30;
+    const rayW = 80 + Math.sin(t * 0.5 + i * 2) * 20;
+    const ray = ctx.createLinearGradient(sx - rayW/2, 0, sx + rayW/2, 0);
+    ray.addColorStop(0, 'rgba(244,162,97,0)');
+    ray.addColorStop(0.3, 'rgba(244,162,97,0.08)');
+    ray.addColorStop(0.5, 'rgba(244,162,97,0.15)');
+    ray.addColorStop(0.7, 'rgba(244,162,97,0.08)');
+    ray.addColorStop(1, 'rgba(244,162,97,0)');
+    ctx.fillStyle = ray;
+    ctx.beginPath();
+    ctx.moveTo(sx - rayW/2, 0);
+    ctx.lineTo(sx + rayW/2, 0);
+    ctx.lineTo(sx + rayW/2 + 40, H * 0.7);
+    ctx.lineTo(sx - rayW/2 + 40, H * 0.7);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  // 花粉粒子
+  for (const p of pollen) {
+    p.x += Math.sin(t + p.a) * 0.5;
+    p.y -= p.s;
+    if (p.y < 0) { p.y = H; p.x = rand(0, W); }
+    ctx.globalAlpha = 0.4;
+    ctx.fillStyle = '#f4a261';
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+
+  // 底部珊瑚剪影
+  ctx.fillStyle = '#1a0f0a';
+  const coralPath = new Path2D();
+  for (let x = 0; x <= W; x += 10) {
+    const h = 60 + Math.sin(x * 0.02) * 30 + Math.sin(x * 0.05 + t) * 10;
+    if (x === 0) coralPath.moveTo(x, H);
+    coralPath.lineTo(x, H - h);
+  }
+  coralPath.lineTo(W, H);
+  coralPath.closePath();
+  ctx.fill(coralPath);
+
+  // 珊瑚细节
+  ctx.strokeStyle = '#2a1810';
+  ctx.lineWidth = 2;
+  for (let x = 50; x < W; x += rand(80, 150)) {
+    const h = 40 + Math.sin(x) * 20;
+    ctx.beginPath();
+    ctx.moveTo(x, H);
+    ctx.quadraticCurveTo(x + 10, H - h/2, x + Math.sin(t*0.5+x)*5, H - h);
+    ctx.stroke();
+    // 分支
+    ctx.beginPath();
+    ctx.moveTo(x + 5, H - h*0.6);
+    ctx.quadraticCurveTo(x + 20, H - h*0.8, x + 25, H - h*0.9);
+    ctx.stroke();
+  }
+
+  // 庇护所区域 (角落发光)
+  const shelterR = 70;
+  for (const [sx, sy] of [[60, H-60], [W-60, H-60], [60, 60]]) {
+    const sg = ctx.createRadialGradient(sx, sy, 0, sx, sy, shelterR);
+    sg.addColorStop(0, 'rgba(42,157,143,0.25)');
+    sg.addColorStop(0.5, 'rgba(42,157,143,0.1)');
+    sg.addColorStop(1, 'rgba(42,157,143,0)');
+    ctx.fillStyle = sg;
+    ctx.beginPath();
+    ctx.arc(sx, sy, shelterR, 0, Math.PI * 2);
+    ctx.fill();
+    // 庇护所标记
+    ctx.strokeStyle = 'rgba(42,157,143,0.5)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath();
+    ctx.arc(sx, sy, shelterR - 5, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  // 宝珠
+  for (let i = 0; i < 5; i++) {
+    const ox = W * 0.3 + Math.sin(t * 0.4 + i * 1.5) * 150;
+    const oy = H * 0.4 + Math.cos(t * 0.3 + i * 1.1) * 100;
+    drawOrb(ctx, ox, oy, i, t, 1);
+  }
+
+  // 虫子
+  const wx = W/2 + Math.sin(t * 0.7) * 100;
+  const wy = H/2 + Math.cos(t * 0.5) * 60;
+  const wAngle = Math.atan2(Math.cos(t*0.5)*0.5, Math.cos(t*0.7));
+  drawWorm(ctx, wx, wy, 12, wAngle, '#f4a261', true, t);
+
+  // 幼体 (更小，发光更强)
+  for (let i = 0; i < 4; i++) {
+    const jx = wx - Math.cos(wAngle) * 35 - i * 12 + Math.sin(t*3+i)*2;
+    const jy = wy - Math.sin(wAngle) * 35 - i * 12 + Math.cos(t*3+i)*2;
+    drawWorm(ctx, jx, jy, 4, wAngle + 0.05, '#e9c46a', true, t + i);
+  }
+
+  // 敌人
+  drawTrilobite(ctx, W*0.8 + Math.sin(t)*80, H*0.3 + Math.cos(t*0.7)*50, t * 0.5, t, '#e76f51');
+
+  // 鼠标光晕
+  if (mouse.x > 0) {
+    const mg = ctx.createRadialGradient(mouse.x, mouse.y, 0, mouse.x, mouse.y, 60);
+    mg.addColorStop(0, 'rgba(244,162,97,0.15)');
+    mg.addColorStop(1, 'rgba(244,162,97,0)');
+    ctx.fillStyle = mg;
+    ctx.beginPath();
+    ctx.arc(mouse.x, mouse.y, 60, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+/* ============ 主题3: 深海裂谷 ============ */
+const deepParticles = [];
+for (let i = 0; i < 100; i++) deepParticles.push({ x: rand(0,2000), y: rand(0,2000), s: rand(0.2,1), a: rand(0,Math.PI*2), size: rand(1,3), color: Math.random() > 0.7 ? '#ff006e' : '#48cae4' });
+
+const jellyfish = [
+  { x: 200, y: 200, size: 1, phase: 0 },
+  { x: 800, y: 300, size: 0.7, phase: 2 },
+  { x: 500, y: 500, size: 1.3, phase: 4 }
+];
+
+function drawDeepSea(t) {
+  // 极暗背景
+  const grd = ctx.createRadialGradient(W/2, H/2, 0, W/2, H/2, Math.max(W,H)*0.8);
+  grd.addColorStop(0, '#0a1a2a');
+  grd.addColorStop(0.5, '#050f1a');
+  grd.addColorStop(1, '#020508');
+  ctx.fillStyle = grd;
+  ctx.fillRect(0, 0, W, H);
+
+  // 远处巨大水母剪影
+  for (const j of jellyfish) {
+    const jx = j.x + Math.sin(t * 0.2 + j.phase) * 50;
+    const jy = j.y + Math.cos(t * 0.15 + j.phase) * 30;
+    const pulse = Math.sin(t * 2 + j.phase) * 0.1 + 1;
+    ctx.save();
+    ctx.translate(jx, jy);
+    ctx.scale(j.size * pulse, j.size * pulse);
+    ctx.globalAlpha = 0.15;
+    ctx.fillStyle = '#48cae4';
+    ctx.shadowBlur = 40;
+    ctx.shadowColor = '#48cae4';
+    // 伞
+    ctx.beginPath();
+    ctx.arc(0, -10, 50, Math.PI, 0);
+    ctx.bezierCurveTo(50, 10, -50, 10, -50, -10);
+    ctx.fill();
+    // 触手
+    ctx.strokeStyle = 'rgba(72,202,228,0.3)';
+    ctx.lineWidth = 2;
+    for (let ti = -3; ti <= 3; ti++) {
+      ctx.beginPath();
+      ctx.moveTo(ti * 12, 0);
+      for (let ty = 0; ty < 80; ty += 5) {
+        ctx.lineTo(ti * 12 + Math.sin(ty * 0.1 + t * 2 + ti) * 5, ty);
+      }
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+  ctx.globalAlpha = 1;
+  ctx.shadowBlur = 0;
+
+  // 荧光粒子 (随水流移动)
+  const flowDir = Math.floor(t / 10) % 2 === 0 ? 1 : -1;
+  for (const p of deepParticles) {
+    p.x += flowDir * p.s + Math.sin(t + p.a) * 0.3;
+    p.y -= p.s * 0.3;
+    if (p.x > W + 10) p.x = -10;
+    if (p.x < -10) p.x = W + 10;
+    if (p.y < -10) p.y = H + 10;
+    ctx.globalAlpha = rand(0.3, 0.8);
+    ctx.fillStyle = p.color;
+    ctx.shadowBlur = 6;
+    ctx.shadowColor = p.color;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  ctx.shadowBlur = 0;
+
+  // 热液喷口 (底部)
+  const vents = [W*0.25, W*0.5, W*0.75];
+  for (const vx of vents) {
+    // 喷口光晕
+    const vg = ctx.createRadialGradient(vx, H, 0, vx, H, 80);
+    vg.addColorStop(0, 'rgba(255,100,0,0.2)');
+    vg.addColorStop(1, 'rgba(255,100,0,0)');
+    ctx.fillStyle = vg;
+    ctx.fillRect(vx - 80, H - 80, 160, 80);
+    // 喷发粒子
+    if (Math.random() < 0.3) {
+      spawnParticles(vx + rand(-10,10), H - 5, 1, Math.random()>0.5?'#ff6600':'#ffcc00', 2, 3);
+    }
+    // 喷口结构
+    ctx.fillStyle = '#1a0a05';
+    ctx.beginPath();
+    ctx.moveTo(vx - 15, H);
+    ctx.lineTo(vx - 20, H - 15);
+    ctx.lineTo(vx + 20, H - 15);
+    ctx.lineTo(vx + 15, H);
+    ctx.fill();
+  }
+
+  // 宝珠
+  for (let i = 0; i < 5; i++) {
+    const ox = W * 0.3 + Math.sin(t * 0.3 + i * 1.5) * 150;
+    const oy = H * 0.35 + Math.cos(t * 0.4 + i * 1.1) * 100;
+    drawOrb(ctx, ox, oy, i, t, 2);
+  }
+
+  // 虫子 (带荧光)
+  const wx = W/2 + Math.sin(t * 0.6) * 120;
+  const wy = H/2 + Math.cos(t * 0.4) * 80;
+  const wAngle = Math.atan2(Math.cos(t*0.4)*0.5, Math.cos(t*0.6));
+  drawWorm(ctx, wx, wy, 12, wAngle, '#48cae4', true, t);
+
+  // 幼体
+  for (let i = 0; i < 3; i++) {
+    const jx = wx - Math.cos(wAngle) * 40 - i * 14 + Math.sin(t*2.5+i)*3;
+    const jy = wy - Math.sin(wAngle) * 40 - i * 14 + Math.cos(t*2.5+i)*3;
+    drawWorm(ctx, jx, jy, 5, wAngle + 0.08, '#90e0ef', true, t + i);
+  }
+
+  // 敌人 (红色荧光)
+  drawTrilobite(ctx, W*0.75 + Math.sin(t*0.5)*100, H*0.4 + Math.cos(t*0.3)*60, t*0.4, t, '#ff006e');
+
+  // 水流方向指示
+  ctx.globalAlpha = 0.15;
+  ctx.strokeStyle = '#48cae4';
+  ctx.lineWidth = 1;
+  for (let y = 50; y < H - 50; y += 60) {
+    for (let x = 50; x < W - 50; x += 80) {
+      const ax = x + Math.sin(t + y * 0.01) * 10;
+      const ay = y + Math.cos(t + x * 0.01) * 5;
+      const angle = flowDir > 0 ? 0 : Math.PI;
+      ctx.beginPath();
+      ctx.moveTo(ax - 15 * flowDir, ay);
+      ctx.lineTo(ax + 15 * flowDir, ay);
+      ctx.lineTo(ax + 10 * flowDir, ay - 4);
+      ctx.moveTo(ax + 15 * flowDir, ay);
+      ctx.lineTo(ax + 10 * flowDir, ay + 4);
+      ctx.stroke();
+    }
+  }
+  ctx.globalAlpha = 1;
+
+  // 鼠标探照灯效果
+  if (mouse.x > 0) {
+    const lg = ctx.createRadialGradient(mouse.x, mouse.y, 0, mouse.x, mouse.y, 120);
+    lg.addColorStop(0, 'rgba(72,202,228,0.12)');
+    lg.addColorStop(1, 'rgba(72,202,228,0)');
+    ctx.fillStyle = lg;
+    ctx.beginPath();
+    ctx.arc(mouse.x, mouse.y, 120, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+/* ============ 主题4: 霓虹数据域 ============ */
+const drops = [];
+for (let i = 0; i < 80; i++) drops.push({ x: rand(0,2000), y: rand(-500,2000), speed: rand(3,8), len: rand(10,30), char: String.fromCharCode(0x30A0 + Math.floor(Math.random()*96)) });
+
+const hexGrid = [];
+for (let row = -2; row < 30; row++) {
+  for (let col = -2; col < 30; col++) {
+    hexGrid.push({ row, col });
+  }
+}
+
+function drawCyber(t) {
+  // 黑底
+  ctx.fillStyle = '#050208';
+  ctx.fillRect(0, 0, W, H);
+
+  // 六边形网格背景
+  const hexSize = 25;
+  for (const h of hexGrid) {
+    const hx = h.col * hexSize * 1.73 + (h.row % 2) * hexSize * 0.865;
+    const hy = h.row * hexSize * 1.5;
+    if (hx < -50 || hx > W + 50 || hy < -50 || hy > H + 50) continue;
+    const d = dist(hx, hy, mouse.x, mouse.y);
+    const bright = Math.max(0, 1 - d / 150) * 0.3;
+    ctx.strokeStyle = `rgba(0,245,255,${0.06 + bright})`;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let i = 0; i < 6; i++) {
+      const a = (Math.PI / 3) * i;
+      const px = hx + hexSize * Math.cos(a);
+      const py = hy + hexSize * Math.sin(a);
+      if (i === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+    ctx.stroke();
+  }
+
+  // 数字雨
+  ctx.font = '14px monospace';
+  ctx.textAlign = 'center';
+  for (const d of drops) {
+    d.y += d.speed;
+    if (d.y > H + 50) { d.y = -rand(50, 300); d.x = rand(0, W); d.char = String.fromCharCode(0x30A0 + Math.floor(Math.random()*96)); }
+    const headA = 0.8 + Math.sin(t * 5 + d.x) * 0.2;
+    ctx.fillStyle = `rgba(0,245,255,${headA})`;
+    ctx.fillText(d.char, d.x, d.y);
+    ctx.strokeStyle = `rgba(0,245,255,${0.15})`;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(d.x, d.y - 5);
+    ctx.lineTo(d.x, d.y - d.len);
+    ctx.stroke();
+  }
+
+  // 防火墙边界收缩动画
+  const cycle = (t % 12) / 12;
+  const wallMargin = 40 + Math.sin(cycle * Math.PI * 2) * 20;
+  const wallColor = cycle < 0.5 ? 'rgba(255,0,110,0.6)' : 'rgba(255,0,110,0.2)';
+  ctx.strokeStyle = wallColor;
+  ctx.lineWidth = 3;
+  ctx.setLineDash([10, 10]);
+  ctx.strokeRect(wallMargin, wallMargin, W - wallMargin*2, H - wallMargin*2);
+  ctx.setLineDash([]);
+  // 警告文字
+  if (cycle < 0.3) {
+    ctx.fillStyle = `rgba(255,0,110,${0.5 + Math.sin(t*10)*0.3})`;
+    ctx.font = 'bold 16px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('⚠ FIREWALL CONTRACTING', W/2, wallMargin - 10);
+  }
+
+  // 电磁脉冲波纹 (周期性)
+  const empPhase = (t % 8) / 8;
+  if (empPhase < 0.3) {
+    const empR = empPhase / 0.3 * Math.max(W, H) * 0.8;
+    ctx.strokeStyle = `rgba(255,0,110,${1 - empPhase/0.3})`;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(W/2, H/2, empR, 0, Math.PI * 2);
+    ctx.stroke();
+    // Glitch效果
+    if (Math.random() < 0.3) {
+      ctx.fillStyle = 'rgba(255,255,255,0.1)';
+      const gy = rand(0, H);
+      ctx.fillRect(0, gy, W, rand(2, 8));
+    }
+  }
+
+  // 宝珠
+  for (let i = 0; i < 5; i++) {
+    const ox = W * 0.3 + Math.sin(t * 0.5 + i * 1.5) * 140;
+    const oy = H * 0.4 + Math.cos(t * 0.4 + i * 1.1) * 90;
+    drawOrb(ctx, ox, oy, i, t, 3);
+  }
+
+  // 虫子 (霓虹)
+  const wx = W/2 + Math.sin(t * 0.9) * 100;
+  const wy = H/2 + Math.cos(t * 0.6) * 70;
+  const wAngle = Math.atan2(Math.cos(t*0.6)*0.5, Math.cos(t*0.9));
+  drawWorm(ctx, wx, wy, 12, wAngle, '#00f5ff', true, t);
+
+  // 幼体
+  for (let i = 0; i < 3; i++) {
+    const jx = wx - Math.cos(wAngle) * 38 - i * 13 + Math.sin(t*2.5+i)*2;
+    const jy = wy - Math.sin(wAngle) * 38 - i * 13 + Math.cos(t*2.5+i)*2;
+    drawWorm(ctx, jx, jy, 5, wAngle + 0.1, '#39ff14', true, t + i);
+  }
+
+  // 敌人
+  drawTrilobite(ctx, W*0.75 + Math.sin(t*0.6)*90, H*0.35 + Math.cos(t*0.4)*70, t*0.5, t, '#ff006e');
+
+  // 鼠标数据光标
+  if (mouse.x > 0) {
+    ctx.strokeStyle = 'rgba(0,245,255,0.5)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(mouse.x, mouse.y, 20, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(mouse.x - 25, mouse.y);
+    ctx.lineTo(mouse.x - 15, mouse.y);
+    ctx.moveTo(mouse.x + 15, mouse.y);
+    ctx.lineTo(mouse.x + 25, mouse.y);
+    ctx.moveTo(mouse.x, mouse.y - 25);
+    ctx.lineTo(mouse.x, mouse.y - 15);
+    ctx.moveTo(mouse.x, mouse.y + 15);
+    ctx.lineTo(mouse.x, mouse.y + 25);
+    ctx.stroke();
+  }
+}
+
+/* ============ 主题5: 古老星渊 ============ */
+const stars = [];
+for (let i = 0; i < 300; i++) {
+  stars.push({ x: rand(0,2000), y: rand(0,2000), z: rand(0.2, 2), size: rand(0.5, 2.5), twinkle: rand(0, Math.PI*2) });
+}
+
+const nebula = [];
+for (let i = 0; i < 5; i++) nebula.push({ x: rand(200,800), y: rand(200,600), r: rand(100,200), color: ['#b388eb','#6d597a','#355070','#e56b6f','#eaac8b'][i], drift: rand(0, Math.PI*2) });
+
+const meteors = [];
+
+function drawStarAbyss(t) {
+  // 深空背景
+  const grd = ctx.createRadialGradient(W/2, H/2, 0, W/2, H/2, Math.max(W,H));
+  grd.addColorStop(0, '#0d0a15');
+  grd.addColorStop(0.5, '#08060c');
+  grd.addColorStop(1, '#030205');
+  ctx.fillStyle = grd;
+  ctx.fillRect(0, 0, W, H);
+
+  // 星云
+  for (const n of nebula) {
+    n.x += Math.sin(t * 0.1 + n.drift) * 0.2;
+    n.y += Math.cos(t * 0.08 + n.drift) * 0.15;
+    const ng = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, n.r);
+    ng.addColorStop(0, n.color + '20');
+    ng.addColorStop(0.5, n.color + '10');
+    ng.addColorStop(1, n.color + '00');
+    ctx.fillStyle = ng;
+    ctx.beginPath();
+    ctx.arc(n.x, n.y, n.r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // 多层视差星空
+  for (const s of stars) {
+    const parallaxX = (mouse.x - W/2) * 0.02 * s.z;
+    const parallaxY = (mouse.y - H/2) * 0.02 * s.z;
+    const sx = (s.x + parallaxX + W * 2) % W;
+    const sy = (s.y + parallaxY + H * 2) % H;
+    const tw = Math.sin(t * 2 + s.twinkle) * 0.5 + 0.5;
+    ctx.globalAlpha = tw * Math.min(1, s.z);
+    ctx.fillStyle = s.z > 1.2 ? '#b388eb' : '#ffffff';
+    ctx.shadowBlur = s.z > 1.2 ? 4 : 0;
+    ctx.shadowColor = '#b388eb';
+    ctx.beginPath();
+    ctx.arc(sx, sy, s.size * s.z, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  ctx.shadowBlur = 0;
+
+  // 引力井 (中心)
+  const gwR = 60 + Math.sin(t) * 5;
+  const gw = ctx.createRadialGradient(W/2, H/2, 0, W/2, H/2, gwR * 3);
+  gw.addColorStop(0, 'rgba(179,136,235,0.3)');
+  gw.addColorStop(0.2, 'rgba(179,136,235,0.1)');
+  gw.addColorStop(1, 'rgba(179,136,235,0)');
+  ctx.fillStyle = gw;
+  ctx.beginPath();
+  ctx.arc(W/2, H/2, gwR * 3, 0, Math.PI * 2);
+  ctx.fill();
+  // 吸积盘漩涡
+  ctx.strokeStyle = 'rgba(179,136,235,0.2)';
+  ctx.lineWidth = 1.5;
+  for (let i = 0; i < 3; i++) {
+    ctx.beginPath();
+    for (let a = 0; a < Math.PI * 6; a += 0.1) {
+      const r = gwR * 0.5 + a * 8 + i * 15;
+      const px = W/2 + Math.cos(a + t * 0.5 + i * 2) * r;
+      const py = H/2 + Math.sin(a + t * 0.5 + i * 2) * r;
+      if (a === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    }
+    ctx.stroke();
+  }
+  // 视界边界
+  ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+  ctx.lineWidth = 2;
+  ctx.setLineDash([5, 5]);
+  ctx.beginPath();
+  ctx.arc(W/2, H/2, gwR, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // 流星雨
+  if (Math.random() < 0.02) {
+    meteors.push({ x: rand(0, W), y: -20, vx: rand(-2, -6), vy: rand(4, 10), life: rand(30, 60), len: rand(30, 80) });
+  }
+  for (let i = meteors.length - 1; i >= 0; i--) {
+    const m = meteors[i];
+    m.x += m.vx;
+    m.y += m.vy;
+    m.life--;
+    if (m.life <= 0) { meteors.splice(i, 1); continue; }
+    const a = m.life / 60;
+    ctx.strokeStyle = `rgba(255,255,255,${a})`;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(m.x, m.y);
+    ctx.lineTo(m.x - m.vx * (m.len/10), m.y - m.vy * (m.len/10));
+    ctx.stroke();
+    ctx.fillStyle = `rgba(255,255,255,${a})`;
+    ctx.beginPath();
+    ctx.arc(m.x, m.y, 2, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // 宝珠 (零重力漂浮)
+  for (let i = 0; i < 5; i++) {
+    const ox = W * 0.3 + Math.sin(t * 0.2 + i * 1.5) * 180;
+    const oy = H * 0.4 + Math.cos(t * 0.25 + i * 1.1) * 120;
+    drawOrb(ctx, ox, oy, i, t, 4);
+  }
+
+  // 虫子
+  const wx = W/2 + Math.sin(t * 0.5) * 140 + Math.cos(t * 0.3) * 30;
+  const wy = H/2 + Math.cos(t * 0.4) * 100 + Math.sin(t * 0.2) * 20;
+  const wAngle = Math.atan2(Math.cos(t*0.4)*0.5 + Math.cos(t*0.2)*0.3, Math.cos(t*0.5));
+  drawWorm(ctx, wx, wy, 12, wAngle, '#b388eb', true, t);
+
+  // 幼体
+  for (let i = 0; i < 3; i++) {
+    const jx = wx - Math.cos(wAngle) * 42 - i * 14 + Math.sin(t*2+i)*4;
+    const jy = wy - Math.sin(wAngle) * 42 - i * 14 + Math.cos(t*2+i)*4;
+    drawWorm(ctx, jx, jy, 5, wAngle + 0.12, '#ffd700', true, t + i);
+  }
+
+  // 敌人
+  drawTrilobite(ctx, W*0.75 + Math.sin(t*0.4)*120, H*0.3 + Math.cos(t*0.35)*80, t*0.35, t, '#e56b6f');
+
+  // 鼠标引力效果
+  if (mouse.x > 0) {
+    const mg = ctx.createRadialGradient(mouse.x, mouse.y, 0, mouse.x, mouse.y, 80);
+    mg.addColorStop(0, 'rgba(179,136,235,0.15)');
+    mg.addColorStop(1, 'rgba(179,136,235,0)');
+    ctx.fillStyle = mg;
+    ctx.beginPath();
+    ctx.arc(mouse.x, mouse.y, 80, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+/* ============ 粒子更新绘制 ============ */
+function updateParticles() {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    if (!particles[i].update()) particles.splice(i, 1);
+    else particles[i].draw(ctx);
+  }
+}
+
+/* ============ 主动画循环 ============ */
+const themeDrawers = [drawPetriDish, drawCoralGarden, drawDeepSea, drawCyber, drawStarAbyss];
+
+function animate() {
+  time += 0.016;
+  ctx.clearRect(0, 0, W, H);
+  themeDrawers[currentTheme](time);
+  updateParticles();
+  requestAnimationFrame(animate);
+}
+
+/* ============ UI 交互 ============ */
+const btns = document.querySelectorAll('.theme-btn');
+const panel = document.getElementById('infoPanel');
+const pTitle = document.getElementById('panelTitle');
+const pTag = document.getElementById('panelTag');
+const pDesc = document.getElementById('panelDesc');
+const pFeatures = document.getElementById('panelFeatures');
+const topBar = document.getElementById('topBar');
+const loading = document.getElementById('loading');
+
+function switchTheme(idx) {
+  if (idx === currentTheme) return;
+  currentTheme = idx;
+
+  btns.forEach((b, i) => b.classList.toggle('active', i === idx));
+
+  // 信息面板动画切换
+  panel.classList.add('hidden');
+  setTimeout(() => {
+    const th = themes[idx];
+    pTitle.textContent = th.name;
+    pTag.textContent = th.tag;
+    pTag.style.background = th.tagBg;
+    pTag.style.color = th.tagColor;
+    pDesc.textContent = th.desc;
+    pFeatures.innerHTML = th.features.map(f => `<span class="feature-tag">${f}</span>`).join('');
+    topBar.style.background = th.topColor;
+    panel.classList.remove('hidden');
+  }, 300);
+}
+
+btns.forEach(b => {
+  b.addEventListener('click', () => switchTheme(parseInt(b.dataset.theme)));
+});
+
+// 键盘切换
+document.addEventListener('keydown', e => {
+  if (e.key === 'ArrowDown') switchTheme((currentTheme + 1) % 5);
+  if (e.key === 'ArrowUp') switchTheme((currentTheme + 4) % 5);
+});
+
+// 启动
+setTimeout(() => {
+  loading.style.opacity = '0';
+  setTimeout(() => loading.style.display = 'none', 300);
+}, 500);
+
+animate();
+</script>
+</body>
+</html>

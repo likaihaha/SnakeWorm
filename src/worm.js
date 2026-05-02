@@ -115,6 +115,7 @@ export class Worm {
         this.isStruggling = false;  // 是否在挣扎
         this.feedCooldown = 0;  // 吃食物冷却（吃一节后游出去一圈再吃下一节）
         this.strugglePhase = 0;  // 挣扎动画相位
+        this.protectingTimer = 0;  // 保护幼体计时器（成年体）
 
         // 冰晶覆盖效果
         this.iceOverlays = [];  // [{segmentIndex, timer, maxTimer}]
@@ -171,6 +172,11 @@ export class Worm {
         if (this.slowStacks > 0) {
             const slowRatio = Math.pow(0.6, this.slowStacks);  // 每层减速到60%
             newSpeed = Math.max(CONFIG.MIN_SPEED * 0.5, newSpeed * slowRatio);
+        }
+
+        // 保护幼体时加速50%
+        if (this.protectingTimer > 0) {
+            newSpeed *= 1.5;
         }
 
         this.speed = newSpeed;
@@ -418,6 +424,7 @@ export class Worm {
         if (this.warningFlashTimer > 0) this.warningFlashTimer -= dt;
         if (this.magnetTimer > 0) this.magnetTimer -= dt;
         if (this.purpleParticleTimer > 0) this.purpleParticleTimer -= dt;
+        if (this.protectingTimer > 0) this.protectingTimer -= dt;
 
         // 更新空闲波动相位（始终保持生命感波动）
         this.idleWavePhase += dt * 4;
@@ -668,16 +675,16 @@ export class Worm {
                     const initialVx = shrinking.initialVelocity ? shrinking.initialVelocity.x : 0;
                     const initialVy = shrinking.initialVelocity ? shrinking.initialVelocity.y : 0;
                     shrinking.velocity = new Vector(
-                        initialVx * 0.1 + (Math.random() - 0.5) * 5,
-                        15 + Math.random() * 15 + initialVy * 0.05
+                        initialVx * CONFIG.DEAD_BODY.INITIAL_VX_INHERIT + (Math.random() - 0.5) * CONFIG.DEAD_BODY.INITIAL_VX_RANDOM,
+                        CONFIG.DEAD_BODY.INITIAL_VY_MIN + Math.random() * CONFIG.DEAD_BODY.INITIAL_VY_SPREAD + initialVy * 0.05
                     );
                 }
             }
 
             if (shrinking.sinking) {
-                shrinking.velocity.y += 60 * dt;
-                shrinking.velocity.x += (Math.random() - 0.5) * 20 * dt;
-                shrinking.velocity.x *= 0.99;
+                shrinking.velocity.y += CONFIG.DEAD_BODY.SINK_GRAVITY * dt;
+                shrinking.velocity.x += (Math.random() - 0.5) * CONFIG.DEAD_BODY.SINK_SWAY * dt;
+                shrinking.velocity.x *= CONFIG.DEAD_BODY.SINK_DAMPING;
 
                 shrinking.pos.x += shrinking.velocity.x * dt;
                 shrinking.pos.y += shrinking.velocity.y * dt;
@@ -687,28 +694,28 @@ export class Worm {
 
                     const roll = Math.random();
                     let type;
-                    if (roll < 0.70) {
+                    if (roll < CONFIG.DEAD_BODY.EMIT_PROB_GREEN) {
                         type = CONFIG.FOOD_TYPES[0];
-                    } else if (roll < 0.85) {
+                    } else if (roll < CONFIG.DEAD_BODY.EMIT_PROB_BLUE) {
                         type = CONFIG.FOOD_TYPES[3];
-                    } else if (roll < 0.95) {
+                    } else if (roll < CONFIG.DEAD_BODY.EMIT_PROB_YELLOW) {
                         type = CONFIG.FOOD_TYPES[1];
                     } else {
                         type = CONFIG.FOOD_TYPES[2];
                     }
 
                     const food = new Food(shrinking.pos.x, shrinking.pos.y, type);
-                    const angle = (5 + Math.random() * 170) * Math.PI / 180;
-                    const speed = 4.0 + Math.random() * 4.0;
+                    const angle = (CONFIG.DEAD_BODY.EMIT_ANGLE_MIN + Math.random() * CONFIG.DEAD_BODY.EMIT_ANGLE_SPREAD) * Math.PI / 180;
+                    const speed = CONFIG.DEAD_BODY.EMIT_SPEED_MIN + Math.random() * CONFIG.DEAD_BODY.EMIT_SPEED_SPREAD;
                     food.velocity.x = speed * Math.cos(angle);
                     food.velocity.y = -speed * Math.sin(angle);
-                    food.inactiveTimer = 2.0;
+                    food.inactiveTimer = CONFIG.DEAD_BODY.EMIT_INACTIVE_TIME;
                     food.birthPhase = 'white';
-                    food.birthTimer = 1.2;
+                    food.birthTimer = CONFIG.DEAD_BODY.EMIT_BIRTH_TIME;
                     allFoods.push(food);
 
                     if (!this.pendingParticles) this.pendingParticles = [];
-                    for (let j = 0; j < 6; j++) {
+                    for (let j = 0; j < CONFIG.DEAD_BODY.EMIT_PARTICLE_COUNT; j++) {
                         this.pendingParticles.push(Particle.acquire(shrinking.pos.x, shrinking.pos.y, type.color));
                     }
                 }
@@ -728,6 +735,57 @@ export class Worm {
         // 幼体AI行为
         if (this.isJuvenile) {
             return this.juvenileThink(foods, allWorms, dt, enemies, brokenTails);
+        }
+
+        // 保护幼体：如果有自己的幼体正被敌人威胁、咬住或最近被攻击
+        if (allWorms && enemies && !this.isPlayer) {
+            let targetEnemy = null;
+            let minDist = Infinity;
+            let foundThreat = false;
+
+            for (const worm of allWorms) {
+                if (!worm.isJuvenile || worm.parentWorm !== this || !worm.isAlive) continue;
+
+                for (const enemy of enemies) {
+                    if (!enemy.isAlive || enemy.isDying) continue;
+
+                    // 敌人正咬住幼体：最高优先级
+                    if (enemy.latchedJuvenile === worm) {
+                        foundThreat = true;
+                        const d = this.head.dist(enemy.pos);
+                        if (d < minDist) {
+                            minDist = d;
+                            targetEnemy = enemy;
+                        }
+                    }
+                    // 敌人正在追击/绕圈这个幼体
+                    else if (enemy.circleTarget === worm || enemy.chaseTarget === worm) {
+                        foundThreat = true;
+                        const d = this.head.dist(enemy.pos);
+                        if (d < minDist) {
+                            minDist = d;
+                            targetEnemy = enemy;
+                        }
+                    }
+                    // 敌人在幼体附近（恐惧半径内）
+                    else {
+                        const distToJuv = worm.head.dist(enemy.pos);
+                        if (distToJuv < CONFIG.FAMILY.JUVENILE_FEAR_RADIUS) {
+                            foundThreat = true;
+                            const d = this.head.dist(enemy.pos);
+                            if (d < minDist) {
+                                minDist = d;
+                                targetEnemy = enemy;
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (foundThreat && targetEnemy) {
+                this.protectingTimer = 3.0;  // 保护状态持续3秒
+                return targetEnemy.pos;
+            }
         }
 
         this.aiWanderTimer -= dt;
@@ -783,16 +841,16 @@ export class Worm {
                 this.isStruggling = false;
             } else {
                 this.isStruggling = true;
-                this.strugglePhase += dt * 10;
-                const wriggleX = Math.sin(this.strugglePhase) * 15;
-                const wriggleY = Math.cos(this.strugglePhase * 1.3) * 15;
+                this.strugglePhase += dt * 18;
+                const wriggleX = Math.sin(this.strugglePhase) * 45;
+                const wriggleY = Math.cos(this.strugglePhase * 1.3) * 45;
                 return new Vector(this.head.x + wriggleX, this.head.y + wriggleY);
             }
         } else {
             this.isStruggling = false;
         }
 
-        // 1. 检查附近是否有敌人（害怕）
+        // 1. 检查附近是否有敌人（害怕/逃亡）
         let nearestEnemy = null;
         let enemyDist = Infinity;
         if (enemies) {
@@ -804,6 +862,23 @@ export class Worm {
                     nearestEnemy = enemy;
                 }
             }
+        }
+
+        // 2. 如果被攻击过，进入逃亡模式：远离敌人，不再跟随父代
+        if (this.juvenileHitCount >= 1) {
+            if (nearestEnemy) {
+                let fleeDir = this.head.sub(nearestEnemy.pos).normalize();
+                let fleeTarget = this.head.add(fleeDir.mult(280));
+                // 逃亡时也要避开边界
+                return this._juvenileAvoidWalls(fleeTarget);
+            }
+            // 没有可见敌人，随机游荡（不跟随父代）
+            this.aiWanderTimer -= dt;
+            if (this.aiWanderTimer <= 0) {
+                this.aiWanderTimer = CONFIG.AI_WANDER_CHANGE + Math.random() * 2;
+                this.aiWanderDir = Vector.randomDir();
+            }
+            return this._juvenileAvoidWalls(this.head.add(this.aiWanderDir.mult(100)));
         }
 
         // 如果敌人在害怕范围内，停止不动
@@ -834,7 +909,7 @@ export class Worm {
                 this.aiWanderTimer = CONFIG.AI_WANDER_CHANGE + Math.random() * 2;
                 this.aiWanderDir = Vector.randomDir();
             }
-            return this.head.add(this.aiWanderDir.mult(50));
+            return this._juvenileAvoidWalls(this.head.add(this.aiWanderDir.mult(50)));
         }
 
         // 2. 寻找成年体掉下的断尾（优先吃）
@@ -891,7 +966,31 @@ export class Worm {
             this.aiWanderTimer = CONFIG.AI_WANDER_CHANGE + Math.random() * 2;
             this.aiWanderDir = Vector.randomDir();
         }
-        return this.head.add(this.aiWanderDir.mult(50));
+        return this._juvenileAvoidWalls(this.head.add(this.aiWanderDir.mult(50)));
+    }
+
+    // 幼体边界避让：目标靠近边缘时推向中心
+    _juvenileAvoidWalls(target) {
+        const safeMargin = CONFIG.WALL_MARGIN * 4;  // 安全边距，比死亡线更早触发
+        const cx = CONFIG.CANVAS_WIDTH / 2;
+        const cy = CONFIG.CANVAS_HEIGHT / 2;
+        let tx = target.x;
+        let ty = target.y;
+
+        // 如果目标超出安全区域，推向中心
+        if (tx < safeMargin) tx = cx;
+        else if (tx > CONFIG.CANVAS_WIDTH - safeMargin) tx = cx;
+        if (ty < safeMargin) ty = cy;
+        else if (ty > CONFIG.CANVAS_HEIGHT - safeMargin) ty = cy;
+
+        // 如果当前位置已经在边缘，强制推向中心
+        if (this.head.x < safeMargin || this.head.x > CONFIG.CANVAS_WIDTH - safeMargin ||
+            this.head.y < safeMargin || this.head.y > CONFIG.CANVAS_HEIGHT - safeMargin) {
+            const pushDir = new Vector(cx - this.head.x, cy - this.head.y).normalize();
+            return this.head.add(pushDir.mult(150));
+        }
+
+        return new Vector(tx, ty);
     }
 
     // 死亡线检测（外框，最外面）

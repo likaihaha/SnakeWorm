@@ -6,7 +6,7 @@ export class DeadBody {
         this.segments = segments.map(s => new Vector(s.x, s.y));
         this.originalColor = originalColor;
         // 每段独立的速度，给初始向下速度确保能下沉
-        this.velocities = segments.map(() => new Vector(0, 30 + Math.random() * 30));
+        this.velocities = segments.map(() => new Vector(0, CONFIG.DEAD_BODY.INITIAL_VY_MIN + Math.random() * CONFIG.DEAD_BODY.INITIAL_VY_SPREAD));
         this.isFinished = false;
     }
 
@@ -19,14 +19,14 @@ export class DeadBody {
             const vel = this.velocities[i];
 
             // 向下重力（增大加速度让下沉速度合理）
-            vel.y += 120 * dt;
+            vel.y += CONFIG.DEAD_BODY.SINK_GRAVITY * dt;
 
             // 左右摆动（柔软无力）
-            vel.x += Math.sin(performance.now() / 400 + i * 0.6) * 30 * dt;
+            vel.x += Math.sin(performance.now() / 400 + i * 0.6) * CONFIG.DEAD_BODY.SINK_SWAY * dt;
 
             // 阻尼
-            vel.x *= 0.97;
-            vel.y *= 0.99;
+            vel.x *= CONFIG.DEAD_BODY.SINK_DAMPING;
+            vel.y *= CONFIG.DEAD_BODY.SINK_DAMPING;
 
             seg.x += vel.x * dt;
             seg.y += vel.y * dt;
@@ -36,11 +36,11 @@ export class DeadBody {
                 // 尸体爆宝珠概率：70%绿、15%蓝、10%黄、5%橙
                 const roll = Math.random();
                 let type;
-                if (roll < 0.70) {
+                if (roll < CONFIG.DEAD_BODY.EMIT_PROB_GREEN) {
                     type = CONFIG.FOOD_TYPES[0]; // 绿色
-                } else if (roll < 0.85) {
+                } else if (roll < CONFIG.DEAD_BODY.EMIT_PROB_BLUE) {
                     type = CONFIG.FOOD_TYPES[3]; // 蓝色
-                } else if (roll < 0.95) {
+                } else if (roll < CONFIG.DEAD_BODY.EMIT_PROB_YELLOW) {
                     type = CONFIG.FOOD_TYPES[1]; // 黄色
                 } else {
                     type = CONFIG.FOOD_TYPES[2]; // 橙色

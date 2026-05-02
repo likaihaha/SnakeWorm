@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BG1 动态背景 - 全 Canvas 程序化渲染</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #0a0a12;
+            color: #eee;
+            font-family: 'Microsoft YaHei', sans-serif;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        h1 { color: #4de8d6; margin-bottom: 6px; }
+        .subtitle { color: #888; margin-bottom: 20px; font-size: 14px; }
+
+        .main-stage {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            align-items: flex-start;
+        }
+
+        .canvas-wrapper {
+            position: relative;
+            border-radius: 12px;
+            overflow: hidden;
+            border: 2px solid #2d2d4a;
+            box-shadow: 0 0 40px rgba(77, 232, 214, 0.1);
+        }
+
+        #demoCanvas {
+            display: block;
+            background: #000;
+        }
+
+        .overlay-ui {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.6);
+            border-radius: 8px;
+            padding: 10px 14px;
+            font-size: 12px;
+            pointer-events: none;
+        }
+        .overlay-ui div { margin: 3px 0; }
+        .overlay-ui .label { color: #888; }
+        .overlay-ui .value { color: #4de8d6; font-weight: bold; }
+
+        .controls {
+            flex: 1;
+            min-width: 280px;
+            max-width: 380px;
+        }
+
+        .panel {
+            background: #1a1a2e;
+            border: 1px solid #2d2d4a;
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 16px;
+        }
+        .panel h3 {
+            color: #ff9a3c;
+            font-size: 14px;
+            margin-bottom: 12px;
+        }
+
+        .control-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin: 10px 0;
+            font-size: 13px;
+        }
+        .control-row label { color: #ccc; }
+        .control-row input[type="range"] {
+            width: 140px;
+            accent-color: #4de8d6;
+        }
+        .control-row input[type="checkbox"] {
+            accent-color: #4de8d6;
+            width: 18px;
+            height: 18px;
+        }
+
+        .toggle-btn {
+            background: #2d2d4a;
+            border: 1px solid #4de8d6;
+            color: #4de8d6;
+            padding: 8px 18px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.2s;
+        }
+        .toggle-btn:hover { background: #4de8d6; color: #0a0a12; }
+        .toggle-btn.active { background: #4de8d6; color: #0a0a12; font-weight: bold; }
+
+        .feature-list {
+            list-style: none;
+            font-size: 13px;
+        }
+        .feature-list li {
+            padding: 5px 0;
+            border-bottom: 1px solid #252540;
+            color: #bbb;
+        }
+        .feature-list li:last-child { border-bottom: none; }
+        .feature-list .ok { color: #69db7c; margin-right: 6px; }
+
+        .code-block {
+            background: #0f0f1a;
+            border: 1px solid #2d2d4a;
+            border-radius: 8px;
+            padding: 14px;
+            overflow-x: auto;
+            font-family: 'Consolas', monospace;
+            font-size: 11px;
+            line-height: 1.6;
+            color: #c5c8e6;
+        }
+        .code-block .kw { color: #ff79c6; }
+        .code-block .str { color: #f1fa8c; }
+        .code-block .fn { color: #8be9fd; }
+        .code-block .cm { color: #6272a4; }
+
+        .perf-bar {
+            height: 6px;
+            background: #2d2d4a;
+            border-radius: 3px;
+            margin-top: 6px;
+            overflow: hidden;
+        }
+        .perf-bar-fill {
+            height: 100%;
+            background: #4de8d6;
+            border-radius: 3px;
+            transition: width 0.3s;
+        }
+    </style>
+</head>
+<body>
+    <h1>BG1 动态背景 - 全 Canvas 程序化渲染</h1>
+    <p class="subtitle">零图片资源，完全由 Canvas 代码实时绘制。水母脉动、热液喷发、微粒闪烁、河流微光。</p>
+
+    <div class="main-stage">
+        <div class="canvas-wrapper">
+            <canvas id="demoCanvas" width="960" height="540"></canvas>
+            <div class="overlay-ui">
+                <div><span class="label">FPS:</span> <span class="value" id="fpsVal">60</span></div>
+                <div><span class="label">微粒:</span> <span class="value" id="particleVal">30</span></div>
+                <div><span class="label">热液:</span> <span class="value" id="magmaVal">50</span></div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <div class="panel">
+                <h3>实时开关</h3>
+                <div class="control-row">
+                    <label>水母动画</label>
+                    <input type="checkbox" id="toggleJelly" checked>
+                </div>
+                <div class="control-row">
+                    <label>热液喷发</label>
+                    <input type="checkbox" id="toggleMagma" checked>
+                </div>
+                <div class="control-row">
+                    <label>河流微光</label>
+                    <input type="checkbox" id="toggleRiver" checked>
+                </div>
+                <div class="control-row">
+                    <label>荧光微粒</label>
+                    <input type="checkbox" id="toggleParticles" checked>
+                </div>
+                <div class="control-row">
+                    <label>远景视差</label>
+                    <input type="checkbox" id="toggleMountains" checked>
+                </div>
+            </div>
+
+            <div class="panel">
+                <h3>动态强度</h3>
+                <div class="control-row">
+                    <label>时间流速</label>
+                    <input type="range" id="timeSpeed" min="0" max="3" step="0.1" value="1">
+                </div>
+                <div class="control-row">
+                    <label>发光强度</label>
+                    <input type="range" id="glowIntensity" min="0.2" max="2" step="0.1" value="1">
+                </div>
+            </div>
+
+            <div class="panel">
+                <h3>技术特性</h3>
+                <ul class="feature-list">
+                    <li><span class="ok">&#10003;</span> 静态层预渲染（offscreen canvas）</li>
+                    <li><span class="ok">&#10003;</span> 动态层每帧更新</li>
+                    <li><span class="ok">&#10003;</span> 零外部图片资源</li>
+                    <li><span class="ok">&#10003;</span> 任意分辨率自适应</li>
+                    <li><span class="ok">&#10003;</span> 支持叠加游戏元素</li>
+                </ul>
+            </div>
+
+            <div class="panel">
+                <h3>集成到 game.js</h3>
+                <div class="code-block">
+<span class="cm">// game.js</span>
+<span class="kw">import</span> { DynamicBG } <span class="kw">from</span> <span class="str">'./dynamic-bg.js'</span>;
+
+<span class="kw">constructor</span>() {
+  <span class="cm">// ...</span>
+  <span class="kw">this</span>.bg = <span class="kw">new</span> DynamicBG(
+    CONFIG.CANVAS_WIDTH,
+    CONFIG.CANVAS_HEIGHT
+  );
+}
+
+<span class="fn">draw</span>() {
+  <span class="cm">// 绘制动态背景</span>
+  <span class="kw">this</span>.bg.update(<span class="str">0.016</span>);
+  <span class="kw">this</span>.bg.draw(ctx);
+
+  <span class="cm">// 原有游戏绘制...</span>
+  <span class="kw">this</span>.drawGrid();
+  <span class="cm">// ...</span>
+}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        // ========== DynamicBG 内联实现（演示用） ==========
+        class DynamicBG {
+            constructor(width, height) {
+                this.w = width; this.h = height; this.t = 0;
+                this.staticCanvas = document.createElement('canvas');
+                this.staticCanvas.width = width;
+                this.staticCanvas.height = height;
+                this.sCtx = this.staticCanvas.getContext('2d');
+                this._renderStatic();
+                this.jellyfish = this._createJellyfish();
+                this.particles = this._createParticles(30);
+                this.magmaParticles = this._createMagmaParticles();
+                this.riverGlints = this._createRiverGlints();
+                this.mountains = this._createMountains();
+                this.enabled = {
+                    jelly: true, magma: true, river: true,
+                    particles: true, mountains: true,
+                };
+                this.timeScale = 1;
+                this.glowScale = 1;
+            }
+            _createJellyfish() {
+                return {
+                    x: this.w * 0.65, y: this.h * 0.22, baseY: this.h * 0.22,
+                    radiusX: 70, radiusY: 55, phase: 0,
+                    tentacles: Array.from({length:5}, (_,i)=>({
+                        offsetX: (i-2)*14, length: 90+Math.random()*40,
+                        waveFreq: 0.8+Math.random()*0.6, waveAmp: 6+Math.random()*4,
+                        phase: Math.random()*Math.PI*2,
+                    })),
+                };
+            }
+            _createParticles(count) {
+                return Array.from({length:count},()=>({
+                    x: Math.random()*this.w, y: Math.random()*this.h,
+                    vx: (Math.random()-0.5)*0.15, vy: (Math.random()-0.5)*0.1-0.05,
+                    r: 0.8+Math.random()*1.8, baseAlpha: 0.2+Math.random()*0.5,
+                    blinkFreq: 0.3+Math.random()*1.5, blinkPhase: Math.random()*Math.PI*2,
+                    color: ['#4de8d6','#6bffe8','#a8fff0'][Math.floor(Math.random()*3)],
+                }));
+            }
+            _createMagmaParticles() {
+                const vents = [{x:this.w*0.113,y:this.h*0.535,i:1},{x:this.w*0.193,y:this.h*0.57,i:0.7}];
+                const pts=[];
+                vents.forEach(v=>{for(let i=0;i<25;i++)pts.push({
+                    ventX:v.x,ventY:v.y,x:v.x+(Math.random()-0.5)*10,y:v.y+Math.random()*5,
+                    vx:(Math.random()-0.5)*0.4,vy:-0.3-Math.random()*0.8,life:Math.random(),
+                    decay:0.003+Math.random()*0.004,r:2+Math.random()*4,maxR:4+Math.random()*6,intensity:v.i,
+                })});
+                return pts;
+            }
+            _getRiverPath(){return[{x:-50,y:this.h*0.486},{x:this.w*0.078,y:this.h*0.472},{x:this.w*0.156,y:this.h*0.583},{x:this.w*0.273,y:this.h*0.556},{x:this.w*0.391,y:this.h*0.528},{x:this.w*0.469,y:this.h*0.625},{x:this.w*0.586,y:this.h*0.597},{x:this.w*0.703,y:this.h*0.569},{x:this.w*0.781,y:this.h*0.667},{x:this.w*0.898,y:this.h*0.639},{x:this.w*0.938,y:this.h*0.625},{x:this.w*0.977,y:this.h*0.653},{x:this.w*1.039,y:this.h*0.625}];}
+            _getPointOnPath(path,t){const idx=t*(path.length-1),i=Math.floor(idx),f=idx-i;if(i>=path.length-1)return path[path.length-1];const a=path[i],b=path[i+1];return{x:a.x+(b.x-a.x)*f,y:a.y+(b.y-a.y)*f};}
+            _createRiverGlints(){const path=this._getRiverPath(),g=[];for(let i=0;i<40;i++){const t=Math.random(),pos=this._getPointOnPath(path,t);g.push({t:t,offsetY:(Math.random()-0.5)*20,r:1.5+Math.random()*2.5,phase:Math.random()*Math.PI*2,freq:0.5+Math.random()*1,alpha:0.3+Math.random()*0.4});}return g;}
+            _createMountains(){return{far:this._generateMountainLine(this.h*0.5,80,0.6),mid:this._generateMountainLine(this.h*0.58,60,0.8)};}
+            _generateMountainLine(baseY,roughness,opacity){const pts=[];for(let i=0;i<=20;i++)pts.push({x:(i/20)*this.w,y:baseY-Math.random()*roughness-(i%3===0?30:0)});return{points:pts,opacity};}
+            _renderStatic(){const ctx=this.sCtx,w=this.w,h=this.h;const bgGrad=ctx.createRadialGradient(w*0.5,h*0.3,0,w*0.5,h*0.3,h*0.8);bgGrad.addColorStop(0,'#164a63');bgGrad.addColorStop(0.4,'#0d2f42');bgGrad.addColorStop(1,'#061924');ctx.fillStyle=bgGrad;ctx.fillRect(0,0,w,h);const ambGrad=ctx.createRadialGradient(w*0.65,h*0.35,0,w*0.65,h*0.35,h*0.5);ambGrad.addColorStop(0,'rgba(30,107,122,0.35)');ambGrad.addColorStop(1,'rgba(13,47,66,0)');ctx.fillStyle=ambGrad;ctx.fillRect(0,0,w,h);ctx.save();ctx.shadowColor='#4de8d6';ctx.shadowBlur=12;const rp=this._getRiverPath();ctx.beginPath();ctx.moveTo(rp[0].x,rp[0].y);for(let i=1;i<rp.length;i++){const c1x=rp[i-1].x+(rp[i].x-rp[i-1].x)*0.5,c1y=rp[i-1].y,c2x=rp[i].x-(rp[i].x-rp[i-1].x)*0.5,c2y=rp[i].y;ctx.bezierCurveTo(c1x,c1y,c2x,c2y,rp[i].x,rp[i].y);}ctx.strokeStyle='rgba(45,212,191,0.25)';ctx.lineWidth=35;ctx.stroke();ctx.strokeStyle='rgba(107,255,232,0.4)';ctx.lineWidth=8;ctx.stroke();ctx.restore();this._drawLeftRocks(ctx);ctx.fillStyle='#0a1c26';ctx.beginPath();ctx.moveTo(w*0.664,h);ctx.lineTo(w*0.703,h*0.833);ctx.lineTo(w*0.766,h*0.764);ctx.lineTo(w*0.82,h*0.806);ctx.lineTo(w*0.875,h*0.722);ctx.lineTo(w*0.938,h*0.778);ctx.lineTo(w,h*0.694);ctx.lineTo(w,h);ctx.closePath();ctx.fill();const fogGrad=ctx.createLinearGradient(0,h,0,0);fogGrad.addColorStop(0,'rgba(10,31,46,0.85)');fogGrad.addColorStop(0.4,'rgba(13,47,66,0.4)');fogGrad.addColorStop(1,'rgba(13,47,66,0)');ctx.fillStyle=fogGrad;ctx.fillRect(0,0,w,h);const vigGrad=ctx.createLinearGradient(0,0,0,h*0.3);vigGrad.addColorStop(0,'rgba(2,10,16,0.5)');vigGrad.addColorStop(1,'rgba(2,10,16,0)');ctx.fillStyle=vigGrad;ctx.fillRect(0,0,w,h);}
+            _drawLeftRocks(ctx){const w=this.w,h=this.h;ctx.fillStyle='#0f222e';ctx.beginPath();ctx.moveTo(0,h);ctx.lineTo(0,h*0.667);ctx.lineTo(w*0.062,h*0.625);ctx.lineTo(w*0.117,h*0.681);ctx.lineTo(w*0.172,h*0.639);ctx.lineTo(w*0.219,h*0.722);ctx.lineTo(w*0.273,h*0.667);ctx.lineTo(w*0.328,h*0.736);ctx.lineTo(w*0.297,h*0.833);ctx.lineTo(w*0.25,h*0.903);ctx.lineTo(w*0.219,h);ctx.closePath();ctx.fill();ctx.strokeStyle='rgba(30,58,77,0.5)';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(w*0.062,h*0.625);ctx.lineTo(w*0.117,h*0.681);ctx.lineTo(w*0.172,h*0.639);ctx.lineTo(w*0.219,h*0.722);ctx.lineTo(w*0.273,h*0.667);ctx.stroke();const p1=ctx.createLinearGradient(w*0.102,0,w*0.125,0);p1.addColorStop(0,'#1a2b38');p1.addColorStop(0.3,'#2d3e4a');p1.addColorStop(0.7,'#1e303d');p1.addColorStop(1,'#0f1f2a');ctx.fillStyle=p1;ctx.beginPath();ctx.moveTo(w*0.094,h*0.694);ctx.lineTo(w*0.102,h*0.528);ctx.lineTo(w*0.125,h*0.514);ctx.lineTo(w*0.121,h*0.681);ctx.closePath();ctx.fill();ctx.fillStyle='#0f1f2a';ctx.beginPath();ctx.ellipse(w*0.113,h*0.521,w*0.013,h*0.008,0,0,Math.PI*2);ctx.fill();const p2=ctx.createLinearGradient(w*0.184,0,w*0.203,0);p2.addColorStop(0,'#1a2b38');p2.addColorStop(0.3,'#2d3e4a');p2.addColorStop(0.7,'#1e303d');p2.addColorStop(1,'#0f1f2a');ctx.fillStyle=p2;ctx.beginPath();ctx.moveTo(w*0.172,h*0.722);ctx.lineTo(w*0.184,h*0.569);ctx.lineTo(w*0.203,h*0.556);ctx.lineTo(w*0.195,h*0.708);ctx.closePath();ctx.fill();ctx.fillStyle='#0f1f2a';ctx.beginPath();ctx.ellipse(w*0.193,h*0.562,w*0.011,h*0.007,0,0,Math.PI*2);ctx.fill();ctx.save();ctx.shadowColor='#ff6b2c';ctx.shadowBlur=6;ctx.strokeStyle='rgba(255,107,44,0.6)';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(w*0.062,h*0.764);ctx.lineTo(w*0.094,h*0.806);ctx.lineTo(w*0.117,h*0.778);ctx.lineTo(w*0.156,h*0.833);ctx.lineTo(w*0.195,h*0.806);ctx.lineTo(w*0.234,h*0.861);ctx.stroke();ctx.strokeStyle='rgba(255,154,60,0.5)';ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(w*0.141,h*0.722);ctx.lineTo(w*0.172,h*0.75);ctx.lineTo(w*0.203,h*0.736);ctx.stroke();ctx.restore();}
+            update(dt){this.t+=dt*this.timeScale;if(this.enabled.jelly){const j=this.jellyfish;j.y=j.baseY+Math.sin(this.t*0.4)*12;j.phase+=dt*1.2*this.timeScale;}if(this.enabled.particles){for(const p of this.particles){p.x+=p.vx;p.y+=p.vy;if(p.x<-10)p.x=this.w+10;if(p.x>this.w+10)p.x=-10;if(p.y<-10)p.y=this.h+10;if(p.y>this.h+10)p.y=-10;}}if(this.enabled.magma){for(const p of this.magmaParticles){p.x+=p.vx+Math.sin(this.t*2+p.life*10)*0.3;p.y+=p.vy;p.life-=p.decay;if(p.life<=0){p.life=1;p.x=p.ventX+(Math.random()-0.5)*8;p.y=p.ventY;p.vx=(Math.random()-0.5)*0.4;p.vy=-0.3-Math.random()*0.8;}}}if(this.enabled.river){for(const g of this.riverGlints)g.phase+=dt*g.freq*this.timeScale;}}
+            draw(ctx){ctx.drawImage(this.staticCanvas,0,0);if(this.enabled.mountains)this._drawMountains(ctx);if(this.enabled.river)this._drawRiverGlints(ctx);if(this.enabled.magma)this._drawMagmaParticles(ctx);if(this.enabled.jelly)this._drawJellyfish(ctx);if(this.enabled.particles)this._drawParticles(ctx);}
+            _drawMountains(ctx){const sway=Math.sin(this.t*0.15)*2;ctx.save();ctx.translate(sway,0);ctx.fillStyle=`rgba(10,31,46,${this.mountains.far.opacity})`;ctx.beginPath();ctx.moveTo(0,this.h);this.mountains.far.points.forEach(p=>ctx.lineTo(p.x,p.y));ctx.lineTo(this.w,this.h);ctx.closePath();ctx.fill();ctx.restore();}
+            _drawRiverGlints(ctx){const path=this._getRiverPath();ctx.save();ctx.globalCompositeOperation='screen';for(const g of this.riverGlints){const pos=this._getPointOnPath(path,g.t);const alpha=g.alpha*(0.5+0.5*Math.sin(g.phase))*this.glowScale;const r=g.r*(0.8+0.2*Math.sin(g.phase*1.3));ctx.fillStyle=`rgba(168,255,240,${alpha})`;ctx.beginPath();ctx.arc(pos.x,pos.y+g.offsetY,r,0,Math.PI*2);ctx.fill();}ctx.restore();}
+            _drawMagmaParticles(ctx){ctx.save();ctx.globalCompositeOperation='screen';for(const p of this.magmaParticles){const alpha=p.life*p.intensity*this.glowScale;const r=p.r+(1-p.life)*(p.maxR-p.r);const warm=Math.floor(255*p.life);ctx.fillStyle=`rgba(255,${Math.floor(100+warm*0.6)},${Math.floor(60*p.life)},${alpha})`;ctx.beginPath();ctx.arc(p.x,p.y,r,0,Math.PI*2);ctx.fill();}ctx.restore();}
+            _drawJellyfish(ctx){const j=this.jellyfish;const breathe=1+Math.sin(this.t*0.8)*0.06;ctx.save();ctx.translate(j.x,j.y);ctx.scale(breathe,breathe);ctx.save();ctx.shadowColor='#6bffe8';ctx.shadowBlur=20*this.glowScale;const glowGrad=ctx.createRadialGradient(0,0,0,0,0,j.radiusX);glowGrad.addColorStop(0,'rgba(168,255,240,0.4)');glowGrad.addColorStop(0.5,'rgba(107,255,232,0.15)');glowGrad.addColorStop(1,'rgba(77,232,214,0)');ctx.fillStyle=glowGrad;ctx.beginPath();ctx.ellipse(0,0,j.radiusX,j.radiusY,0,0,Math.PI*2);ctx.fill();ctx.restore();for(let i=0;i<j.tentacles.length;i++){const t=j.tentacles[i];ctx.save();ctx.strokeStyle=i%2===0?'rgba(107,255,232,0.45)':'rgba(168,255,240,0.55)';ctx.lineWidth=i%2===0?2.5:2;ctx.beginPath();ctx.moveTo(t.offsetX,15);for(let s=1;s<=8;s++){const sy=15+(t.length*s)/8;const wave=Math.sin(this.t*t.waveFreq+t.phase+s*0.5)*t.waveAmp*(s/8);ctx.lineTo(t.offsetX+wave,sy);}ctx.stroke();ctx.restore();}for(let i=0;i<j.tentacles.length;i++){const t=j.tentacles[i];const sy=15+t.length*0.6;const wave=Math.sin(this.t*t.waveFreq+t.phase+3)*t.waveAmp*0.6;ctx.fillStyle='rgba(168,255,240,0.6)';ctx.beginPath();ctx.arc(t.offsetX+wave,sy,2,0,Math.PI*2);ctx.fill();}const bodyGrad=ctx.createLinearGradient(0,-j.radiusY,0,22);bodyGrad.addColorStop(0,'rgba(168,255,240,0.85)');bodyGrad.addColorStop(0.4,'rgba(107,255,232,0.6)');bodyGrad.addColorStop(1,'rgba(77,232,214,0.2)');ctx.fillStyle=bodyGrad;ctx.beginPath();ctx.moveTo(-35,0);ctx.bezierCurveTo(-35,-35,-20,-55,0,-55);ctx.bezierCurveTo(20,-55,35,-35,35,0);ctx.bezierCurveTo(35,10,20,22,0,22);ctx.bezierCurveTo(-20,22,-35,10,-35,0);ctx.closePath();ctx.fill();ctx.strokeStyle='rgba(168,255,240,0.35)';ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(-20,-10);ctx.quadraticCurveTo(-10,-25,0,-30);ctx.quadraticCurveTo(10,-25,20,-10);ctx.stroke();ctx.beginPath();ctx.moveTo(-15,0);ctx.quadraticCurveTo(-5,-15,0,-20);ctx.quadraticCurveTo(5,-15,15,0);ctx.stroke();ctx.fillStyle='rgba(255,255,255,0.25)';ctx.beginPath();ctx.ellipse(-10,-35,8,4,-0.26,0,Math.PI*2);ctx.fill();ctx.restore();}
+            _drawParticles(ctx){ctx.save();ctx.globalCompositeOperation='screen';for(const p of this.particles){const alpha=p.baseAlpha*(0.5+0.5*Math.sin(this.t*p.blinkFreq+p.blinkPhase))*this.glowScale;ctx.fillStyle=p.color;ctx.globalAlpha=alpha;ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.fill();}ctx.globalAlpha=1;ctx.restore();}
+        }
+
+        // ========== 主循环 ==========
+        const canvas = document.getElementById('demoCanvas');
+        const ctx = canvas.getContext('2d');
+        const bg = new DynamicBG(canvas.width, canvas.height);
+
+        let lastTime = performance.now();
+        let fps = 60;
+        let frameCount = 0;
+        let fpsTimer = 0;
+
+        function loop(now) {
+            const dt = Math.min((now - lastTime) / 1000, 0.05);
+            lastTime = now;
+            frameCount++;
+            fpsTimer += dt;
+            if (fpsTimer >= 0.5) {
+                fps = Math.round(frameCount / fpsTimer);
+                frameCount = 0;
+                fpsTimer = 0;
+                document.getElementById('fpsVal').textContent = fps;
+            }
+
+            bg.update(dt);
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            bg.draw(ctx);
+
+            // 叠加假游戏元素
+            drawFakeGame(ctx);
+
+            requestAnimationFrame(loop);
+        }
+
+        function drawFakeGame(ctx) {
+            // 网格
+            ctx.strokeStyle = 'rgba(78, 204, 163, 0.06)';
+            ctx.lineWidth = 0.5;
+            for (let x = 0; x < canvas.width; x += 30) {
+                ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
+            }
+            for (let y = 0; y < canvas.height; y += 30) {
+                ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+            }
+            // 虫子
+            ctx.save();
+            ctx.shadowColor = '#ff6b6b'; ctx.shadowBlur = 10;
+            ctx.fillStyle = '#ff6b6b';
+            const t = performance.now() * 0.002;
+            for (let i = 0; i < 10; i++) {
+                const tt = i / 9;
+                const angle = tt * Math.PI * 2 + t;
+                ctx.beginPath();
+                ctx.arc(canvas.width * 0.55 + Math.cos(angle) * 4, canvas.height * 0.55 + Math.sin(angle) * 4, 22 - i * 2, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            ctx.restore();
+            // 宝珠
+            const colors = ['#ffd700', '#4dabf7', '#69db7c'];
+            const pos = [[0.25, 0.35], [0.72, 0.65], [0.45, 0.75]];
+            pos.forEach((p, i) => {
+                ctx.save();
+                ctx.globalCompositeOperation = 'screen';
+                ctx.shadowColor = colors[i]; ctx.shadowBlur = 15;
+                ctx.fillStyle = colors[i];
+                ctx.beginPath();
+                ctx.arc(canvas.width * p[0], canvas.height * p[1], 6, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            });
+        }
+
+        requestAnimationFrame(loop);
+
+        // ========== 控件绑定 ==========
+        document.getElementById('toggleJelly').onchange = e => bg.enabled.jelly = e.target.checked;
+        document.getElementById('toggleMagma').onchange = e => bg.enabled.magma = e.target.checked;
+        document.getElementById('toggleRiver').onchange = e => bg.enabled.river = e.target.checked;
+        document.getElementById('toggleParticles').onchange = e => bg.enabled.particles = e.target.checked;
+        document.getElementById('toggleMountains').onchange = e => bg.enabled.mountains = e.target.checked;
+        document.getElementById('timeSpeed').oninput = e => bg.timeScale = parseFloat(e.target.value);
+        document.getElementById('glowIntensity').oninput = e => bg.glowScale = parseFloat(e.target.value);
+    </script>
+</body>
+</html>

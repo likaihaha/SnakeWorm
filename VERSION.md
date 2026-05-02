@@ -14,7 +14,7 @@
 ```javascript
 // src/config.js
 export const CONFIG = {
-    VERSION: '1.51',  // ← 只改这里
+    VERSION: '1.52',  // ← 只改这里
     // ...
 };
 ```
@@ -24,7 +24,7 @@ export const CONFIG = {
 HTML 中对应位置已添加 `data-version` 属性：
 
 ```html
-<span data-version style="color:#888; font-size:14px;">v1.51</span>
+<span data-version style="color:#888; font-size:14px;">v1.52</span>
 ```
 
 ## 升级时机
@@ -42,7 +42,7 @@ HTML 中对应位置已添加 `data-version` 属性：
 升级版本号时，Git commit message 建议包含版本号：
 
 ```bash
-git commit -m "feat: 死亡后进入观战模式 (v1.51)"
+git commit -m "feat: 死亡后进入观战模式 (v1.52)"
 ```
 
 方便后续通过 `git log` 快速追溯每个版本对应的代码。

@@ -1,0 +1,1052 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Melody Worm — 反传统主题展示</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    background: #000;
+    color: #fff;
+    overflow: hidden;
+    width: 100vw;
+    height: 100vh;
+    display: flex;
+  }
+
+  /* 侧边导航 */
+  .sidebar {
+    width: 280px;
+    background: rgba(5,5,8,0.98);
+    border-right: 1px solid rgba(255,255,255,0.06);
+    display: flex;
+    flex-direction: column;
+    padding: 20px 0;
+    z-index: 10;
+  }
+  .sidebar h1 {
+    font-size: 18px;
+    font-weight: 700;
+    text-align: center;
+    margin-bottom: 4px;
+    background: linear-gradient(90deg, #ff006e, #00f5ff, #b388eb);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    letter-spacing: 3px;
+  }
+  .sidebar .subtitle {
+    font-size: 10px;
+    color: rgba(255,255,255,0.25);
+    text-align: center;
+    margin-bottom: 20px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+  .theme-btn {
+    position: relative;
+    padding: 14px 20px;
+    margin: 3px 10px;
+    border: none;
+    background: transparent;
+    color: rgba(255,255,255,0.4);
+    font-size: 13px;
+    cursor: pointer;
+    border-radius: 8px;
+    text-align: left;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .theme-btn:hover {
+    background: rgba(255,255,255,0.04);
+    color: rgba(255,255,255,0.8);
+  }
+  .theme-btn.active {
+    background: rgba(255,255,255,0.08);
+    color: #fff;
+  }
+  .theme-btn .icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    background: rgba(255,255,255,0.05);
+  }
+  .theme-btn .info { display: flex; flex-direction: column; }
+  .theme-btn .name { font-weight: 600; font-size: 13px; }
+  .theme-btn .desc { font-size: 10px; color: rgba(255,255,255,0.25); margin-top: 2px; }
+
+  /* 主画布区域 */
+  .main {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+  }
+  canvas {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+  }
+
+  /* 信息面板 */
+  .info-panel {
+    position: absolute;
+    bottom: 24px;
+    right: 24px;
+    width: 380px;
+    background: rgba(5,5,8,0.9);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 12px;
+    padding: 20px;
+    backdrop-filter: blur(20px);
+    z-index: 10;
+    transition: all 0.4s ease;
+  }
+  .info-panel.hidden {
+    transform: translateY(20px);
+    opacity: 0;
+    pointer-events: none;
+  }
+  .info-panel h2 {
+    font-size: 20px;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .info-panel .philosophy {
+    font-size: 11px;
+    color: rgba(255,255,255,0.35);
+    font-style: italic;
+    margin-bottom: 12px;
+    padding-left: 12px;
+    border-left: 2px solid rgba(255,255,255,0.1);
+  }
+  .info-panel p {
+    font-size: 12px;
+    line-height: 1.8;
+    color: rgba(255,255,255,0.6);
+    margin-bottom: 14px;
+  }
+  .features {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .feature-tag {
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 11px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.08);
+    color: rgba(255,255,255,0.6);
+  }
+
+  .hint {
+    position: absolute;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 11px;
+    color: rgba(255,255,255,0.2);
+    z-index: 10;
+    pointer-events: none;
+    letter-spacing: 1px;
+  }
+</style>
+</head>
+<body>
+
+<nav class="sidebar">
+  <h1>MELODY WORM</h1>
+  <div class="subtitle">反传统主题设计</div>
+  
+  <button class="theme-btn active" data-theme="0">
+    <span class="icon">💻</span>
+    <span class="info"><span class="name">代码编辑器</span><span class="desc">虫子在 IDE 里爬行</span></span>
+  </button>
+  <button class="theme-btn" data-theme="1">
+    <span class="icon">⚡</span>
+    <span class="info"><span class="name">故障博物馆</span><span class="desc">故障是美学，不是 bug</span></span>
+  </button>
+  <button class="theme-btn" data-theme="2">
+    <span class="icon">🎭</span>
+    <span class="info"><span class="name">情绪调色板</span><span class="desc">背景是情绪，不是空间</span></span>
+  </button>
+  <button class="theme-btn" data-theme="3">
+    <span class="icon">⏳</span>
+    <span class="info"><span class="name">时间切片</span><span class="desc">同一空间，时间在流动</span></span>
+  </button>
+  <button class="theme-btn" data-theme="4">
+    <span class="icon">♾️</span>
+    <span class="info"><span class="name">无限递归</span><span class="desc">虫子在自己身体里爬行</span></span>
+  </button>
+  <button class="theme-btn" data-theme="5">
+    <span class="icon">🎵</span>
+    <span class="info"><span class="name">声音可视化</span><span class="desc">旋律决定视觉形态</span></span>
+  </button>
+</nav>
+
+<div class="main">
+  <canvas id="canvas"></canvas>
+  <div class="hint">移动鼠标与场景互动 · ↑↓ 切换主题</div>
+
+  <div class="info-panel" id="infoPanel">
+    <h2 id="panelTitle">💻 代码编辑器</h2>
+    <div class="philosophy" id="panelPhilosophy">"背景是玩法，不是装饰"</div>
+    <p id="panelDesc">虫子在 IDE 里爬行，代码就是地形。语法高亮是配色方案，Bug 是真正的敌人。光标闪烁是危险信号，编译错误是红色警告区。</p>
+    <div class="features" id="panelFeatures">
+      <span class="feature-tag">📝 代码行即路径</span>
+      <span class="feature-tag">🐛 Bug 即敌人</span>
+      <span class="feature-tag">💾 保存即清场</span>
+      <span class="feature-tag">🔍 折叠即地形</span>
+    </div>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+let W, H, DPR;
+let mouse = { x: -1000, y: -1000 };
+let currentTheme = 0;
+let time = 0;
+
+function resize() {
+  DPR = window.devicePixelRatio || 1;
+  W = canvas.parentElement.clientWidth;
+  H = canvas.parentElement.clientHeight;
+  canvas.width = W * DPR;
+  canvas.height = H * DPR;
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+}
+window.addEventListener('resize', resize);
+resize();
+
+canvas.addEventListener('mousemove', e => {
+  const rect = canvas.getBoundingClientRect();
+  mouse.x = e.clientX - rect.left;
+  mouse.y = e.clientY - rect.top;
+});
+
+function rand(a, b) { return a + Math.random() * (b - a); }
+function dist(x1,y1,x2,y2) { return Math.hypot(x2-x1, y2-y1); }
+
+/* ============ 主题数据 ============ */
+const themes = [
+  {
+    name: '💻 代码编辑器',
+    philosophy: '"背景是玩法，不是装饰"',
+    desc: '虫子在 IDE 里爬行，代码就是地形。语法高亮是配色方案，Bug 是真正的敌人。光标闪烁是危险信号，编译错误是红色警告区。代码折叠/展开改变地形结构。',
+    features: ['📝 代码行即路径','🐛 Bug 即敌人','💾 保存即清场','🔍 折叠即地形','⌨️ 自动补全生成路径','🖥️ 终端即传送门']
+  },
+  {
+    name: '⚡ 故障博物馆',
+    philosophy: '"故障不是 bug，是艺术"',
+    desc: '画面会随机撕裂、RGB 通道分离、颜色溢出、形状融化、文字乱码、扫描线闪烁。每一帧都在故意损坏，但损坏本身就是美学。',
+    features: ['📺 像素撕裂','🌈 RGB 分离','💧 颜色溢出','🔄 形状融化','📜 文字乱码','📼 扫描线']
+  },
+  {
+    name: '🎭 情绪调色板',
+    philosophy: '"背景是情绪，不是空间"',
+    desc: '虫子在焦虑、平静、狂喜、悲伤、愤怒之间游走。每种情绪有独特的视觉语言：焦虑是疯狂旋转的粒子，平静是水面倒影，狂喜是烟花爆炸。',
+    features: ['😰 焦虑区：抖动+饱和','😌 平静区：水面+呼吸','🤩 狂喜区：烟花+万花筒','😢 悲伤区：雨滴+涟漪','😡 愤怒区：火焰+锯齿']
+  },
+  {
+    name: '⏳ 时间切片',
+    philosophy: '"同一空间，时间在流动"',
+    desc: '从黎明到午夜，从远古到未来。同一个空间在不同时间段呈现完全不同的面貌。玩家可以控制时间流速，时间裂缝区域可以同时看到过去和未来。',
+    features: ['🌅 黎明：露珠+晨雾','☀️ 正午：热浪+蝉鸣','🌆 黄昏：长影+萤火虫','🌙 午夜：月光+猫眼','⏳ 时间裂缝：过去与未来']
+  },
+  {
+    name: '♾️ 无限递归',
+    philosophy: '"世界是分形的，虫子在自己身体里"',
+    desc: '画面中心是虫子，虫子体内是缩小版的世界，世界边缘是虫子的放大版。无限嵌套、无限递归。Mandelbrot 集和 Julia 集作为地形。',
+    features: ['🔄 自相似结构','🌀 Mandelbrot 地形','🔍 深层改变规则','🚪 反向思考出口','♾️ 无限嵌套','📐 分形几何']
+  },
+  {
+    name: '🎵 声音可视化',
+    philosophy: '"旋律决定视觉形态"',
+    desc: '背景由音乐驱动，音频波形实时显示为地形，频谱分析决定颜色分布，节拍触发粒子爆发，和弦改变背景色调。虫子移动会发出音符，通关需要演奏完整旋律。',
+    features: ['🎹 波形即地形','📊 频谱即颜色','💥 节拍即爆发','🎶 和弦即色调','🔇 静音即真空','🎼 通关即演奏']
+  }
+];
+
+/* ============ 主题1: 代码编辑器 ============ */
+const codeLines = [];
+const codeKeywords = ['function','const','let','var','if','else','return','for','while','class','import','export','async','await','try','catch','new','this','true','false','null','undefined'];
+const codeSymbols = ['{','}','(',')','[',']',';','=','+','-','*','/','<','>','!','&','|','?','.',',',':'];
+
+for (let i = 0; i < 40; i++) {
+  const indent = Math.floor(rand(0,4));
+  let line = '  '.repeat(indent);
+  const type = rand(0,1);
+  if (type < 0.3) {
+    line += codeKeywords[Math.floor(rand(0,codeKeywords.length))] + ' ';
+    line += codeKeywords[Math.floor(rand(0,codeKeywords.length))] + ' ';
+    line += codeSymbols[Math.floor(rand(0,codeSymbols.length))];
+  } else if (type < 0.6) {
+    line += '// ' + ['TODO','FIXME','HACK','NOTE','BUG'][Math.floor(rand(0,5))] + ': ';
+    line += ['fix this','implement','refactor','optimize','debug'][Math.floor(rand(0,5))];
+  } else {
+    for (let j = 0; j < rand(3,8); j++) {
+      line += codeSymbols[Math.floor(rand(0,codeSymbols.length))] + ' ';
+      if (Math.random() > 0.5) line += codeKeywords[Math.floor(rand(0,codeKeywords.length))] + ' ';
+    }
+  }
+  codeLines.push({ text: line, y: i * 20, collapsed: Math.random() > 0.85 });
+}
+
+const bugs = [];
+for (let i = 0; i < 5; i++) bugs.push({ x: rand(100, W-100), y: rand(100, H-100), vx: rand(-1,1), vy: rand(-1,1), size: rand(8,14) });
+
+function drawCodeEditor(t) {
+  // 背景
+  ctx.fillStyle = '#1e1e1e';
+  ctx.fillRect(0, 0, W, H);
+
+  // 行号区域
+  ctx.fillStyle = '#252526';
+  ctx.fillRect(0, 0, 50, H);
+
+  // 代码行
+  ctx.font = '13px Consolas, monospace';
+  const lineH = 20;
+  const scrollY = (t * 30) % (codeLines.length * lineH);
+  
+  for (let i = 0; i < codeLines.length; i++) {
+    const line = codeLines[i];
+    const y = (line.y - scrollY + H) % (codeLines.length * lineH) - lineH;
+    if (y < -lineH || y > H + lineH) continue;
+
+    // 行号
+    ctx.fillStyle = '#858585';
+    ctx.textAlign = 'right';
+    ctx.fillText(String(i + 1).padStart(3, ' '), 40, y + 14);
+    ctx.textAlign = 'left';
+
+    // 折叠标记
+    if (line.collapsed) {
+      ctx.fillStyle = '#569cd6';
+      ctx.fillText('▶', 55, y + 14);
+    }
+
+    // 代码高亮
+    const tokens = line.text.split(/(\s+|[{}()\[\];=+\-*/<>!&|?.,:])/);
+    let x = 70;
+    for (const token of tokens) {
+      if (codeKeywords.includes(token)) {
+        ctx.fillStyle = '#569cd6'; // 关键字蓝色
+      } else if (token.startsWith('//')) {
+        ctx.fillStyle = '#6a9955'; // 注释绿色
+      } else if (token.match(/^[{}()\[\];=+\-*/<>!&|?.,:]$/)) {
+        ctx.fillStyle = '#d4d4d4'; // 符号白色
+      } else if (token.match(/^\d+$/)) {
+        ctx.fillStyle = '#b5cea8'; // 数字浅绿
+      } else {
+        ctx.fillStyle = '#9cdcfe'; // 标识符浅蓝
+      }
+      ctx.fillText(token, x, y + 14);
+      x += ctx.measureText(token).width;
+    }
+
+    // 鼠标悬停高亮
+    if (mouse.y > y && mouse.y < y + lineH) {
+      ctx.fillStyle = 'rgba(255,255,255,0.03)';
+      ctx.fillRect(0, y, W, lineH);
+    }
+  }
+
+  // 光标闪烁
+  if (Math.sin(t * 4) > 0) {
+    const cursorX = 70 + Math.sin(t * 0.5) * 200;
+    const cursorY = H/2 + Math.sin(t * 0.3) * 100;
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(cursorX, cursorY, 2, lineH);
+  }
+
+  // Bug 敌人
+  for (const bug of bugs) {
+    bug.x += bug.vx;
+    bug.y += bug.vy;
+    if (bug.x < 60 || bug.x > W-20) bug.vx *= -1;
+    if (bug.y < 20 || bug.y > H-20) bug.vy *= -1;
+
+    ctx.save();
+    ctx.translate(bug.x, bug.y);
+    // Bug 身体
+    ctx.fillStyle = '#ff6b6b';
+    ctx.beginPath();
+    ctx.ellipse(0, 0, bug.size, bug.size * 0.7, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // Bug 腿
+    ctx.strokeStyle = '#ff6b6b';
+    ctx.lineWidth = 1.5;
+    for (let i = 0; i < 3; i++) {
+      const angle = (i - 1) * 0.4 + Math.sin(t * 8 + i) * 0.3;
+      ctx.beginPath();
+      ctx.moveTo(-bug.size * 0.8, -bug.size * 0.3 + i * bug.size * 0.3);
+      ctx.lineTo(-bug.size * 1.5, -bug.size * 0.5 + i * bug.size * 0.3 + Math.sin(t * 10) * 3);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(bug.size * 0.8, -bug.size * 0.3 + i * bug.size * 0.3);
+      ctx.lineTo(bug.size * 1.5, -bug.size * 0.5 + i * bug.size * 0.3 + Math.sin(t * 10 + 1) * 3);
+      ctx.stroke();
+    }
+    // Bug 触角
+    ctx.beginPath();
+    ctx.moveTo(-3, -bug.size * 0.6);
+    ctx.quadraticCurveTo(-8, -bug.size * 1.5, -12 + Math.sin(t * 6) * 3, -bug.size * 1.8);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(3, -bug.size * 0.6);
+    ctx.quadraticCurveTo(8, -bug.size * 1.5, 12 + Math.sin(t * 6 + 1) * 3, -bug.size * 1.8);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // 虫子
+  const wx = W/2 + Math.sin(t * 0.7) * 150;
+  const wy = H/2 + Math.cos(t * 0.5) * 80;
+  drawWorm(ctx, wx, wy, 10, Math.atan2(Math.cos(t*0.5), Math.cos(t*0.7)), '#4ec9b0', true, t);
+
+  // 终端窗口
+  ctx.fillStyle = '#1e1e1e';
+  ctx.strokeStyle = '#3c3c3c';
+  ctx.lineWidth = 1;
+  const termX = W - 250, termY = H - 150;
+  ctx.fillRect(termX, termY, 230, 130);
+  ctx.strokeRect(termX, termY, 230, 130);
+  ctx.fillStyle = '#3c3c3c';
+  ctx.fillRect(termX, termY, 230, 20);
+  ctx.fillStyle = '#cccccc';
+  ctx.font = '11px Consolas';
+  ctx.fillText('Terminal', termX + 8, termY + 14);
+  ctx.fillStyle = '#4ec9b0';
+  ctx.fillText('$ npm run dev', termX + 8, termY + 40);
+  ctx.fillStyle = '#6a9955';
+  ctx.fillText('✓ Server started', termX + 8, termY + 58);
+  ctx.fillStyle = '#cccccc';
+  ctx.fillText('  http://localhost:3000', termX + 8, termY + 76);
+
+  // 鼠标效果
+  if (mouse.x > 0) {
+    ctx.strokeStyle = 'rgba(78,201,176,0.3)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([3, 3]);
+    ctx.strokeRect(mouse.x - 10, mouse.y - 10, 20, 20);
+    ctx.setLineDash([]);
+  }
+}
+
+/* ============ 主题2: 故障博物馆 ============ */
+let glitchTime = 0;
+let glitchActive = false;
+
+function drawGlitch(t) {
+  // 基础背景
+  ctx.fillStyle = '#0a0a0a';
+  ctx.fillRect(0, 0, W, H);
+
+  // 随机触发故障
+  if (Math.random() < 0.02) glitchActive = true;
+  if (glitchActive) {
+    glitchTime += 0.1;
+    if (glitchTime > 1) { glitchActive = false; glitchTime = 0; }
+  }
+
+  // 正常内容
+  const centerX = W/2, centerY = H/2;
+  
+  // 几何形状
+  ctx.save();
+  ctx.translate(centerX, centerY);
+  
+  // 故障时的 RGB 分离
+  const rgbOffset = glitchActive ? Math.sin(t * 20) * 20 : 0;
+  
+  // 红色通道
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.fillStyle = `rgba(255,0,0,${glitchActive ? 0.3 : 0})`;
+  ctx.beginPath();
+  ctx.arc(-rgbOffset, 0, 80, 0, Math.PI * 2);
+  ctx.fill();
+  
+  // 绿色通道
+  ctx.fillStyle = `rgba(0,255,0,${glitchActive ? 0.3 : 0})`;
+  ctx.beginPath();
+  ctx.arc(0, rgbOffset * 0.5, 80, 0, Math.PI * 2);
+  ctx.fill();
+  
+  // 蓝色通道
+  ctx.fillStyle = `rgba(0,0,255,${glitchActive ? 0.3 : 0})`;
+  ctx.beginPath();
+  ctx.arc(rgbOffset, -rgbOffset * 0.3, 80, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.globalCompositeOperation = 'source-over';
+  
+  // 主形状
+  ctx.fillStyle = '#fff';
+  ctx.beginPath();
+  ctx.arc(0, 0, 60, 0, Math.PI * 2);
+  ctx.fill();
+  
+  // 内部图案
+  ctx.fillStyle = '#000';
+  ctx.beginPath();
+  ctx.arc(0, 0, 40, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#fff';
+  ctx.beginPath();
+  ctx.arc(0, 0, 20, 0, Math.PI * 2);
+  ctx.fill();
+  
+  ctx.restore();
+
+  // 像素撕裂效果
+  if (glitchActive) {
+    for (let i = 0; i < 10; i++) {
+      const y = rand(0, H);
+      const h = rand(2, 20);
+      const offset = rand(-50, 50);
+      const imageData = ctx.getImageData(0, y, W, h);
+      ctx.putImageData(imageData, offset, y);
+    }
+  }
+
+  // 扫描线
+  ctx.fillStyle = 'rgba(0,0,0,0.1)';
+  for (let y = 0; y < H; y += 3) {
+    ctx.fillRect(0, y, W, 1);
+  }
+
+  // 噪点
+  if (glitchActive) {
+    for (let i = 0; i < 200; i++) {
+      ctx.fillStyle = `rgba(255,255,255,${rand(0.1,0.5)})`;
+      ctx.fillRect(rand(0,W), rand(0,H), rand(1,3), rand(1,3));
+    }
+  }
+
+  // 颜色溢出效果
+  if (glitchActive && Math.random() > 0.5) {
+    const gradient = ctx.createRadialGradient(
+      centerX + Math.sin(t * 5) * 100,
+      centerY + Math.cos(t * 5) * 100,
+      0,
+      centerX + Math.sin(t * 5) * 100,
+      centerY + Math.cos(t * 5) * 100,
+      200
+    );
+    gradient.addColorStop(0, 'rgba(255,0,110,0.3)');
+    gradient.addColorStop(1, 'rgba(255,0,110,0)');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, W, H);
+  }
+
+  // 虫子
+  const wx = W/2 + Math.sin(t * 0.8) * 120;
+  const wy = H/2 + Math.cos(t * 0.6) * 80;
+  drawWorm(ctx, wx, wy, 8, Math.atan2(Math.cos(t*0.6), Math.cos(t*0.8)), '#ff006e', true, t);
+
+  // 鼠标效果 - 故障触发器
+  if (mouse.x > 0) {
+    ctx.strokeStyle = 'rgba(255,0,110,0.5)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(mouse.x - 30, mouse.y - 30, 60, 60);
+    if (Math.random() < 0.1) {
+      ctx.fillStyle = 'rgba(255,0,110,0.2)';
+      ctx.fillRect(mouse.x - 30, mouse.y - 30, 60, 60);
+    }
+  }
+}
+
+/* ============ 主题3: 情绪调色板 ============ */
+const emotionParticles = [];
+for (let i = 0; i < 100; i++) {
+  emotionParticles.push({
+    x: rand(0, 2000), y: rand(0, 2000),
+    vx: rand(-2, 2), vy: rand(-2, 2),
+    size: rand(2, 6),
+    emotion: Math.floor(rand(0, 5)),
+    phase: rand(0, Math.PI * 2)
+  });
+}
+
+function drawEmotion(t) {
+  // 背景根据鼠标位置变化情绪
+  const mx = mouse.x / W;
+  const my = mouse.y / H;
+  
+  let bgColor1, bgColor2;
+  if (mx < 0.33 && my < 0.5) {
+    // 焦虑区 - 左上
+    bgColor1 = '#1a0a0a';
+    bgColor2 = '#2a0505';
+  } else if (mx > 0.66 && my < 0.5) {
+    // 平静区 - 右上
+    bgColor1 = '#0a1a1a';
+    bgColor2 = '#052a2a';
+  } else if (mx < 0.33 && my > 0.5) {
+    // 悲伤区 - 左下
+    bgColor1 = '#0a0a1a';
+    bgColor2 = '#05052a';
+  } else if (mx > 0.66 && my > 0.5) {
+    // 狂喜区 - 右下
+    bgColor1 = '#1a0a1a';
+    bgColor2 = '#2a052a';
+  } else {
+    // 愤怒区 - 中央
+    bgColor1 = '#1a0505';
+    bgColor2 = '#2a0000';
+  }
+  
+  const grd = ctx.createLinearGradient(0, 0, W, H);
+  grd.addColorStop(0, bgColor1);
+  grd.addColorStop(1, bgColor2);
+  ctx.fillStyle = grd;
+  ctx.fillRect(0, 0, W, H);
+
+  // 情绪粒子
+  for (const p of emotionParticles) {
+    p.x += p.vx;
+    p.y += p.vy;
+    if (p.x < 0 || p.x > W) p.vx *= -1;
+    if (p.y < 0 || p.y > H) p.vy *= -1;
+
+    let color, alpha;
+    switch (p.emotion) {
+      case 0: // 焦虑
+        color = '#ff4444';
+        alpha = 0.6 + Math.sin(t * 10 + p.phase) * 0.3;
+        p.vx += Math.sin(t * 5 + p.phase) * 0.1;
+        p.vy += Math.cos(t * 5 + p.phase) * 0.1;
+        break;
+      case 1: // 平静
+        color = '#4488ff';
+        alpha = 0.3 + Math.sin(t * 2 + p.phase) * 0.1;
+        p.vx *= 0.99;
+        p.vy *= 0.99;
+        break;
+      case 2: // 狂喜
+        color = '#ffaa00';
+        alpha = 0.8;
+        p.vx += Math.sin(t * 3 + p.phase) * 0.2;
+        p.vy += Math.cos(t * 3 + p.phase) * 0.2;
+        break;
+      case 3: // 悲伤
+        color = '#4444ff';
+        alpha = 0.4;
+        p.vy += 0.02; // 下沉
+        break;
+      case 4: // 愤怒
+        color = '#ff0000';
+        alpha = 0.7 + Math.sin(t * 8 + p.phase) * 0.3;
+        break;
+    }
+
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+
+  // 情绪区域指示
+  ctx.font = '14px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.globalAlpha = 0.3;
+  ctx.fillStyle = '#ff4444';
+  ctx.fillText('😰 焦虑', W * 0.15, H * 0.25);
+  ctx.fillStyle = '#4488ff';
+  ctx.fillText('😌 平静', W * 0.85, H * 0.25);
+  ctx.fillStyle = '#4444ff';
+  ctx.fillText('😢 悲伤', W * 0.15, H * 0.75);
+  ctx.fillStyle = '#ffaa00';
+  ctx.fillText('🤩 狂喜', W * 0.85, H * 0.75);
+  ctx.fillStyle = '#ff0000';
+  ctx.fillText('😡 愤怒', W * 0.5, H * 0.5);
+  ctx.globalAlpha = 1;
+
+  // 虫子
+  const wx = W/2 + Math.sin(t * 0.7) * 150;
+  const wy = H/2 + Math.cos(t * 0.5) * 100;
+  drawWorm(ctx, wx, wy, 10, Math.atan2(Math.cos(t*0.5), Math.cos(t*0.7)), '#ffffff', true, t);
+
+  // 鼠标情绪光环
+  if (mouse.x > 0) {
+    const emotion = mx < 0.33 ? (my < 0.5 ? 'anxiety' : 'sadness') : 
+                   mx > 0.66 ? (my < 0.5 ? 'calm' : 'joy') : 'anger';
+    const colors = { anxiety: '#ff4444', calm: '#4488ff', joy: '#ffaa00', sadness: '#4444ff', anger: '#ff0000' };
+    const mg = ctx.createRadialGradient(mouse.x, mouse.y, 0, mouse.x, mouse.y, 80);
+    mg.addColorStop(0, colors[emotion] + '40');
+    mg.addColorStop(1, colors[emotion] + '00');
+    ctx.fillStyle = mg;
+    ctx.beginPath();
+    ctx.arc(mouse.x, mouse.y, 80, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+/* ============ 主题4: 时间切片 ============ */
+function drawTimeSlice(t) {
+  // 时间周期
+  const timeOfDay = (t * 0.05) % 1; // 0-1 代表一天
+  let skyColor1, skyColor2, sunMoonY, sunColor;
+  
+  if (timeOfDay < 0.25) {
+    // 黎明
+    const p = timeOfDay / 0.25;
+    skyColor1 = `rgb(${30 + p * 100}, ${20 + p * 80}, ${40 + p * 60})`;
+    skyColor2 = `rgb(${20 + p * 60}, ${10 + p * 40}, ${30 + p * 50})`;
+    sunColor = '#ffa500';
+    sunMoonY = H * (0.8 - p * 0.6);
+  } else if (timeOfDay < 0.5) {
+    // 白天
+    const p = (timeOfDay - 0.25) / 0.25;
+    skyColor1 = `rgb(${130 - p * 30}, ${100 - p * 20}, ${100 - p * 30})`;
+    skyColor2 = `rgb(${80 - p * 20}, ${50 - p * 10}, ${80 - p * 30})`;
+    sunColor = '#ffff00';
+    sunMoonY = H * (0.2 + p * 0.1);
+  } else if (timeOfDay < 0.75) {
+    // 黄昏
+    const p = (timeOfDay - 0.5) / 0.25;
+    skyColor1 = `rgb(${100 - p * 60}, ${80 - p * 50}, ${70 - p * 30})`;
+    skyColor2 = `rgb(${60 - p * 40}, ${40 - p * 30}, ${50 - p * 20})`;
+    sunColor = '#ff6347';
+    sunMoonY = H * (0.3 + p * 0.5);
+  } else {
+    // 夜晚
+    const p = (timeOfDay - 0.75) / 0.25;
+    skyColor1 = `rgb(${40 - p * 10}, ${30 - p * 10}, ${40 - p * 10})`;
+    skyColor2 = `rgb(${20 - p * 10}, ${10 - p * 5}, ${30 - p * 15})`;
+    sunColor = '#ffffff';
+    sunMoonY = H * (0.8 - p * 0.6);
+  }
+
+  // 天空
+  const grd = ctx.createLinearGradient(0, 0, 0, H);
+  grd.addColorStop(0, skyColor1);
+  grd.addColorStop(1, skyColor2);
+  ctx.fillStyle = grd;
+  ctx.fillRect(0, 0, W, H);
+
+  // 太阳/月亮
+  ctx.fillStyle = sunColor;
+  ctx.shadowBlur = 50;
+  ctx.shadowColor = sunColor;
+  ctx.beginPath();
+  ctx.arc(W * 0.7, sunMoonY, 30, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.shadowBlur = 0;
+
+  // 星星（夜晚）
+  if (timeOfDay > 0.7 || timeOfDay < 0.15) {
+    const starAlpha = timeOfDay > 0.7 ? (timeOfDay - 0.7) / 0.3 : (0.15 - timeOfDay) / 0.15;
+    ctx.globalAlpha = starAlpha * 0.8;
+    for (let i = 0; i < 50; i++) {
+      const sx = (i * 137.5) % W;
+      const sy = (i * 97.3) % (H * 0.6);
+      const twinkle = Math.sin(t * 3 + i) * 0.5 + 0.5;
+      ctx.fillStyle = '#fff';
+      ctx.beginPath();
+      ctx.arc(sx, sy, 1 + twinkle, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // 地面
+  ctx.fillStyle = '#1a1a0a';
+  ctx.fillRect(0, H * 0.7, W, H * 0.3);
+
+  // 草/树剪影
+  ctx.fillStyle = '#0a0a05';
+  for (let x = 0; x < W; x += 20) {
+    const h = 20 + Math.sin(x * 0.1) * 10;
+    ctx.fillRect(x, H * 0.7 - h, 3, h);
+  }
+
+  // 虫子
+  const wx = W/2 + Math.sin(t * 0.5) * 200;
+  const wy = H * 0.65 + Math.cos(t * 0.3) * 20;
+  drawWorm(ctx, wx, wy, 10, Math.atan2(Math.cos(t*0.3), Math.cos(t*0.5)), '#ffd700', true, t);
+
+  // 时间指示器
+  ctx.fillStyle = 'rgba(255,255,255,0.5)';
+  ctx.font = '14px sans-serif';
+  ctx.textAlign = 'center';
+  const timeLabel = timeOfDay < 0.25 ? '🌅 黎明' : timeOfDay < 0.5 ? '☀️ 正午' : timeOfDay < 0.75 ? '🌆 黄昏' : '🌙 午夜';
+  ctx.fillText(timeLabel, W/2, 30);
+
+  // 时间进度条
+  ctx.fillStyle = 'rgba(255,255,255,0.1)';
+  ctx.fillRect(W * 0.2, 50, W * 0.6, 4);
+  ctx.fillStyle = 'rgba(255,255,255,0.5)';
+  ctx.fillRect(W * 0.2, 50, W * 0.6 * timeOfDay, 4);
+}
+
+/* ============ 主题5: 无限递归 ============ */
+function drawFractal(t) {
+  ctx.fillStyle = '#050508';
+  ctx.fillRect(0, 0, W, H);
+
+  const cx = W/2, cy = H/2;
+  const maxIter = 50;
+  const zoom = 0.5 + Math.sin(t * 0.2) * 0.2;
+  const offsetX = Math.sin(t * 0.1) * 0.5;
+  const offsetY = Math.cos(t * 0.15) * 0.5;
+
+  // Mandelbrot 集
+  const imgData = ctx.createImageData(W, H);
+  const data = imgData.data;
+
+  for (let px = 0; px < W; px += 2) {
+    for (let py = 0; py < H; py += 2) {
+      const x0 = (px - cx) / (W * zoom) + offsetX;
+      const y0 = (py - cy) / (H * zoom) + offsetY;
+      let x = 0, y = 0, iter = 0;
+      
+      while (x*x + y*y <= 4 && iter < maxIter) {
+        const xtemp = x*x - y*y + x0;
+        y = 2*x*y + y0;
+        x = xtemp;
+        iter++;
+      }
+
+      const idx = (py * W + px) * 4;
+      if (iter === maxIter) {
+        data[idx] = data[idx+1] = data[idx+2] = 0;
+      } else {
+        const hue = (iter / maxIter * 360 + t * 50) % 360;
+        const [r, g, b] = hslToRgb(hue / 360, 0.8, 0.5);
+        data[idx] = r;
+        data[idx+1] = g;
+        data[idx+2] = b;
+      }
+      data[idx+3] = 255;
+
+      // 填充相邻像素
+      if (px + 1 < W) {
+        data[idx+4] = data[idx];
+        data[idx+5] = data[idx+1];
+        data[idx+6] = data[idx+2];
+        data[idx+7] = 255;
+      }
+      if (py + 1 < H) {
+        const idx2 = ((py+1) * W + px) * 4;
+        data[idx2] = data[idx];
+        data[idx2+1] = data[idx+1];
+        data[idx2+2] = data[idx+2];
+        data[idx2+3] = 255;
+      }
+    }
+  }
+  ctx.putImageData(imgData, 0, 0);
+
+  // 递归虫子
+  for (let depth = 0; depth < 3; depth++) {
+    const scale = Math.pow(0.4, depth);
+    const wx = cx + Math.sin(t * 0.5 + depth) * 100 * scale;
+    const wy = cy + Math.cos(t * 0.3 + depth) * 60 * scale;
+    ctx.save();
+    ctx.translate(wx, wy);
+    ctx.scale(scale, scale);
+    drawWorm(ctx, 0, 0, 6, t * 0.5 + depth, '#b388eb', true, t);
+    ctx.restore();
+  }
+
+  // 鼠标缩放效果
+  if (mouse.x > 0) {
+    ctx.strokeStyle = 'rgba(179,136,235,0.5)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(mouse.x, mouse.y, 30 + Math.sin(t * 3) * 10, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+}
+
+function hslToRgb(h, s, l) {
+  let r, g, b;
+  if (s === 0) {
+    r = g = b = l;
+  } else {
+    const hue2rgb = (p, q, t) => {
+      if (t < 0) t += 1;
+      if (t > 1) t -= 1;
+      if (t < 1/6) return p + (q - p) * 6 * t;
+      if (t < 1/2) return q;
+      if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+      return p;
+    };
+    const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+    const p = 2 * l - q;
+    r = hue2rgb(p, q, h + 1/3);
+    g = hue2rgb(p, q, h);
+    b = hue2rgb(p, q, h - 1/3);
+  }
+  return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
+}
+
+/* ============ 主题6: 声音可视化 ============ */
+const audioBars = 64;
+const audioData = new Array(audioBars).fill(0);
+const audioTarget = new Array(audioBars).fill(0);
+
+function drawSound(t) {
+  ctx.fillStyle = '#050508';
+  ctx.fillRect(0, 0, W, H);
+
+  // 模拟音频数据
+  for (let i = 0; i < audioBars; i++) {
+    audioTarget[i] = Math.sin(t * 2 + i * 0.3) * 0.5 + 0.5 + 
+                     Math.sin(t * 5 + i * 0.5) * 0.3 +
+                     (mouse.x > 0 ? Math.sin(dist(mouse.x, mouse.y, W * i / audioBars, H/2) * 0.01 - t * 3) * 0.2 : 0);
+    audioData[i] += (audioTarget[i] - audioData[i]) * 0.1;
+  }
+
+  // 频谱柱状图
+  const barW = W / audioBars;
+  for (let i = 0; i < audioBars; i++) {
+    const h = audioData[i] * H * 0.6;
+    const hue = (i / audioBars * 360 + t * 30) % 360;
+    const [r, g, b] = hslToRgb(hue / 360, 0.8, 0.5);
+    
+    // 柱状图
+    ctx.fillStyle = `rgba(${r},${g},${b},0.8)`;
+    ctx.fillRect(i * barW, H - h, barW - 2, h);
+    
+    // 顶部光晕
+    ctx.shadowBlur = 20;
+    ctx.shadowColor = `rgb(${r},${g},${b})`;
+    ctx.fillStyle = `rgba(${r},${g},${b},0.5)`;
+    ctx.fillRect(i * barW, H - h - 5, barW - 2, 5);
+    ctx.shadowBlur = 0;
+  }
+
+  // 波形线
+  ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  for (let i = 0; i < W; i += 2) {
+    const idx = Math.floor(i / barW);
+    const y = H/2 + audioData[Math.min(idx, audioBars-1)] * 100 * Math.sin(i * 0.02 + t * 3);
+    if (i === 0) ctx.moveTo(i, y);
+    else ctx.lineTo(i, y);
+  }
+  ctx.stroke();
+
+  // 音符粒子
+  if (Math.random() < 0.1) {
+    const noteX = rand(50, W-50);
+    const noteY = H - audioData[Math.floor(noteX / barW)] * H * 0.6;
+    ctx.fillStyle = 'rgba(255,255,255,0.6)';
+    ctx.font = '20px sans-serif';
+    ctx.fillText(['♩', '♪', '♫', '♬'][Math.floor(rand(0,4))], noteX, noteY);
+  }
+
+  // 虫子（随音乐跳动）
+  const wx = W/2 + Math.sin(t * 0.5) * 200;
+  const wy = H * 0.4 + Math.sin(t * 3) * 30 * audioData[Math.floor(wx / barW)];
+  drawWorm(ctx, wx, wy, 10, Math.atan2(Math.cos(t*0.3), Math.cos(t*0.5)), '#ff6b6b', true, t);
+
+  // 鼠标音波效果
+  if (mouse.x > 0) {
+    ctx.strokeStyle = 'rgba(255,107,107,0.3)';
+    ctx.lineWidth = 1;
+    for (let r = 0; r < 3; r++) {
+      const radius = 30 + r * 20 + Math.sin(t * 5) * 10;
+      ctx.beginPath();
+      ctx.arc(mouse.x, mouse.y, radius, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+  }
+}
+
+/* ============ 通用虫子绘制 ============ */
+function drawWorm(ctx, x, y, segments, angle, color, glow, time) {
+  const segLen = 14;
+  let px = x, py = y;
+  for (let i = 0; i < segments; i++) {
+    const wave = Math.sin(time * 3 + i * 0.5) * 3;
+    const size = 10 - i * 0.6;
+    const bx = px - Math.cos(angle) * segLen * i + Math.sin(angle) * wave;
+    const by = py - Math.sin(angle) * segLen * i - Math.cos(angle) * wave;
+    ctx.shadowBlur = glow ? 15 : 0;
+    ctx.shadowColor = color;
+    ctx.fillStyle = color;
+    ctx.globalAlpha = 1 - i / (segments + 2);
+    ctx.beginPath();
+    ctx.arc(bx, by, Math.max(2, size), 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  ctx.shadowBlur = 0;
+  // 眼睛
+  ctx.fillStyle = '#fff';
+  ctx.beginPath();
+  ctx.arc(px + Math.cos(angle + 0.4) * 5, py + Math.sin(angle + 0.4) * 5, 3, 0, Math.PI * 2);
+  ctx.arc(px + Math.cos(angle - 0.4) * 5, py + Math.sin(angle - 0.4) * 5, 3, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#000';
+  ctx.beginPath();
+  ctx.arc(px + Math.cos(angle + 0.4) * 6, py + Math.sin(angle + 0.4) * 6, 1.5, 0, Math.PI * 2);
+  ctx.arc(px + Math.cos(angle - 0.4) * 6, py + Math.sin(angle - 0.4) * 6, 1.5, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+/* ============ 主动画循环 ============ */
+const themeDrawers = [drawCodeEditor, drawGlitch, drawEmotion, drawTimeSlice, drawFractal, drawSound];
+
+function animate() {
+  time += 0.016;
+  ctx.clearRect(0, 0, W, H);
+  themeDrawers[currentTheme](time);
+  requestAnimationFrame(animate);
+}
+
+/* ============ UI 交互 ============ */
+const btns = document.querySelectorAll('.theme-btn');
+const panel = document.getElementById('infoPanel');
+const pTitle = document.getElementById('panelTitle');
+const pPhilosophy = document.getElementById('panelPhilosophy');
+const pDesc = document.getElementById('panelDesc');
+const pFeatures = document.getElementById('panelFeatures');
+
+function switchTheme(idx) {
+  if (idx === currentTheme) return;
+  currentTheme = idx;
+
+  btns.forEach((b, i) => b.classList.toggle('active', i === idx));
+
+  panel.classList.add('hidden');
+  setTimeout(() => {
+    const th = themes[idx];
+    pTitle.textContent = th.name;
+    pPhilosophy.textContent = th.philosophy;
+    pDesc.textContent = th.desc;
+    pFeatures.innerHTML = th.features.map(f => `<span class="feature-tag">${f}</span>`).join('');
+    panel.classList.remove('hidden');
+  }, 300);
+}
+
+btns.forEach(b => {
+  b.addEventListener('click', () => switchTheme(parseInt(b.dataset.theme)));
+});
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'ArrowDown') switchTheme((currentTheme + 1) % themes.length);
+  if (e.key === 'ArrowUp') switchTheme((currentTheme + themes.length - 1) % themes.length);
+});
+
+animate();
+</script>
+</body>
+</html>

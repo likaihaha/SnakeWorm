@@ -272,21 +272,6 @@ export class Food {
             this.pos.x += Math.sin(this.movePhase) * this.type.wobble * dt * 60;
         }
 
-        // 左右边界碰撞（反弹）— 防止宝珠进入左右死亡区
-        const margin = CONFIG.WALL_MARGIN * 2 + CONFIG.SEGMENT_RADIUS * 2;
-        if (this.pos.x < margin) {
-            this.pos.x = margin;
-            this.velocity.x = Math.abs(this.velocity.x) * 0.5;
-        }
-        if (this.pos.x > CONFIG.CANVAS_WIDTH - margin) {
-            this.pos.x = CONFIG.CANVAS_WIDTH - margin;
-            this.velocity.x = -Math.abs(this.velocity.x) * 0.5;
-        }
-        // 顶部边界反弹
-        if (this.pos.y < margin) {
-            this.pos.y = margin;
-            this.velocity.y = Math.abs(this.velocity.y) * 0.3;
-        }
         // 底部：不反弹，让宝珠自然掉落（由Game类处理消散特效）
     }
 

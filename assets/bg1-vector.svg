@@ -1,0 +1,224 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <!-- 深海背景渐变 -->
+    <radialGradient id="deepSea" cx="50%" cy="30%" r="80%">
+      <stop offset="0%" stop-color="#164a63"/>
+      <stop offset="40%" stop-color="#0d2f42"/>
+      <stop offset="100%" stop-color="#061924"/>
+    </radialGradient>
+
+    <!-- 环境光晕 -->
+    <radialGradient id="ambientGlow" cx="65%" cy="35%" r="50%">
+      <stop offset="0%" stop-color="#1e6b7a" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#0d2f42" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- 发光河流渐变 -->
+    <linearGradient id="riverGrad" x1="0%" y1="50%" x2="100%" y2="50%">
+      <stop offset="0%" stop-color="#2dd4bf" stop-opacity="0.3"/>
+      <stop offset="20%" stop-color="#4de8d6" stop-opacity="0.7"/>
+      <stop offset="50%" stop-color="#6bffe8" stop-opacity="0.9"/>
+      <stop offset="80%" stop-color="#4de8d6" stop-opacity="0.7"/>
+      <stop offset="100%" stop-color="#2dd4bf" stop-opacity="0.3"/>
+    </linearGradient>
+
+    <!-- 热液岩浆渐变 -->
+    <radialGradient id="magma" cx="50%" cy="80%" r="60%">
+      <stop offset="0%" stop-color="#ff9a3c"/>
+      <stop offset="30%" stop-color="#ff6b2c"/>
+      <stop offset="70%" stop-color="#e8451a" stop-opacity="0.8"/>
+      <stop offset="100%" stop-color="#8b2500" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- 烟囱管渐变 -->
+    <linearGradient id="pipeGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#1a2b38"/>
+      <stop offset="30%" stop-color="#2d3e4a"/>
+      <stop offset="70%" stop-color="#1e303d"/>
+      <stop offset="100%" stop-color="#0f1f2a"/>
+    </linearGradient>
+
+    <!-- 水母发光 -->
+    <radialGradient id="jellyGlow" cx="50%" cy="40%" r="50%">
+      <stop offset="0%" stop-color="#a8fff0" stop-opacity="0.6"/>
+      <stop offset="50%" stop-color="#6bffe8" stop-opacity="0.3"/>
+      <stop offset="100%" stop-color="#4de8d6" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- 水母本体渐变 -->
+    <linearGradient id="jellyBody" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#a8fff0" stop-opacity="0.85"/>
+      <stop offset="40%" stop-color="#6bffe8" stop-opacity="0.6"/>
+      <stop offset="100%" stop-color="#4de8d6" stop-opacity="0.2"/>
+    </linearGradient>
+
+    <!-- 迷雾层 -->
+    <linearGradient id="fogGrad" x1="0%" y1="100%" x2="0%" y2="0%">
+      <stop offset="0%" stop-color="#0a1f2e" stop-opacity="0.85"/>
+      <stop offset="40%" stop-color="#0d2f42" stop-opacity="0.4"/>
+      <stop offset="100%" stop-color="#0d2f42" stop-opacity="0"/>
+    </linearGradient>
+
+    <!-- 发光滤镜 -->
+    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <filter id="softGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <filter id="riverGlow" x="-30%" y="-50%" width="160%" height="200%">
+      <feGaussianBlur stdDeviation="6" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <!-- 热液粒子 -->
+    <filter id="magmaGlow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="12" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <!-- 岩石纹理图案 -->
+    <pattern id="rockTexture" x="0" y="0" width="40" height="40" patternUnits="userSpaceOnUse">
+      <rect width="40" height="40" fill="#0f222e"/>
+      <path d="M0,20 L20,0 L40,20 L20,40 Z" fill="#142a38" opacity="0.5"/>
+      <path d="M10,0 L30,0 L40,10 L20,30 Z" fill="#0d1f2a" opacity="0.3"/>
+    </pattern>
+  </defs>
+
+  <!-- 1. 深海背景层 -->
+  <rect width="1280" height="720" fill="url(#deepSea)"/>
+
+  <!-- 环境光晕 -->
+  <ellipse cx="830" cy="250" rx="500" ry="350" fill="url(#ambientGlow)"/>
+
+  <!-- 2. 远景山脉层 -->
+  <path d="M0,450 L120,380 L250,420 L380,350 L520,400 L680,320 L850,380 L1000,300 L1150,360 L1280,310 L1280,720 L0,720 Z" fill="#0a1f2e" opacity="0.6"/>
+
+  <!-- 3. 中景山脉层 -->
+  <path d="M0,520 L150,440 L280,480 L420,410 L580,460 L750,390 L900,450 L1050,380 L1200,430 L1280,400 L1280,720 L0,720 Z" fill="#0d2533" opacity="0.8"/>
+
+  <!-- 4. 发光河流层（在最亮区域下方） -->
+  <!-- 河流主路径 -->
+  <path d="M-50,350 C100,340 200,420 350,400 C500,380 600,450 750,430 C900,410 1000,480 1150,460 C1200,455 1250,470 1330,450" 
+        stroke="url(#riverGrad)" stroke-width="35" fill="none" filter="url(#riverGlow)" opacity="0.9"/>
+  
+  <!-- 河流核心亮线 -->
+  <path d="M-50,350 C100,340 200,420 350,400 C500,380 600,450 750,430 C900,410 1000,480 1150,460 C1200,455 1250,470 1330,450" 
+        stroke="#a8fff0" stroke-width="8" fill="none" filter="url(#softGlow)" opacity="0.7"/>
+  
+  <!-- 河流分支/延伸 -->
+  <path d="M150,460 C200,480 280,520 350,540 C450,570 550,590 650,600" 
+        stroke="#2dd4bf" stroke-width="12" fill="none" filter="url(#riverGlow)" opacity="0.4"/>
+
+  <!-- 5. 前景左侧岩石与热液喷口 -->
+  <!-- 左侧大岩壁 -->
+  <path d="M0,720 L0,480 L80,450 L150,490 L220,460 L280,520 L350,480 L420,530 L380,600 L320,650 L280,720 Z" fill="#0f222e"/>
+  <path d="M0,720 L0,480 L80,450 L150,490 L220,460 L280,520 L350,480 L420,530 L380,600 L320,650 L280,720 Z" fill="url(#rockTexture)" opacity="0.3"/>
+  
+  <!-- 左侧岩壁高光边缘 -->
+  <path d="M80,450 L150,490 L220,460 L280,520 L350,480" stroke="#1e3a4d" stroke-width="2" fill="none" opacity="0.5"/>
+
+  <!-- 烟囱管道1（左侧） -->
+  <path d="M120,500 L130,380 L160,370 L155,490 Z" fill="url(#pipeGrad)"/>
+  <!-- 烟囱口1 -->
+  <ellipse cx="145" cy="375" rx="17" ry="6" fill="#0f1f2a"/>
+  <!-- 热液发光1 -->
+  <ellipse cx="145" cy="385" rx="25" ry="12" fill="url(#magma)" filter="url(#magmaGlow)" opacity="0.9"/>
+  <ellipse cx="145" cy="390" rx="14" ry="6" fill="#ff9a3c" filter="url(#softGlow)" opacity="0.8"/>
+
+  <!-- 烟囱管道2（右侧，稍矮） -->
+  <path d="M220,520 L235,410 L260,400 L250,510 Z" fill="url(#pipeGrad)"/>
+  <!-- 烟囱口2 -->
+  <ellipse cx="247" cy="405" rx="14" ry="5" fill="#0f1f2a"/>
+  <!-- 热液发光2 -->
+  <ellipse cx="247" cy="415" rx="20" ry="10" fill="url(#magma)" filter="url(#magmaGlow)" opacity="0.85"/>
+  <ellipse cx="247" cy="420" rx="11" ry="5" fill="#ff9a3c" filter="url(#softGlow)" opacity="0.75"/>
+
+  <!-- 岩浆裂缝（岩石上的发光裂缝） -->
+  <path d="M80,550 L120,580 L150,560 L200,600 L250,580 L300,620" 
+        stroke="#ff6b2c" stroke-width="2" fill="none" filter="url(#softGlow)" opacity="0.6"/>
+  <path d="M180,520 L220,540 L260,530" 
+        stroke="#ff9a3c" stroke-width="1.5" fill="none" filter="url(#softGlow)" opacity="0.5"/>
+
+  <!-- 6. 前景右侧岩石 -->
+  <path d="M850,720 L900,600 L980,550 L1050,580 L1120,520 L1200,560 L1280,500 L1280,720 Z" fill="#0a1c26"/>
+  <path d="M900,600 L980,550 L1050,580 L1120,520 L1200,560" stroke="#152a38" stroke-width="2" fill="none" opacity="0.4"/>
+
+  <!-- 7. 水母（右上角） -->
+  <g transform="translate(830, 160)" filter="url(#glow)">
+    <!-- 外发光 -->
+    <ellipse cx="0" cy="0" rx="70" ry="55" fill="url(#jellyGlow)"/>
+    
+    <!-- 触手 -->
+    <path d="M-20,15 Q-25,45 -30,80 Q-35,110 -25,130" stroke="#6bffe8" stroke-width="2.5" fill="none" opacity="0.5"/>
+    <path d="M-10,20 Q-12,55 -8,95 Q-5,125 -15,145" stroke="#a8fff0" stroke-width="2" fill="none" opacity="0.6"/>
+    <path d="M0,22 Q5,60 2,100 Q0,130 8,155" stroke="#6bffe8" stroke-width="2.5" fill="none" opacity="0.5"/>
+    <path d="M12,20 Q18,50 22,85 Q25,115 18,140" stroke="#a8fff0" stroke-width="2" fill="none" opacity="0.6"/>
+    <path d="M22,15 Q30,40 35,70 Q38,95 32,115" stroke="#6bffe8" stroke-width="2" fill="none" opacity="0.45"/>
+    
+    <!-- 触手微光点缀 -->
+    <circle cx="-30" cy="80" r="2" fill="#a8fff0" opacity="0.6"/>
+    <circle cx="-8" cy="95" r="2.5" fill="#a8fff0" opacity="0.7"/>
+    <circle cx="2" cy="100" r="2" fill="#a8fff0" opacity="0.6"/>
+    <circle cx="22" cy="85" r="2.5" fill="#a8fff0" opacity="0.7"/>
+    
+    <!-- 水母伞盖 -->
+    <path d="M-35,0 C-35,-35 -20,-55 0,-55 C20,-55 35,-35 35,0 C35,10 20,22 0,22 C-20,22 -35,10 -35,0 Z" fill="url(#jellyBody)"/>
+    
+    <!-- 伞盖内纹理 -->
+    <path d="M-20,-10 Q-10,-25 0,-30 Q10,-25 20,-10" stroke="#a8fff0" stroke-width="1.5" fill="none" opacity="0.4"/>
+    <path d="M-15,0 Q-5,-15 0,-20 Q5,-15 15,0" stroke="#a8fff0" stroke-width="1.5" fill="none" opacity="0.4"/>
+    <path d="M-25,5 Q-12,-8 0,-12 Q12,-8 25,5" stroke="#a8fff0" stroke-width="1" fill="none" opacity="0.3"/>
+    
+    <!-- 伞盖高光 -->
+    <ellipse cx="-10" cy="-35" rx="8" ry="4" fill="#ffffff" opacity="0.3" transform="rotate(-15 -10 -35)"/>
+  </g>
+
+  <!-- 8. 深海荧光微粒（环境氛围） -->
+  <g opacity="0.5">
+    <circle cx="200" cy="200" r="1.5" fill="#4de8d6" filter="url(#softGlow)"/>
+    <circle cx="450" cy="150" r="2" fill="#6bffe8" filter="url(#softGlow)"/>
+    <circle cx="600" cy="280" r="1" fill="#4de8d6" filter="url(#softGlow)"/>
+    <circle cx="750" cy="180" r="1.5" fill="#a8fff0" filter="url(#softGlow)"/>
+    <circle cx="950" cy="250" r="2" fill="#6bffe8" filter="url(#softGlow)"/>
+    <circle cx="1100" cy="320" r="1" fill="#4de8d6" filter="url(#softGlow)"/>
+    <circle cx="350" cy="350" r="1.5" fill="#a8fff0" filter="url(#softGlow)"/>
+    <circle cx="500" cy="120" r="1" fill="#4de8d6" filter="url(#softGlow)"/>
+    <circle cx="100" cy="300" r="2" fill="#6bffe8" filter="url(#softGlow)"/>
+    <circle cx="650" cy="220" r="1.5" fill="#a8fff0" filter="url(#softGlow)"/>
+    <circle cx="850" cy="300" r="1" fill="#4de8d6" filter="url(#softGlow)"/>
+    <circle cx="1050" cy="200" r="1.5" fill="#6bffe8" filter="url(#softGlow)"/>
+    <circle cx="250" cy="280" r="1" fill="#a8fff0" filter="url(#softGlow)"/>
+    <circle cx="400" cy="320" r="2" fill="#4de8d6" filter="url(#softGlow)"/>
+    <circle cx="700" cy="140" r="1.5" fill="#6bffe8" filter="url(#softGlow)"/>
+    <circle cx="900" cy="350" r="1" fill="#a8fff0" filter="url(#softGlow)"/>
+  </g>
+
+  <!-- 9. 前景迷雾层 -->
+  <rect width="1280" height="720" fill="url(#fogGrad)" style="mix-blend-mode: multiply;" pointer-events="none"/>
+
+  <!-- 10. 水面/顶部暗角 -->
+  <linearGradient id="vignette" x1="0%" y1="0%" x2="0%" y2="100%">
+    <stop offset="0%" stop-color="#020a10" stop-opacity="0.5"/>
+    <stop offset="30%" stop-color="#020a10" stop-opacity="0"/>
+  </linearGradient>
+  <rect width="1280" height="720" fill="url(#vignette)" pointer-events="none"/>
+</svg>

@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>编辑器测试</title>
+<style>
+  body {
+    font-family: 'Segoe UI', sans-serif;
+    background: #0f1115;
+    color: #c9d1d9;
+    padding: 20px;
+  }
+  .test-section {
+    margin-bottom: 20px;
+    padding: 15px;
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+  }
+  .test-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: #58a6ff;
+    margin-bottom: 10px;
+  }
+  .test-result {
+    padding: 10px;
+    background: #0d1117;
+    border-radius: 4px;
+    font-family: monospace;
+    font-size: 12px;
+    margin-top: 10px;
+    white-space: pre-wrap;
+  }
+  .success { color: #3fb950; }
+  .error { color: #f85149; }
+  button {
+    padding: 8px 16px;
+    background: #21262d;
+    border: 1px solid #30363d;
+    color: #c9d1d9;
+    border-radius: 6px;
+    cursor: pointer;
+    margin-right: 8px;
+    margin-bottom: 8px;
+  }
+  button:hover { background: #30363d; }
+  button.primary { background: #1f6feb; border-color: #1f6feb; color: #fff; }
+  button.primary:hover { background: #388bfd; }
+</style>
+</head>
+<body>
+
+<h1>DynamicBG 编辑器 v2.0 测试</h1>
+
+<div class="test-section">
+  <div class="test-title">模块加载测试</div>
+  <button onclick="testModuleLoading()">测试模块加载</button>
+  <div id="module-test-result" class="test-result"></div>
+</div>
+
+<div class="test-section">
+  <div class="test-title">编辑器初始化测试</div>
+  <button onclick="testEditorInit()">测试编辑器初始化</button>
+  <div id="editor-test-result" class="test-result"></div>
+</div>
+
+<div class="test-section">
+  <div class="test-title">元素创建测试</div>
+  <button onclick="testElementCreation()">测试元素创建</button>
+  <div id="element-test-result" class="test-result"></div>
+</div>
+
+<div class="test-section">
+  <div class="test-title">撤销重做测试</div>
+  <button onclick="testUndoRedo()">测试撤销重做</button>
+  <div id="undo-test-result" class="test-result"></div>
+</div>
+
+<div class="test-section">
+  <div class="test-title">AI接口测试</div>
+  <button onclick="testAIInterface()">测试AI接口</button>
+  <div id="ai-test-result" class="test-result"></div>
+</div>
+
+<div class="test-section">
+  <div class="test-title">导出功能测试</div>
+  <button onclick="testExport()">测试导出功能</button>
+  <div id="export-test-result" class="test-result"></div>
+</div>
+
+<script type="module">
+  // 导入模块
+  import { BackgroundEditor } from './core.js';
+  import { CanvasManager } from './canvas.js';
+  import { ElementFactory } from './elements.js';
+  import { HistoryManager } from './history.js';
+  import { ExportManager } from './export.js';
+  import { KeyboardManager } from './keyboard.js';
+  import { AIInterface } from './ai.js';
+
+  // 全局测试变量
+  let editor = null;
+  let canvasManager = null;
+  let elementFactory = null;
+  let historyManager = null;
+  let exportManager = null;
+  let keyboardManager = null;
+  let aiInterface = null;
+
+  // 模块加载测试
+  window.testModuleLoading = () => {
+    const result = document.getElementById('module-test-result');
+    try {
+      result.innerHTML = '测试中...\n';
+      
+      // 检查模块是否正确导入
+      const modules = [
+        { name: 'BackgroundEditor', module: BackgroundEditor },
+        { name: 'CanvasManager', module: CanvasManager },
+        { name: 'ElementFactory', module: ElementFactory },
+        { name: 'HistoryManager', module: HistoryManager },
+        { name: 'ExportManager', module: ExportManager },
+        { name: 'KeyboardManager', module: KeyboardManager },
+        { name: 'AIInterface', module: AIInterface }
+      ];
+      
+      let allLoaded = true;
+      modules.forEach(({ name, module }) => {
+        if (module) {
+          result.innerHTML += `<span class="success">✓ ${name} 加载成功</span>\n`;
+        } else {
+          result.innerHTML += `<span class="error">✗ ${name} 加载失败</span>\n`;
+          allLoaded = false;
+        }
+      });
+      
+      if (allLoaded) {
+        result.innerHTML += '\n<span class="success">所有模块加载成功！</span>';
+      } else {
+        result.innerHTML += '\n<span class="error">部分模块加载失败</span>';
+      }
+      
+    } catch (error) {
+      result.innerHTML = `<span class="error">测试失败: ${error.message}</span>`;
+    }
+  };
+
+  // 编辑器初始化测试
+  window.testEditorInit = () => {
+    const result = document.getElementById('editor-test-result');
+    try {
+      result.innerHTML = '测试中...\n';
+      
+      // 创建测试容器
+      const container = document.createElement('div');
+      container.id = 'test-container';
+      container.style.width = '400px';
+      container.style.height = '300px';
+      container.style.position = 'relative';
+      document.body.appendChild(container);
+      
+      // 初始化编辑器
+      editor = new BackgroundEditor('test-container');
+      canvasManager = new CanvasManager(editor);
+      elementFactory = new ElementFactory(editor);
+      historyManager = new HistoryManager(editor);
+      exportManager = new ExportManager(editor);
+      keyboardManager = new KeyboardManager(editor);
+      aiInterface = new AIInterface(editor);
+      
+      // 设置引用
+      editor.canvasManager = canvasManager;
+      editor.elementFactory = elementFactory;
+      editor.historyManager = historyManager;
+      editor.exportManager = exportManager;
+      editor.keyboardManager = keyboardManager;
+      editor.aiInterface = aiInterface;
+      
+      result.innerHTML += `<span class="success">✓ 编辑器初始化成功</span>\n`;
+      result.innerHTML += `<span class="success">✓ 画布尺寸: ${editor.config.canvas.width}x${editor.config.canvas.height}</span>\n`;
+      result.innerHTML += `<span class="success">✓ 所有管理器初始化成功</span>\n`;
+      
+      // 清理测试容器
+      setTimeout(() => {
+        container.remove();
+      }, 1000);
+      
+    } catch (error) {
+      result.innerHTML = `<span class="error">测试失败: ${error.message}</span>`;
+    }
+  };
+
+  // 元素创建测试
+  window.testElementCreation = () => {
+    const result = document.getElementById('element-test-result');
+    try {
+      result.innerHTML = '测试中...\n';
+      
+      if (!editor) {
+        result.innerHTML = '<span class="error">请先运行编辑器初始化测试</span>';
+        return;
+      }
+      
+      // 测试创建各种元素
+      const elementsToTest = [
+        { type: 'rectangle', name: '矩形' },
+        { type: 'circle', name: '圆形' },
+        { type: 'ellipse', name: '椭圆' },
+        { type: 'polygon', name: '多边形' },
+        { type: 'particles', name: '粒子系统' }
+      ];
+      
+      elementsToTest.forEach(({ type, name }) => {
+        try {
+          const elementId = elementFactory.createElement(type);
+          result.innerHTML += `<span class="success">✓ ${name} 创建成功 (ID: ${elementId})</span>\n`;
+        } catch (error) {
+          result.innerHTML += `<span class="error">✗ ${name} 创建失败: ${error.message}</span>\n`;
+        }
+      });
+      
+      result.innerHTML += `\n<span class="success">当前元素数量: ${editor.config.shapes.length}</span>`;
+      
+    } catch (error) {
+      result.innerHTML = `<span class="error">测试失败: ${error.message}</span>`;
+    }
+  };
+
+  // 撤销重做测试
+  window.testUndoRedo = () => {
+    const result = document.getElementById('undo-test-result');
+    try {
+      result.innerHTML = '测试中...\n';
+      
+      if (!editor) {
+        result.innerHTML = '<span class="error">请先运行编辑器初始化测试</span>';
+        return;
+      }
+      
+      // 保存初始状态
+      const initialCount = editor.config.shapes.length;
+      result.innerHTML += `初始元素数量: ${initialCount}\n`;
+      
+      // 添加一个元素
+      elementFactory.createElement('rectangle');
+      const afterAddCount = editor.config.shapes.length;
+      result.innerHTML += `添加后元素数量: ${afterAddCount}\n`;
+      
+      // 测试撤销
+      const undoSuccess = historyManager.undo();
+      const afterUndoCount = editor.config.shapes.length;
+      result.innerHTML += `<span class="${undoSuccess ? 'success' : 'error'}">${undoSuccess ? '✓' : '✗'} 撤销${undoSuccess ? '成功' : '失败'}</span>\n`;
+      result.innerHTML += `撤销后元素数量: ${afterUndoCount}\n`;
+      
+      // 测试重做
+      const redoSuccess = historyManager.redo();
+      const afterRedoCount = editor.config.shapes.length;
+      result.innerHTML += `<span class="${redoSuccess ? 'success' : 'error'}">${redoSuccess ? '✓' : '✗'} 重做${redoSuccess ? '成功' : '失败'}</span>\n`;
+      result.innerHTML += `重做后元素数量: ${afterRedoCount}\n`;
+      
+      // 验证结果
+      if (undoSuccess && redoSuccess && afterUndoCount === initialCount && afterRedoCount === afterAddCount) {
+        result.innerHTML += '\n<span class="success">撤销重做功能正常！</span>';
+      } else {
+        result.innerHTML += '\n<span class="error">撤销重做功能异常</span>';
+      }
+      
+    } catch (error) {
+      result.innerHTML = `<span class="error">测试失败: ${error.message}</span>`;
+    }
+  };
+
+  // AI接口测试
+  window.testAIInterface = () => {
+    const result = document.getElementById('ai-test-result');
+    try {
+      result.innerHTML = '测试中...\n';
+      
+      if (!aiInterface) {
+        result.innerHTML = '<span class="error">请先运行编辑器初始化测试</span>';
+        return;
+      }
+      
+      // 测试获取状态
+      const state = aiInterface.getState();
+      result.innerHTML += `<span class="success">✓ 获取状态成功</span>\n`;
+      result.innerHTML += `  画布尺寸: ${state.canvasSize.width}x${state.canvasSize.height}\n`;
+      result.innerHTML += `  元素数量: ${state.elements.length}\n`;
+      
+      // 测试执行命令
+      const addResult = aiInterface.executeCommand({
+        type: 'addElement',
+        params: { type: 'circle', properties: { x: 0.5, y: 0.5, radius: 0.1 } }
+      });
+      
+      if (addResult.success) {
+        result.innerHTML += `<span class="success">✓ 添加元素命令执行成功</span>\n`;
+      } else {
+        result.innerHTML += `<span class="error">✗ 添加元素命令执行失败: ${addResult.error}</span>\n`;
+      }
+      
+      // 测试自然语言处理
+      aiInterface.processNaturalLanguage('添加一个矩形').then(nlResult => {
+        if (nlResult.success) {
+          result.innerHTML += `<span class="success">✓ 自然语言处理成功</span>\n`;
+        } else {
+          result.innerHTML += `<span class="error">✗ 自然语言处理失败: ${nlResult.error}</span>\n`;
+        }
+      });
+      
+      result.innerHTML += '\n<span class="success">AI接口测试完成！</span>';
+      
+    } catch (error) {
+      result.innerHTML = `<span class="error">测试失败: ${error.message}</span>`;
+    }
+  };
+
+  // 导出功能测试
+  window.testExport = () => {
+    const result = document.getElementById('export-test-result');
+    try {
+      result.innerHTML = '测试中...\n';
+      
+      if (!exportManager) {
+        result.innerHTML = '<span class="error">请先运行编辑器初始化测试</span>';
+        return;
+      }
+      
+      // 测试JSON导出
+      const json = exportManager.exportJSON();
+      result.innerHTML += `<span class="success">✓ JSON导出成功</span>\n`;
+      result.innerHTML += `  JSON大小: ${JSON.stringify(json).length} 字节\n`;
+      
+      // 测试代码导出
+      const code = exportManager.exportJavaScript();
+      result.innerHTML += `<span class="success">✓ JavaScript代码导出成功</span>\n`;
+      result.innerHTML += `  代码大小: ${code.length} 字节\n`;
+      
+      // 测试SVG导出
+      const svg = exportManager.generateSVG(100, 100);
+      result.innerHTML += `<span class="success">✓ SVG生成成功</span>\n`;
+      result.innerHTML += `  SVG大小: ${svg.length} 字节\n`;
+      
+      result.innerHTML += '\n<span class="success">导出功能测试完成！</span>';
+      
+    } catch (error) {
+      result.innerHTML = `<span class="error">测试失败: ${error.message}</span>`;
+    }
+  };
+
+  // 页面加载完成后自动运行模块加载测试
+  window.addEventListener('load', () => {
+    setTimeout(() => {
+      window.testModuleLoading();
+    }, 500);
+  });
+</script>
+
+</body>
+</html>

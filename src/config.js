@@ -5,7 +5,7 @@
  */
 
 export const CONFIG = {
-    VERSION: '1.51',
+    VERSION: '1.56',
     CANVAS_WIDTH: 800, CANVAS_HEIGHT: 600,
     SEGMENT_RADIUS: 8, SEGMENT_SPACING: 14,
     BASE_SPEED: 5, MIN_SPEED: 2, SPEED_DECAY: 0.02,
@@ -98,6 +98,27 @@ export const CONFIG = {
         SIZE_SPREAD: 2,
     },
     BULLET_RADIUS: 5,
+    // 尸体下沉 & 宝珠发射参数
+    DEAD_BODY: {
+        SINK_GRAVITY: 60,           // 下沉重力加速度
+        SINK_SWAY: 20,              // 左右摆动强度
+        SINK_DAMPING: 0.99,         // 下沉阻尼
+        INITIAL_VY_MIN: 15,         // 初始向下速度最小值
+        INITIAL_VY_SPREAD: 15,      // 初始向下速度随机范围
+        INITIAL_VX_INHERIT: 0.1,    // 继承初始水平速度比例
+        INITIAL_VX_RANDOM: 5,       // 初始水平随机速度
+        EMIT_SPEED_MIN: 2.0,        // 宝珠发射速度最小值
+        EMIT_SPEED_SPREAD: 2.0,     // 宝珠发射速度随机范围
+        EMIT_ANGLE_MIN: 30,         // 发射角度最小值（度）
+        EMIT_ANGLE_SPREAD: 120,     // 发射角度随机范围（度）
+        EMIT_INACTIVE_TIME: 2.0,    // 宝珠初生冷却时间
+        EMIT_BIRTH_TIME: 1.2,       // 宝珠白点动画时间
+        EMIT_PARTICLE_COUNT: 6,     // 发射粒子数量
+        // 宝珠类型概率（绿70%、蓝15%、黄10%、橙5%）
+        EMIT_PROB_GREEN: 0.70,
+        EMIT_PROB_BLUE: 0.85,
+        EMIT_PROB_YELLOW: 0.95,
+    },
 };
 
 export const GAME_STATE = {

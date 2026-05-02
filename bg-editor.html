@@ -1,0 +1,3368 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DynamicBG 编辑器</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    background: #0f1115;
+    color: #c9d1d9;
+    overflow: hidden;
+    width: 100vw;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* 顶部工具栏 */
+  .toolbar {
+    height: 48px;
+    background: #161b22;
+    border-bottom: 1px solid #30363d;
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    gap: 12px;
+    flex-shrink: 0;
+    z-index: 20;
+  }
+  .toolbar h1 {
+    font-size: 15px;
+    font-weight: 600;
+    color: #58a6ff;
+    margin-right: auto;
+    letter-spacing: 1px;
+  }
+  .btn {
+    padding: 6px 14px;
+    border: 1px solid #30363d;
+    background: #21262d;
+    color: #c9d1d9;
+    border-radius: 6px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .btn:hover { background: #30363d; border-color: #8b949e; }
+  .btn.primary { background: #1f6feb; border-color: #1f6feb; color: #fff; }
+  .btn.primary:hover { background: #388bfd; }
+  .btn.danger { background: #da3633; border-color: #da3633; color: #fff; }
+  .btn.danger:hover { background: #f85149; }
+
+  /* 主体 */
+  .main {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+  }
+
+  /* 左侧场景元素列表 */
+  .sidebar {
+    width: 240px;
+    background: #161b22;
+    border-right: 1px solid #30363d;
+    overflow-y: auto;
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .sidebar::-webkit-scrollbar { width: 6px; }
+  .sidebar::-webkit-scrollbar-thumb { background: #30363d; border-radius: 3px; }
+
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .field-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .field label {
+    font-size: 12px;
+    color: #8b949e;
+    min-width: 70px;
+  }
+  .field input[type="range"] {
+    flex: 1;
+    accent-color: #58a6ff;
+  }
+  .field input[type="color"] {
+    width: 36px;
+    height: 24px;
+    border: 1px solid #30363d;
+    border-radius: 4px;
+    background: none;
+    cursor: pointer;
+  }
+  .field input[type="number"] {
+    width: 60px;
+    background: #0d1117;
+    border: 1px solid #30363d;
+    color: #c9d1d9;
+    border-radius: 4px;
+    padding: 3px 6px;
+    font-size: 12px;
+  }
+  .field input[type="text"] {
+    flex: 1;
+    background: #0d1117;
+    border: 1px solid #30363d;
+    color: #c9d1d9;
+    border-radius: 4px;
+    padding: 4px 8px;
+    font-size: 12px;
+  }
+  .field select {
+    flex: 1;
+    background: #0d1117;
+    border: 1px solid #30363d;
+    color: #c9d1d9;
+    border-radius: 4px;
+    padding: 4px 6px;
+    font-size: 12px;
+  }
+  .val {
+    font-size: 11px;
+    color: #58a6ff;
+    min-width: 36px;
+    text-align: right;
+    font-family: monospace;
+  }
+
+  /* 画布区域 */
+  .canvas-wrap {
+    flex: 1;
+    position: relative;
+    background: #000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  canvas {
+    box-shadow: 0 0 30px rgba(0,0,0,0.8);
+  }
+  .canvas-info {
+    position: absolute;
+    bottom: 10px;
+    left: 10px;
+    font-size: 11px;
+    color: rgba(255,255,255,0.3);
+    pointer-events: none;
+  }
+
+  /* JSON 导出弹窗 */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+  }
+  .modal-overlay.active { display: flex; }
+  .modal {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 12px;
+    width: 600px;
+    max-width: 90vw;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+  }
+  .modal-header {
+    padding: 14px 18px;
+    border-bottom: 1px solid #30363d;
+    font-size: 14px;
+    font-weight: 600;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .modal-body {
+    padding: 14px 18px;
+    flex: 1;
+    overflow: auto;
+  }
+  .modal-body textarea {
+    width: 100%;
+    height: 300px;
+    background: #0d1117;
+    border: 1px solid #30363d;
+    color: #c9d1d9;
+    border-radius: 6px;
+    padding: 10px;
+    font-family: 'Consolas', monospace;
+    font-size: 12px;
+    resize: none;
+  }
+  .modal-footer {
+    padding: 12px 18px;
+    border-top: 1px solid #30363d;
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+
+  /* 浮动属性面板（可拖拽，无遮罩） */
+  .prop-panel {
+    position: fixed;
+    top: 64px;
+    right: 20px;
+    width: 520px;
+    max-width: 90vw;
+    max-height: 85vh;
+    background: rgba(22, 27, 34, 0.92);
+    border: 1px solid #30363d;
+    border-radius: 12px;
+    display: none;
+    flex-direction: column;
+    z-index: 120;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    backdrop-filter: blur(8px);
+  }
+  .prop-panel.active { display: flex; }
+  .prop-panel .modal-header {
+    cursor: grab;
+    user-select: none;
+    padding: 12px 16px;
+    font-size: 13px;
+  }
+  .prop-panel .modal-header:active { cursor: grabbing; }
+  .prop-panel .modal-body {
+    padding: 12px 16px;
+    max-height: 65vh;
+    overflow-y: auto;
+    flex: 1;
+  }
+  .prop-panel .modal-footer {
+    padding: 10px 16px;
+  }
+
+  /* 场景元素列表 */
+  .scene-list-header {
+    font-size: 13px;
+    font-weight: 600;
+    color: #58a6ff;
+    padding: 8px 12px 6px;
+    letter-spacing: 1px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .scene-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+    border: 1px solid transparent;
+    user-select: none;
+    position: relative;
+  }
+  .scene-item:hover {
+    background: #161b22;
+    border-color: #30363d;
+  }
+  .scene-item.selected {
+    background: rgba(31, 111, 235, 0.15);
+    border-color: #1f6feb;
+  }
+  .scene-item .item-icon {
+    font-size: 16px;
+    width: 22px;
+    text-align: center;
+    flex-shrink: 0;
+  }
+  .scene-item .item-name {
+    flex: 1;
+    font-size: 13px;
+    color: #c9d1d9;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .scene-item.hidden .item-name {
+    color: #6e7681;
+    text-decoration: line-through;
+  }
+  .scene-item .item-eye {
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    opacity: 0.5;
+    transition: opacity 0.15s;
+    flex-shrink: 0;
+    border-radius: 4px;
+  }
+  .scene-item:hover .item-eye,
+  .scene-item .item-eye:hover {
+    opacity: 1;
+    background: rgba(255,255,255,0.06);
+  }
+  .scene-group {
+    margin-top: 6px;
+  }
+  .scene-group-title {
+    font-size: 11px;
+    color: #6e7681;
+    padding: 6px 12px 2px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .scene-divider {
+    height: 1px;
+    background: #21262d;
+    margin: 6px 12px;
+  }
+
+  /* 渐变色选择器 */
+  .grad-mode-bar {
+    display: flex;
+    gap: 2px;
+    margin-bottom: 6px;
+  }
+  .grad-mode-btn {
+    padding: 3px 10px;
+    font-size: 11px;
+    border: 1px solid #30363d;
+    background: #0d1117;
+    color: #8b949e;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+  .grad-mode-btn:hover { border-color: #58a6ff; color: #c9d1d9; }
+  .grad-mode-btn.active { background: #1f6feb; border-color: #1f6feb; color: #fff; }
+  .grad-preview-bar {
+    height: 22px;
+    border-radius: 4px;
+    border: 1px solid #30363d;
+    margin-bottom: 6px;
+  }
+  .grad-stop-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-bottom: 3px;
+  }
+  .grad-stop-row input[type="color"] {
+    width: 26px; height: 20px; border: 1px solid #30363d; border-radius: 3px; background: none; cursor: pointer; padding: 0;
+  }
+  .grad-stop-row input[type="range"] { flex: 1; accent-color: #58a6ff; }
+  .grad-stop-row .val { font-size: 10px; min-width: 28px; }
+  .grad-stop-del {
+    width: 18px; height: 18px; display: flex; align-items: center; justify-content: center;
+    font-size: 10px; cursor: pointer; color: #6e7681; border-radius: 3px; flex-shrink: 0;
+  }
+  .grad-stop-del:hover { color: #f85149; background: rgba(248,81,73,0.12); }
+  .grad-add-btn {
+    padding: 2px 8px; font-size: 10px; border: 1px solid #30363d; background: #0d1117;
+    color: #8b949e; border-radius: 3px; cursor: pointer; margin-top: 2px;
+  }
+  .grad-add-btn:hover { border-color: #58a6ff; color: #c9d1d9; }
+
+  /* 图层面板 */
+  .layer-panel { margin-bottom: 4px; }
+  .layer-panel-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 12px 4px;
+  }
+  .layer-panel-title {
+    font-size: 13px; font-weight: 600; color: #58a6ff; letter-spacing: 1px;
+  }
+  .layer-panel-actions { display: flex; gap: 4px; }
+  .layer-panel-btn {
+    padding: 2px 8px; font-size: 10px; border: 1px solid #30363d; background: #0d1117;
+    color: #8b949e; border-radius: 3px; cursor: pointer;
+  }
+  .layer-panel-btn:hover { border-color: #58a6ff; color: #c9d1d9; }
+  .layer-panel-btn:disabled { opacity: 0.4; cursor: default; border-color: #30363d; color: #6e7681; }
+  .layer-list { padding: 0 4px; }
+  .layer-item {
+    display: flex; align-items: center; gap: 4px;
+    padding: 3px 6px; border-radius: 4px; cursor: pointer;
+    transition: background 0.12s; user-select: none;
+    border: 1px solid transparent; margin-bottom: 1px;
+  }
+  .layer-item:hover { background: #21262d; }
+  .layer-item.selected { background: #1f6feb22; border-color: #1f6feb44; }
+  .layer-item.drag-over-top { border-top: 2px solid #58a6ff; }
+  .layer-item.drag-over-bottom { border-bottom: 2px solid #58a6ff; }
+  .layer-item.hidden-layer { opacity: 0.45; }
+  .layer-item.in-group { padding-left: 20px; }
+  .layer-drag {
+    cursor: grab; color: #484f58; font-size: 11px; width: 14px; text-align: center;
+    flex-shrink: 0; padding: 2px 0;
+  }
+  .layer-drag:active { cursor: grabbing; color: #8b949e; }
+  .layer-icon { font-size: 13px; width: 18px; text-align: center; flex-shrink: 0; }
+  .layer-name {
+    flex: 1; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    min-width: 0;
+  }
+  .layer-eye {
+    font-size: 11px; cursor: pointer; color: #6e7681; flex-shrink: 0; padding: 2px;
+    border-radius: 3px;
+  }
+  .layer-eye:hover { color: #c9d1d9; background: #30363d; }
+  .layer-group-header {
+    display: flex; align-items: center; gap: 4px;
+    padding: 4px 6px; border-radius: 4px; cursor: pointer;
+    transition: background 0.12s; margin-bottom: 1px;
+    border: 1px solid #30363d;
+  }
+  .layer-group-header:hover { background: #21262d; }
+  .layer-group-header.selected { background: #1f6feb22; border-color: #1f6feb44; }
+  .layer-group-toggle {
+    font-size: 9px; color: #8b949e; width: 14px; text-align: center;
+    transition: transform 0.2s; flex-shrink: 0;
+  }
+  .layer-group-toggle.collapsed { transform: rotate(-90deg); }
+  .layer-group-icon { font-size: 13px; flex-shrink: 0; }
+  .layer-group-name {
+    flex: 1; font-size: 11px; font-weight: 500; overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap;
+  }
+  .layer-group-count {
+    font-size: 9px; color: #6e7681; background: #21262d;
+    padding: 1px 5px; border-radius: 8px; flex-shrink: 0;
+  }
+  .layer-group-children { margin-left: 10px; }
+  .layer-group-children.collapsed { display: none; }
+  .layer-ctx-menu {
+    position: fixed; background: #161b22; border: 1px solid #30363d;
+    border-radius: 8px; padding: 4px 0; z-index: 300; min-width: 140px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.5); display: none;
+  }
+  .layer-ctx-item {
+    padding: 5px 14px; font-size: 12px; cursor: pointer; color: #c9d1d9;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .layer-ctx-item:hover { background: #21262d; }
+  .layer-ctx-item.danger { color: #f85149; }
+  .layer-ctx-divider { height: 1px; background: #30363d; margin: 4px 0; }
+</style>
+</head>
+<body>
+
+<div class="toolbar">
+  <h1>DynamicBG 编辑器 <span style="color:#8b949e;font-size:13px;font-weight:normal;">v2.2</span></h1>
+  <button class="btn" onclick="loadConfig()">📂 载入 JSON</button>
+  <button class="btn primary" onclick="saveConfig()">💾 保存 JSON</button>
+  <button class="btn" onclick="exportCode()">📋 导出代码</button>
+  <button class="btn danger" onclick="resetConfig()">↺ 重置</button>
+</div>
+
+<div class="main">
+  <div class="sidebar" id="sidebar"></div>
+  <div class="canvas-wrap">
+    <canvas id="preview"></canvas>
+    <div class="canvas-info" id="canvasInfo"></div>
+  </div>
+</div>
+
+<!-- 隐藏文件输入 -->
+<input type="file" id="fileInput" accept=".json" style="display:none" onchange="handleFile(event)">
+
+<!-- 导出弹窗 -->
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <div class="modal-header">
+      <span id="modalTitle">导出</span>
+      <span style="cursor:pointer;color:#8b949e;" onclick="closeModal()">✕</span>
+    </div>
+    <div class="modal-body">
+      <textarea id="modalText" readonly></textarea>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="copyModal()">复制</button>
+      <button class="btn primary" onclick="closeModal()">关闭</button>
+    </div>
+  </div>
+</div>
+
+<!-- 属性编辑浮动面板 -->
+<div class="prop-panel" id="propEditor">
+  <div class="modal-header" id="propEditorHeader">
+    <span id="propEditorTitle">元素属性编辑</span>
+    <span style="cursor:pointer;color:#8b949e;" onclick="closePropertyEditor()">✕</span>
+  </div>
+  <div class="modal-body" id="propEditorBody">
+  </div>
+  <div class="modal-footer">
+    <button class="btn danger" onclick="closePropertyEditor()">关闭</button>
+  </div>
+</div>
+
+<!-- 点击选择菜单 -->
+<div id="hitMenu" style="display:none;position:fixed;background:#161b22;border:1px solid #30363d;border-radius:8px;padding:6px 0;z-index:200;min-width:160px;box-shadow:0 4px 20px rgba(0,0,0,0.5);"></div>
+
+<script>
+// ===================== 默认配置 =====================
+const DEFAULT_CONFIG = {
+  // 画布
+  canvas: { width: 960, height: 540 },
+
+  // 深海背景渐变
+  background: {
+    visible: true,
+    centerX: 0.5, centerY: 0.3, radius: 0.8,
+    color0: '#164a63', color1: '#0d2f42', color2: '#061924',
+  },
+
+  // 环境光晕
+  ambient: {
+    visible: true,
+    centerX: 0.65, centerY: 0.35, radius: 0.5,
+    color0: 'rgba(30, 107, 122, 0.35)', color1: 'rgba(13, 47, 66, 0)',
+  },
+
+  // 发光河流
+  river: {
+    visible: true,
+    shadowColor: '#4de8d6', shadowBlur: 12,
+    stroke0: 'rgba(45, 212, 191, 0.25)', width0: 35,
+    stroke1: 'rgba(107, 255, 232, 0.4)', width1: 8,
+    // 贝塞尔控制点 (相对坐标 0-1)
+    path: [
+      [-0.052,0.486],[0.078,0.472],[0.156,0.583],[0.273,0.556],
+      [0.391,0.528],[0.469,0.625],[0.586,0.597],[0.703,0.569],
+      [0.781,0.667],[0.898,0.639],[0.938,0.625],[0.977,0.653],[1.039,0.625]
+    ]
+  },
+
+  // 左侧岩石
+  leftRock: {
+    visible: true,
+    fill: '#0f222e',
+    highlight: 'rgba(30, 58, 77, 0.5)',
+    points: [[0,1],[0,0.667],[0.062,0.625],[0.117,0.681],[0.172,0.639],[0.219,0.722],[0.273,0.667],[0.328,0.736],[0.297,0.833],[0.25,0.903],[0.219,1]],
+  },
+
+  // 右侧前景岩石
+  rightRock: {
+    visible: true,
+    fill: '#0a1c26',
+    points: [[0.664,1],[0.703,0.833],[0.766,0.764],[0.82,0.806],[0.875,0.722],[0.938,0.778],[1,0.694],[1,1]],
+  },
+
+  // 烟囱
+  vents: {
+    visible: true,
+    pipeGrad: ['#1a2b38','#2d3e4a','#1e303d','#0f1f2a'],
+    topFill: '#0f1f2a',
+    crackColor: 'rgba(255, 107, 44, 0.6)',
+    crackGlow: '#ff6b2c',
+    crackWidth: 2,
+    crack2Color: 'rgba(255, 154, 60, 0.5)',
+    // 两个烟囱: [x, y, wTop, wBot, h]
+    pipes: [
+      { x: 0.113, y: 0.521, wTop: 0.013, wBot: 0.013, h: 0.174 },
+      { x: 0.193, y: 0.562, wTop: 0.011, wBot: 0.011, h: 0.153 },
+    ],
+    // 岩浆裂缝点
+    cracks: [
+      [0.062,0.764],[0.094,0.806],[0.117,0.778],[0.156,0.833],[0.195,0.806],[0.234,0.861]
+    ],
+    cracks2: [
+      [0.141,0.722],[0.172,0.75],[0.203,0.736]
+    ],
+  },
+
+  // 迷雾
+  fog: {
+    visible: true,
+    color0: 'rgba(10, 31, 46, 0.85)',
+    color1: 'rgba(13, 47, 66, 0.4)',
+    color2: 'rgba(13, 47, 66, 0)',
+  },
+
+  // 暗角
+  vignette: {
+    visible: true,
+    color0: 'rgba(2, 10, 16, 0.5)',
+    color1: 'rgba(2, 10, 16, 0)',
+  },
+
+  // 水母
+  jellyfish: {
+    visible: true,
+    x: 0.65, y: 0.22,
+    radiusX: 70, radiusY: 55,
+    bobSpeed: 0.4, bobAmp: 12,
+    breatheSpeed: 0.8, breatheAmp: 0.06,
+    glowColor: '#6bffe8', glowBlur: 20,
+    bodyGrad: ['rgba(168, 255, 240, 0.85)', 'rgba(107, 255, 232, 0.6)', 'rgba(77, 232, 214, 0.2)'],
+    tentacleCount: 5,
+    tentacleSpacing: 14,
+    tentacleLenMin: 90, tentacleLenMax: 130,
+    tentacleWaveFreqMin: 0.8, tentacleWaveFreqMax: 1.4,
+    tentacleWaveAmpMin: 6, tentacleWaveAmpMax: 10,
+  },
+
+  // 深海荧光微粒
+  particles: {
+    visible: true,
+    count: 30,
+    vxMin: -0.075, vxMax: 0.075,
+    vyMin: -0.1, vyMax: 0.0,
+    rMin: 0.8, rMax: 2.6,
+    alphaMin: 0.2, alphaMax: 0.7,
+    blinkFreqMin: 0.3, blinkFreqMax: 1.8,
+    colors: ['#4de8d6', '#6bffe8', '#a8fff0'],
+  },
+
+  // 热液喷发粒子
+  magma: {
+    visible: true,
+    countPerVent: 25,
+    vxMin: -0.2, vxMax: 0.2,
+    vyMin: -1.1, vyMax: -0.3,
+    rMin: 2, rMax: 6,
+    maxRMin: 4, maxRMax: 10,
+    decayMin: 0.003, decayMax: 0.007,
+    ventIntensity: [1.0, 0.7],
+  },
+
+  // 河流微光
+  glints: {
+    visible: true,
+    count: 40,
+    rMin: 1.5, rMax: 4,
+    alphaMin: 0.3, alphaMax: 0.7,
+    freqMin: 0.5, freqMax: 1.5,
+  },
+
+  // 远景山脉
+  mountains: {
+    visible: true,
+    farBaseY: 0.5, farRoughness: 80, farOpacity: 0.6,
+    midBaseY: 0.58, midRoughness: 60, midOpacity: 0.8,
+    steps: 20,
+    swaySpeed: 0.15, swayAmp: 2,
+    // 固定轮廓点 (相对坐标 0-1)，为空时自动根据参数生成
+    farPoints: [
+      [0,0.507],[0.05,0.463],[0.1,0.481],[0.15,0.444],[0.2,0.472],
+      [0.25,0.435],[0.3,0.458],[0.35,0.412],[0.4,0.435],[0.45,0.389],
+      [0.5,0.412],[0.55,0.370],[0.6,0.398],[0.65,0.356],[0.7,0.384],
+      [0.75,0.342],[0.8,0.370],[0.85,0.333],[0.9,0.356],[0.95,0.319],[1,0.347]
+    ],
+    midPoints: [
+      [0,0.587],[0.05,0.546],[0.1,0.569],[0.15,0.528],[0.2,0.550],
+      [0.25,0.514],[0.3,0.536],[0.35,0.495],[0.4,0.517],[0.45,0.476],
+      [0.5,0.498],[0.55,0.458],[0.6,0.480],[0.65,0.439],[0.7,0.462],
+      [0.75,0.421],[0.8,0.443],[0.85,0.403],[0.9,0.425],[0.95,0.384],[1,0.407]
+    ],
+  },
+
+  // 自定义几何体
+  shapes: [],
+
+  // 图层顺序（从底到顶）
+  layerOrder: ['background', 'ambient', 'river', 'leftRock', 'vents', 'rightRock', 'mountains', 'fog', 'vignette', 'jellyfish', 'particles', 'magma', 'glints'],
+
+  // 编组
+  groups: [],
+};
+
+let config = JSON.parse(JSON.stringify(DEFAULT_CONFIG));
+
+// ===================== UI 生成 =====================
+const sidebar = document.getElementById('sidebar');
+
+// 场景元素元数据
+const ELEMENT_META = {
+  background: { icon: '🌊', name: '深海背景' },
+  ambient:    { icon: '💡', name: '环境光晕' },
+  river:      { icon: '🏞️', name: '发光河流' },
+  leftRock:   { icon: '🪨', name: '左侧岩石' },
+  rightRock:  { icon: '🪨', name: '右侧岩石' },
+  vents:      { icon: '♨️', name: '烟囱 & 裂缝' },
+  mountains:  { icon: '⛰️', name: '远景山脉' },
+  fog:        { icon: '🌫️', name: '迷雾' },
+  vignette:   { icon: '🔲', name: '暗角' },
+  jellyfish:  { icon: '🪼', name: '水母' },
+  particles:  { icon: '✨', name: '荧光微粒' },
+  magma:      { icon: '🔥', name: '热液粒子' },
+  glints:     { icon: '💫', name: '河流微光' },
+};
+
+// 图层拖拽状态
+let _layerDragId = null;
+let _layerDragOverId = null;
+let _layerDragOverPos = null; // 'top' | 'bottom'
+let _layerSelectedIds = new Set();
+
+// 右键菜单
+let _ctxMenuEl = null;
+
+function closeCtxMenu() {
+  if (_ctxMenuEl) { _ctxMenuEl.remove(); _ctxMenuEl = null; }
+}
+
+function showCtxMenu(x, y, items) {
+  closeCtxMenu();
+  const menu = document.createElement('div');
+  menu.className = 'layer-ctx-menu';
+  menu.style.left = x + 'px'; menu.style.top = y + 'px';
+  items.forEach(item => {
+    if (item === '---') {
+      const d = document.createElement('div'); d.className = 'layer-ctx-divider';
+      menu.appendChild(d); return;
+    }
+    const el = document.createElement('div');
+    el.className = 'layer-ctx-item' + (item.danger ? ' danger' : '');
+    el.textContent = item.label;
+    el.onclick = () => { closeCtxMenu(); item.action(); };
+    menu.appendChild(el);
+  });
+  document.body.appendChild(menu);
+  _ctxMenuEl = menu;
+  // 确保不超出视口
+  const r = menu.getBoundingClientRect();
+  if (r.right > window.innerWidth) menu.style.left = (x - r.width) + 'px';
+  if (r.bottom > window.innerHeight) menu.style.top = (y - r.height) + 'px';
+  setTimeout(() => document.addEventListener('click', closeCtxMenu, { once: true }), 0);
+}
+
+function getLayerMeta(id) {
+  if (id.startsWith('shape_')) {
+    const sid = parseInt(id.split('_')[1]);
+    const s = (config.shapes || []).find(sh => sh.id === sid);
+    return { icon: s ? (s.type === 'polygon' ? '⬟' : s.type === 'polyline' ? '⌇' : '∿') : '?', name: s ? (s.name || '未命名形状') : '未知' };
+  }
+  if (id.startsWith('group_')) {
+    const g = (config.groups || []).find(gr => gr.id === id);
+    return { icon: '📁', name: g ? (g.name || '编组') : '未知' };
+  }
+  return ELEMENT_META[id] || { icon: '?', name: id };
+}
+
+function isLayerVisible(id) {
+  if (id.startsWith('shape_')) {
+    const sid = parseInt(id.split('_')[1]);
+    const s = (config.shapes || []).find(sh => sh.id === sid);
+    return s && s.visible !== false;
+  }
+  if (id.startsWith('group_')) return true;
+  return getNestedValue(config, id + '.visible') !== false;
+}
+
+function toggleLayerVisibility(id) {
+  if (id.startsWith('shape_')) {
+    const sid = parseInt(id.split('_')[1]);
+    const s = (config.shapes || []).find(sh => sh.id === sid);
+    if (s) s.visible = s.visible === false ? true : false;
+  } else if (!id.startsWith('group_')) {
+    const cur = getNestedValue(config, id + '.visible');
+    setNestedValue(config, id + '.visible', cur === false ? true : false);
+  }
+  rebuild();
+}
+
+function moveLayerInOrder(id, direction) {
+  const order = config.layerOrder;
+  const idx = order.indexOf(id);
+  if (idx < 0) return;
+  const targetIdx = idx + direction;
+  if (targetIdx < 0 || targetIdx >= order.length) return;
+  [order[idx], order[targetIdx]] = [order[targetIdx], order[idx]];
+  rebuild();
+}
+
+function moveLayerToPosition(id, targetId, pos) {
+  const order = config.layerOrder;
+  const fromIdx = order.indexOf(id);
+  if (fromIdx < 0) return;
+  order.splice(fromIdx, 1);
+  let toIdx = order.indexOf(targetId);
+  if (toIdx < 0) { order.push(id); }
+  else {
+    if (pos === 'bottom') toIdx++;
+    order.splice(toIdx, 0, id);
+  }
+  rebuild();
+}
+
+function getSelectedLayerIds() {
+  return Array.from(_layerSelectedIds);
+}
+
+function groupSelectedLayers() {
+  const ids = getSelectedLayerIds().filter(id => !id.startsWith('group_'));
+  if (ids.length < 2) return;
+  const gid = 'group_' + Date.now();
+  const group = { id: gid, name: '编组 ' + ((config.groups || []).length + 1), children: ids, collapsed: false };
+  if (!config.groups) config.groups = [];
+  config.groups.push(group);
+  // 在 layerOrder 中，用 group 替换第一个元素的位置，移除其他元素
+  const order = config.layerOrder;
+  // 收集索引并从高到低排序，避免 splice 时索引偏移
+  const indices = ids.map(id => order.indexOf(id)).filter(i => i >= 0).sort((a, b) => b - a);
+  const firstIdx = indices[indices.length - 1];
+  indices.forEach(i => order.splice(i, 1));
+  order.splice(firstIdx, 0, gid);
+  _layerSelectedIds = new Set([gid]);
+  rebuild();
+}
+
+function ungroupLayer(gid) {
+  const group = (config.groups || []).find(g => g.id === gid);
+  if (!group) return;
+  const order = config.layerOrder;
+  const idx = order.indexOf(gid);
+  if (idx >= 0) {
+    order.splice(idx, 1, ...group.children);
+  }
+  config.groups = config.groups.filter(g => g.id !== gid);
+  _layerSelectedIds = new Set(group.children);
+  rebuild();
+}
+
+function deleteLayer(id) {
+  if (id.startsWith('shape_')) {
+    const sid = parseInt(id.split('_')[1]);
+    deleteShape(sid);
+  } else if (id.startsWith('group_')) {
+    ungroupLayer(id);
+  }
+}
+
+function buildUI() {
+  sidebar.innerHTML = '';
+
+  // ---- 图层面板 ----
+  const panel = document.createElement('div');
+  panel.className = 'layer-panel';
+
+  // 标题栏
+  const panelHeader = document.createElement('div');
+  panelHeader.className = 'layer-panel-header';
+  const title = document.createElement('span');
+  title.className = 'layer-panel-title';
+  title.textContent = '📑 图层';
+  panelHeader.appendChild(title);
+
+  const actions = document.createElement('div');
+  actions.className = 'layer-panel-actions';
+  // 添加形状按钮
+  const addBtn = document.createElement('button');
+  addBtn.className = 'layer-panel-btn';
+  addBtn.textContent = '+ 形状';
+  addBtn.onclick = (e) => {
+    e.stopPropagation();
+    showCtxMenu(e.clientX, e.clientY, [
+      { label: '⬟ 多边形', action: () => addShape('polygon') },
+      { label: '⌇ 折线', action: () => addShape('polyline') },
+      { label: '∿ 曲线', action: () => addShape('path') },
+    ]);
+  };
+  actions.appendChild(addBtn);
+
+  // 编组按钮
+  const groupBtn = document.createElement('button');
+  groupBtn.className = 'layer-panel-btn';
+  groupBtn.textContent = '编组';
+  groupBtn.disabled = _layerSelectedIds.size < 2;
+  groupBtn.onclick = () => groupSelectedLayers();
+  actions.appendChild(groupBtn);
+
+  panelHeader.appendChild(actions);
+  panel.appendChild(panelHeader);
+
+  // 图层列表
+  const layerList = document.createElement('div');
+  layerList.className = 'layer-list';
+
+  // 从顶到底渲染（反转 layerOrder，顶部图层在列表上方）
+  const order = config.layerOrder || [];
+  const groups = config.groups || [];
+  const groupedIds = new Set();
+  groups.forEach(g => g.children.forEach(id => groupedIds.add(id)));
+
+  // 构建显示列表（从顶到底）
+  const displayList = [];
+  for (let i = order.length - 1; i >= 0; i--) {
+    const id = order[i];
+    if (groupedIds.has(id)) continue; // 在编组内的跳过
+    displayList.push({ id, depth: 0 });
+    if (id.startsWith('group_')) {
+      const group = groups.find(g => g.id === id);
+      if (group && !group.collapsed) {
+        for (let j = group.children.length - 1; j >= 0; j--) {
+          displayList.push({ id: group.children[j], depth: 1, groupId: id });
+        }
+      }
+    }
+  }
+
+  displayList.forEach(item => {
+    const { id, depth, groupId } = item;
+    const meta = getLayerMeta(id);
+    const vis = isLayerVisible(id);
+    const isSelected = _layerSelectedIds.has(id);
+    const isGroup = id.startsWith('group_');
+
+    if (isGroup) {
+      const group = groups.find(g => g.id === id);
+      const row = document.createElement('div');
+      row.className = 'layer-group-header' + (isSelected ? ' selected' : '');
+      row.dataset.id = id;
+
+      // 拖拽手柄
+      const drag = document.createElement('span');
+      drag.className = 'layer-drag';
+      drag.textContent = '⠿';
+      drag.draggable = true;
+      drag.ondragstart = (e) => { _layerDragId = id; e.dataTransfer.effectAllowed = 'move'; };
+      row.appendChild(drag);
+
+      // 折叠箭头
+      const toggle = document.createElement('span');
+      toggle.className = 'layer-group-toggle' + (group.collapsed ? ' collapsed' : '');
+      toggle.textContent = '▼';
+      toggle.onclick = (e) => {
+        e.stopPropagation();
+        group.collapsed = !group.collapsed;
+        buildUI();
+      };
+      row.appendChild(toggle);
+
+      const icon = document.createElement('span');
+      icon.className = 'layer-group-icon';
+      icon.textContent = meta.icon;
+      row.appendChild(icon);
+
+      const name = document.createElement('span');
+      name.className = 'layer-group-name';
+      name.textContent = meta.name;
+      row.appendChild(name);
+
+      const count = document.createElement('span');
+      count.className = 'layer-group-count';
+      count.textContent = group.children.length;
+      row.appendChild(count);
+
+      row.onclick = (e) => {
+        if (e.ctrlKey || e.metaKey) {
+          if (_layerSelectedIds.has(id)) _layerSelectedIds.delete(id);
+          else _layerSelectedIds.add(id);
+        } else {
+          _layerSelectedIds = new Set([id]);
+        }
+        buildUI();
+      };
+
+      row.oncontextmenu = (e) => {
+        e.preventDefault();
+        if (!_layerSelectedIds.has(id)) _layerSelectedIds = new Set([id]);
+        showCtxMenu(e.clientX, e.clientY, [
+          { label: '📂 解散编组', action: () => ungroupLayer(id) },
+          '---',
+          { label: '⬆ 上移一层', action: () => moveLayerInOrder(id, 1) },
+          { label: '⬇ 下移一层', action: () => moveLayerInOrder(id, -1) },
+          '---',
+          { label: '置顶', action: () => { const o = config.layerOrder; const i = o.indexOf(id); if (i >= 0) { o.splice(i, 1); o.push(id); } rebuild(); } },
+          { label: '置底', action: () => { const o = config.layerOrder; const i = o.indexOf(id); if (i >= 0) { o.splice(i, 1); o.unshift(id); } rebuild(); } },
+        ]);
+      };
+
+      row.ondragover = (e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; };
+      row.ondrop = (e) => { e.preventDefault(); if (_layerDragId && _layerDragId !== id) moveLayerToPosition(_layerDragId, id, 'top'); _layerDragId = null; buildUI(); };
+
+      layerList.appendChild(row);
+
+      // 子元素
+      if (!group.collapsed) {
+        const childWrap = document.createElement('div');
+        childWrap.className = 'layer-group-children';
+        for (let j = group.children.length - 1; j >= 0; j--) {
+          const childId = group.children[j];
+          const childMeta = getLayerMeta(childId);
+          const childVis = isLayerVisible(childId);
+          const childSelected = _layerSelectedIds.has(childId);
+          const crow = buildLayerItem(childId, childMeta, childVis, childSelected, 1, id);
+          childWrap.appendChild(crow);
+        }
+        layerList.appendChild(childWrap);
+      }
+    } else {
+      const row = buildLayerItem(id, meta, vis, isSelected, depth, groupId);
+      layerList.appendChild(row);
+    }
+  });
+
+  panel.appendChild(layerList);
+  sidebar.appendChild(panel);
+}
+
+function buildLayerItem(id, meta, vis, isSelected, depth, groupId) {
+  const row = document.createElement('div');
+  row.className = 'layer-item' + (isSelected ? ' selected' : '') + (!vis ? ' hidden-layer' : '') + (depth > 0 ? ' in-group' : '');
+  row.dataset.id = id;
+
+  // 拖拽手柄
+  const drag = document.createElement('span');
+  drag.className = 'layer-drag';
+  drag.textContent = '⠿';
+  drag.draggable = true;
+  drag.ondragstart = (e) => { _layerDragId = id; e.dataTransfer.effectAllowed = 'move'; };
+  row.appendChild(drag);
+
+  // 图标
+  const icon = document.createElement('span');
+  icon.className = 'layer-icon';
+  icon.textContent = meta.icon;
+  row.appendChild(icon);
+
+  // 名称
+  const name = document.createElement('span');
+  name.className = 'layer-name';
+  name.textContent = meta.name;
+  row.appendChild(name);
+
+  // 可见性
+  const eye = document.createElement('span');
+  eye.className = 'layer-eye';
+  eye.textContent = vis ? '👁' : '◌';
+  eye.title = vis ? '隐藏' : '显示';
+  eye.onclick = (e) => { e.stopPropagation(); toggleLayerVisibility(id); };
+  row.appendChild(eye);
+
+  // 点击选中
+  row.onclick = (e) => {
+    if (e.target === eye) return;
+    if (e.ctrlKey || e.metaKey) {
+      if (_layerSelectedIds.has(id)) _layerSelectedIds.delete(id);
+      else _layerSelectedIds.add(id);
+    } else {
+      _layerSelectedIds = new Set([id]);
+    }
+    window.selectedElement = id;
+    openPropertyEditor(id);
+    buildUI();
+  };
+
+  // 右键菜单
+  row.oncontextmenu = (e) => {
+    e.preventDefault();
+    if (!_layerSelectedIds.has(id)) _layerSelectedIds = new Set([id]);
+    const items = [
+      { label: '⬆ 上移一层', action: () => moveLayerInOrder(id, 1) },
+      { label: '⬇ 下移一层', action: () => moveLayerInOrder(id, -1) },
+      '---',
+      { label: '置顶', action: () => { const o = config.layerOrder; const i = o.indexOf(id); if (i >= 0) { o.splice(i, 1); o.push(id); } rebuild(); } },
+      { label: '置底', action: () => { const o = config.layerOrder; const i = o.indexOf(id); if (i >= 0) { o.splice(i, 1); o.unshift(id); } rebuild(); } },
+    ];
+    if (groupId) {
+      items.push('---');
+      items.push({ label: '📂 从编组移出', action: () => {
+        const group = (config.groups || []).find(g => g.id === groupId);
+        if (group) {
+          group.children = group.children.filter(cid => cid !== id);
+          if (group.children.length < 2) ungroupLayer(groupId);
+          rebuild();
+        }
+      }});
+    }
+    if (_layerSelectedIds.size >= 2) {
+      items.push('---');
+      items.push({ label: '📁 编组选中项', action: () => groupSelectedLayers() });
+    }
+    if (id.startsWith('shape_')) {
+      items.push('---');
+      items.push({ label: '🗑 删除', danger: true, action: () => deleteLayer(id) });
+    }
+    showCtxMenu(e.clientX, e.clientY, items);
+  };
+
+  // 拖放
+  row.ondragover = (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    const rect = row.getBoundingClientRect();
+    const midY = rect.top + rect.height / 2;
+    if (e.clientY < midY) {
+      row.classList.add('drag-over-top');
+      row.classList.remove('drag-over-bottom');
+    } else {
+      row.classList.add('drag-over-bottom');
+      row.classList.remove('drag-over-top');
+    }
+  };
+  row.ondragleave = () => {
+    row.classList.remove('drag-over-top', 'drag-over-bottom');
+  };
+  row.ondrop = (e) => {
+    e.preventDefault();
+    row.classList.remove('drag-over-top', 'drag-over-bottom');
+    if (_layerDragId && _layerDragId !== id) {
+      const rect = row.getBoundingClientRect();
+      const pos = e.clientY < rect.top + rect.height / 2 ? 'top' : 'bottom';
+      moveLayerToPosition(_layerDragId, id, pos);
+    }
+    _layerDragId = null;
+  };
+
+  return row;
+}
+
+// 嵌套取值辅助
+function getNestedValue(obj, path) {
+  const keys = path.split('.');
+  let cur = obj;
+  for (const k of keys) {
+    if (cur == null) return undefined;
+    cur = cur[k];
+  }
+  return cur;
+}
+function setNestedValue(obj, path, val) {
+  const keys = path.split('.');
+  let cur = obj;
+  for (let i = 0; i < keys.length - 1; i++) {
+    if (cur[keys[i]] == null) cur[keys[i]] = {};
+    cur = cur[keys[i]];
+  }
+  cur[keys[keys.length - 1]] = val;
+}
+
+// ===================== 渐变色辅助 =====================
+function isGradient(v) { return v && typeof v === 'object' && v.mode && v.stops; }
+
+function defaultGradient() {
+  return { mode: 'linear', angle: 0, cx: 0.5, cy: 0.5, r: 0.5, stops: [{ pos: 0, color: '#000000' }, { pos: 1, color: '#ffffff' }] };
+}
+
+function gradientToCSS(v) {
+  if (!v || !v.stops || v.stops.length < 2) return '#000';
+  const stops = v.stops.map(s => `${s.color} ${(s.pos * 100).toFixed(1)}%`).join(', ');
+  if (v.mode === 'linear') return `linear-gradient(${v.angle || 0}deg, ${stops})`;
+  return `radial-gradient(circle, ${stops})`;
+}
+
+function colorToHex(c) {
+  if (!c) return '#000000';
+  if (c.startsWith('#')) return c.slice(0, 7);
+  const m = c.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+  if (m) return '#' + [m[1], m[2], m[3]].map(x => parseInt(x).toString(16).padStart(2, '0')).join('');
+  return '#000000';
+}
+
+function hexAlphaToRgba(hex, alpha) {
+  const r = parseInt(hex.slice(1, 3), 16), g = parseInt(hex.slice(3, 5), 16), b = parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+function rgbaAlpha(c) {
+  if (!c) return 1;
+  const m = c.match(/rgba?\([^)]*,\s*([\d.]+)\)/);
+  return m ? parseFloat(m[1]) : 1;
+}
+
+/**
+ * 将颜色值（字符串或渐变对象）解析为 canvas fillStyle
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {*} value - 字符串颜色 或 渐变对象 {mode, angle/cx/cy/r, stops}
+ * @param {number} w - 画布宽
+ * @param {number} h - 画布高
+ * @param {object} [bounds] - {x0,y0,x1,y1} 元素包围盒，用于线性渐变定位
+ */
+function resolveColor(ctx, value, w, h, bounds) {
+  if (typeof value === 'string') return value;
+  if (!isGradient(value) || value.stops.length < 2) return '#000';
+  if (value.mode === 'linear') {
+    const angle = (value.angle || 0) * Math.PI / 180;
+    let cx, cy, len;
+    if (bounds) {
+      cx = (bounds.x0 + bounds.x1) / 2; cy = (bounds.y0 + bounds.y1) / 2;
+      len = Math.hypot(bounds.x1 - bounds.x0, bounds.y1 - bounds.y0) / 2;
+    } else { cx = w / 2; cy = h / 2; len = Math.max(w, h) / 2; }
+    const grad = ctx.createLinearGradient(
+      cx - Math.cos(angle) * len, cy - Math.sin(angle) * len,
+      cx + Math.cos(angle) * len, cy + Math.sin(angle) * len
+    );
+    value.stops.forEach(s => grad.addColorStop(Math.max(0, Math.min(1, s.pos)), s.color));
+    return grad;
+  }
+  if (value.mode === 'radial') {
+    const cx = w * (value.cx != null ? value.cx : 0.5);
+    const cy = h * (value.cy != null ? value.cy : 0.5);
+    const r = Math.max(w, h) * (value.r != null ? value.r : 0.5);
+    const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+    value.stops.forEach(s => grad.addColorStop(Math.max(0, Math.min(1, s.pos)), s.color));
+    return grad;
+  }
+  return '#000';
+}
+
+/** 提取渐变对象的主色（第一个 stop），用于 shadowColor 等只接受纯色的场景 */
+function primaryColor(value) {
+  if (typeof value === 'string') return value;
+  if (isGradient(value) && value.stops.length > 0) return value.stops[0].color;
+  return '#000';
+}
+
+/**
+ * 创建渐变色选择器 UI
+ * @param {*} currentValue - 当前值（字符串或渐变对象）
+ * @param {boolean} withAlpha - 是否支持透明度
+ * @param {function} onChange - 值变更回调
+ */
+function createGradientPicker(currentValue, withAlpha, onChange) {
+  const wrap = document.createElement('div');
+  wrap.style.cssText = 'flex:1;';
+
+  // 解析当前值
+  let mode = 'solid';
+  let solidHex = '#000000', solidAlpha = 1;
+  let grad = defaultGradient();
+
+  if (isGradient(currentValue)) {
+    mode = currentValue.mode;
+    grad = JSON.parse(JSON.stringify(currentValue));
+    if (!grad.stops || grad.stops.length < 2) grad.stops = [{ pos: 0, color: '#000' }, { pos: 1, color: '#fff' }];
+  } else {
+    solidHex = colorToHex(currentValue);
+    solidAlpha = rgbaAlpha(currentValue);
+  }
+
+  // ---- 模式切换栏 ----
+  const modeBar = document.createElement('div');
+  modeBar.className = 'grad-mode-bar';
+  const modes = [['solid', '纯色'], ['linear', '线性渐变'], ['radial', '径向渐变']];
+  const modeBtns = modes.map(([m, lbl]) => {
+    const btn = document.createElement('button');
+    btn.className = 'grad-mode-btn' + (mode === m ? ' active' : '');
+    btn.textContent = lbl;
+    btn.onclick = () => { mode = m; refreshUI(); emit(); };
+    modeBar.appendChild(btn);
+    return btn;
+  });
+  wrap.appendChild(modeBar);
+
+  // ---- 纯色面板 ----
+  const solidPanel = document.createElement('div');
+  solidPanel.className = 'field-row';
+  const solidCp = document.createElement('input'); solidCp.type = 'color'; solidCp.value = solidHex;
+  solidCp.oninput = () => { solidHex = solidCp.value; emit(); };
+  solidPanel.appendChild(solidCp);
+  if (withAlpha) {
+    const solidAp = document.createElement('input'); solidAp.type = 'range'; solidAp.min = 0; solidAp.max = 1; solidAp.step = 0.01; solidAp.value = solidAlpha; solidAp.style.flex = '1';
+    const solidAv = document.createElement('span'); solidAv.className = 'val'; solidAv.textContent = solidAlpha.toFixed(2);
+    solidAp.oninput = () => { solidAlpha = parseFloat(solidAp.value); solidAv.textContent = solidAlpha.toFixed(2); emit(); };
+    solidPanel.appendChild(solidAp); solidPanel.appendChild(solidAv);
+  }
+  wrap.appendChild(solidPanel);
+
+  // ---- 渐变面板 ----
+  const gradPanel = document.createElement('div');
+  gradPanel.style.display = 'none';
+
+  // 预览条
+  const previewBar = document.createElement('div');
+  previewBar.className = 'grad-preview-bar';
+  gradPanel.appendChild(previewBar);
+
+  // 角度 / 半径
+  const ctrlRow = document.createElement('div'); ctrlRow.className = 'field-row'; ctrlRow.style.marginBottom = '6px';
+  const ctrlLabel = document.createElement('label'); ctrlLabel.style.minWidth = '40px';
+  const ctrlInput = document.createElement('input'); ctrlInput.type = 'range'; ctrlInput.style.flex = '1';
+  const ctrlVal = document.createElement('span'); ctrlVal.className = 'val';
+  ctrlInput.oninput = () => {
+    if (mode === 'linear') grad.angle = parseFloat(ctrlInput.value);
+    else grad.r = parseFloat(ctrlInput.value) / 100;
+    ctrlVal.textContent = ctrlInput.value;
+    updatePreview(); emit();
+  };
+  ctrlRow.appendChild(ctrlLabel); ctrlRow.appendChild(ctrlInput); ctrlRow.appendChild(ctrlVal);
+  gradPanel.appendChild(ctrlRow);
+
+  // 色标列表
+  const stopsDiv = document.createElement('div');
+  gradPanel.appendChild(stopsDiv);
+
+  // 添加色标按钮
+  const addBtn = document.createElement('button');
+  addBtn.className = 'grad-add-btn'; addBtn.textContent = '+ 添加色标';
+  addBtn.onclick = () => {
+    grad.stops.push({ pos: 0.5, color: '#ffffff' });
+    grad.stops.sort((a, b) => a.pos - b.pos);
+    renderStops(); updatePreview(); emit();
+  };
+  gradPanel.appendChild(addBtn);
+  wrap.appendChild(gradPanel);
+
+  function renderStops() {
+    stopsDiv.innerHTML = '';
+    grad.stops.forEach((s, i) => {
+      const row = document.createElement('div'); row.className = 'grad-stop-row';
+      const cp = document.createElement('input'); cp.type = 'color'; cp.value = colorToHex(s.color);
+      cp.oninput = () => { s.color = cp.value; updatePreview(); emit(); };
+      const pos = document.createElement('input'); pos.type = 'range'; pos.min = 0; pos.max = 1; pos.step = 0.01; pos.value = s.pos;
+      const pv = document.createElement('span'); pv.className = 'val'; pv.textContent = s.pos.toFixed(2);
+      pos.oninput = () => { s.pos = parseFloat(pos.value); pv.textContent = s.pos.toFixed(2); updatePreview(); emit(); };
+      row.appendChild(cp); row.appendChild(pos); row.appendChild(pv);
+      if (grad.stops.length > 2) {
+        const del = document.createElement('span'); del.className = 'grad-stop-del'; del.textContent = '✕';
+        del.onclick = () => { grad.stops.splice(i, 1); renderStops(); updatePreview(); emit(); };
+        row.appendChild(del);
+      }
+      stopsDiv.appendChild(row);
+    });
+  }
+
+  function updatePreview() {
+    previewBar.style.background = gradientToCSS(grad);
+  }
+
+  function refreshUI() {
+    modeBtns.forEach((btn, i) => btn.classList.toggle('active', modes[i][0] === mode));
+    solidPanel.style.display = mode === 'solid' ? 'flex' : 'none';
+    gradPanel.style.display = mode !== 'solid' ? 'block' : 'none';
+    if (mode !== 'solid') {
+      ctrlLabel.textContent = mode === 'linear' ? '角度' : '半径';
+      ctrlInput.max = mode === 'linear' ? 360 : 100;
+      ctrlInput.value = mode === 'linear' ? (grad.angle || 0) : ((grad.r || 0.5) * 100);
+      ctrlVal.textContent = ctrlInput.value;
+      renderStops(); updatePreview();
+    }
+  }
+
+  function emit() {
+    if (mode === 'solid') {
+      onChange(withAlpha ? hexAlphaToRgba(solidHex, solidAlpha) : solidHex);
+    } else {
+      const out = { mode, stops: grad.stops.map(s => ({ pos: s.pos, color: s.color })) };
+      if (mode === 'linear') out.angle = grad.angle || 0;
+      else { out.cx = grad.cx || 0.5; out.cy = grad.cy || 0.5; out.r = grad.r || 0.5; }
+      onChange(out);
+    }
+  }
+
+  refreshUI();
+  return wrap;
+}
+
+let _shapeIdCounter = 0;
+function addShape(stype) {
+  if (!config.shapes) config.shapes = [];
+  const id = 's' + (++_shapeIdCounter) + '_' + Date.now().toString(36);
+  const defaults = {
+    polygon: {
+      name: '多边形 ' + (config.shapes.length + 1),
+      type: 'polygon', visible: true, closed: true,
+      fill: 'rgba(88, 166, 255, 0.3)', stroke: 'rgba(88, 166, 255, 0.8)', strokeWidth: 2,
+      data: [[0.3,0.3],[0.5,0.2],[0.7,0.3],[0.6,0.5],[0.4,0.5]]
+    },
+    polyline: {
+      name: '折线 ' + (config.shapes.length + 1),
+      type: 'polyline', visible: true, closed: false,
+      fill: 'none', stroke: 'rgba(255, 107, 44, 0.8)', strokeWidth: 2,
+      data: [[0.2,0.4],[0.4,0.3],[0.6,0.4],[0.8,0.35]]
+    },
+    path: {
+      name: '曲线 ' + (config.shapes.length + 1),
+      type: 'path', visible: true, closed: false,
+      fill: 'none', stroke: 'rgba(77, 232, 214, 0.8)', strokeWidth: 3,
+      data: [[0.2,0.5],[0.4,0.3],[0.6,0.5],[0.8,0.4]]
+    }
+  };
+  config.shapes.push({ id, ...defaults[stype] });
+  // 添加到图层顺序末尾（最顶层）
+  if (!config.layerOrder) config.layerOrder = [];
+  config.layerOrder.push('shape_' + id);
+  buildUI();
+  rebuild();
+  // 自动打开编辑
+  selectedElement = 'shape_' + id;
+  _layerSelectedIds = new Set(['shape_' + id]);
+  openPropertyEditor('shape_' + id);
+}
+
+function deleteShape(sid) {
+  config.shapes = (config.shapes || []).filter(s => s.id !== sid);
+  // 从图层顺序中移除
+  if (config.layerOrder) {
+    config.layerOrder = config.layerOrder.filter(id => id !== 'shape_' + sid);
+  }
+  // 从编组中移除
+  if (config.groups) {
+    config.groups.forEach(g => { g.children = g.children.filter(id => id !== 'shape_' + sid); });
+    config.groups = config.groups.filter(g => g.children.length >= 2);
+  }
+  if (selectedElement === 'shape_' + sid) {
+    selectedElement = null;
+    _layerSelectedIds.delete('shape_' + sid);
+    closePropertyEditor();
+  }
+  buildUI();
+  rebuild();
+}
+
+// ===================== 可配置 DynamicBG =====================
+class EditableDynamicBG {
+  constructor(cfg) {
+    this.cfg = cfg;
+    this.w = cfg.canvas.width;
+    this.h = cfg.canvas.height;
+    this.t = 0;
+
+    this.staticCanvas = document.createElement('canvas');
+    this.staticCanvas.width = this.w;
+    this.staticCanvas.height = this.h;
+    this.sCtx = this.staticCanvas.getContext('2d');
+    this._renderStatic();
+
+    this.jellyfish = this._createJellyfish();
+    this.particles = this._createParticles(cfg.particles.count);
+    this.magmaParticles = this._createMagmaParticles();
+    this.riverGlints = this._createRiverGlints();
+    this.mountains = this._createMountains();
+  }
+
+  _createJellyfish() {
+    const c = this.cfg.jellyfish;
+    return {
+      x: this.w * c.x, y: this.h * c.y, baseY: this.h * c.y,
+      radiusX: c.radiusX, radiusY: c.radiusY,
+      phase: 0,
+      tentacles: Array.from({ length: c.tentacleCount }, (_, i) => ({
+        offsetX: (i - (c.tentacleCount-1)/2) * c.tentacleSpacing,
+        length: c.tentacleLenMin + Math.random() * (c.tentacleLenMax - c.tentacleLenMin),
+        waveFreq: c.tentacleWaveFreqMin + Math.random() * (c.tentacleWaveFreqMax - c.tentacleWaveFreqMin),
+        waveAmp: c.tentacleWaveAmpMin + Math.random() * (c.tentacleWaveAmpMax - c.tentacleWaveAmpMin),
+        phase: Math.random() * Math.PI * 2,
+      })),
+    };
+  }
+
+  _createParticles(count) {
+    const c = this.cfg.particles;
+    return Array.from({ length: count }, () => ({
+      x: Math.random() * this.w, y: Math.random() * this.h,
+      vx: c.vxMin + Math.random() * (c.vxMax - c.vxMin),
+      vy: c.vyMin + Math.random() * (c.vyMax - c.vyMin),
+      r: c.rMin + Math.random() * (c.rMax - c.rMin),
+      baseAlpha: c.alphaMin + Math.random() * (c.alphaMax - c.alphaMin),
+      blinkFreq: c.blinkFreqMin + Math.random() * (c.blinkFreqMax - c.blinkFreqMin),
+      blinkPhase: Math.random() * Math.PI * 2,
+      color: c.colors[Math.floor(Math.random() * c.colors.length)],
+    }));
+  }
+
+  _createMagmaParticles() {
+    const c = this.cfg.magma;
+    const vents = [
+      { x: this.w * 0.113, y: this.h * 0.535, intensity: c.ventIntensity[0] },
+      { x: this.w * 0.193, y: this.h * 0.57, intensity: c.ventIntensity[1] },
+    ];
+    const particles = [];
+    vents.forEach((vent) => {
+      for (let i = 0; i < c.countPerVent; i++) {
+        particles.push({
+          ventX: vent.x, ventY: vent.y,
+          x: vent.x + (Math.random() - 0.5) * 10,
+          y: vent.y + Math.random() * 5,
+          vx: c.vxMin + Math.random() * (c.vxMax - c.vxMin),
+          vy: c.vyMin + Math.random() * (c.vyMax - c.vyMin),
+          life: Math.random(),
+          decay: c.decayMin + Math.random() * (c.decayMax - c.decayMin),
+          r: c.rMin + Math.random() * (c.rMax - c.rMin),
+          maxR: c.maxRMin + Math.random() * (c.maxRMax - c.maxRMin),
+          intensity: vent.intensity,
+        });
+      }
+    });
+    return particles;
+  }
+
+  _createRiverGlints() {
+    const path = this._getRiverPath();
+    const c = this.cfg.glints;
+    const glints = [];
+    for (let i = 0; i < c.count; i++) {
+      const t = Math.random();
+      const pos = this._getPointOnPath(path, t);
+      glints.push({
+        t, offsetY: (Math.random() - 0.5) * 20,
+        r: c.rMin + Math.random() * (c.rMax - c.rMin),
+        phase: Math.random() * Math.PI * 2,
+        freq: c.freqMin + Math.random() * (c.freqMax - c.freqMin),
+        alpha: c.alphaMin + Math.random() * (c.alphaMax - c.alphaMin),
+      });
+    }
+    return glints;
+  }
+
+  _getRiverPath() {
+    return this.cfg.river.path.map(p => ({ x: p[0] * this.w, y: p[1] * this.h }));
+  }
+
+  _getPointOnPath(path, t) {
+    const idx = t * (path.length - 1);
+    const i = Math.floor(idx); const f = idx - i;
+    if (i >= path.length - 1) return path[path.length - 1];
+    const a = path[i], b = path[i + 1];
+    return { x: a.x + (b.x - a.x) * f, y: a.y + (b.y - a.y) * f };
+  }
+
+  _createMountains() {
+    const c = this.cfg.mountains;
+    // 若配置中已有固定轮廓点则直接用，否则按参数生成并固化到 config
+    if (!c.farPoints || c.farPoints.length === 0) {
+      c.farPoints = this._generateMountainLineRel(c.farBaseY, c.farRoughness);
+    }
+    if (!c.midPoints || c.midPoints.length === 0) {
+      c.midPoints = this._generateMountainLineRel(c.midBaseY, c.midRoughness);
+    }
+    return {
+      far: { points: c.farPoints.map(p => ({ x: p[0] * this.w, y: p[1] * this.h })), opacity: c.farOpacity },
+      mid: { points: c.midPoints.map(p => ({ x: p[0] * this.w, y: p[1] * this.h })), opacity: c.midOpacity },
+    };
+  }
+
+  _generateMountainLineRel(baseYRel, roughness) {
+    const h = this.h;
+    const baseY = h * baseYRel;
+    const points = []; const steps = this.cfg.mountains.steps;
+    for (let i = 0; i <= steps; i++) {
+      const xRel = i / steps;
+      const yPx = baseY - Math.random() * roughness - (i % 3 === 0 ? 30 : 0);
+      points.push([xRel, Math.max(0, Math.min(1, yPx / h))]);
+    }
+    return points;
+  }
+
+  _renderStatic() {
+    const ctx = this.sCtx; const w = this.w, h = this.h;
+    ctx.clearRect(0, 0, w, h);
+    // 按图层顺序渲染所有静态元素
+    const order = this.cfg.layerOrder || [];
+    const orderSet = new Set(order);
+    for (const id of order) {
+      this._renderStaticLayer(ctx, id);
+    }
+    // 渲染不在 layerOrder 中的 shapes（兼容旧配置）
+    const shapes = this.cfg.shapes || [];
+    for (const s of shapes) {
+      const sid = 'shape_' + s.id;
+      if (!orderSet.has(sid) && s.visible !== false && s.data && s.data.length > 0) {
+        this._drawSingleShape(ctx, s, false);
+      }
+    }
+  }
+
+  _renderStaticLayer(ctx, id) {
+    const w = this.w, h = this.h; const c = this.cfg;
+    switch(id) {
+      case 'background':
+        if (c.background.visible) {
+          const bg = ctx.createRadialGradient(w * c.background.centerX, h * c.background.centerY, 0, w * c.background.centerX, h * c.background.centerY, h * c.background.radius);
+          bg.addColorStop(0, primaryColor(c.background.color0));
+          bg.addColorStop(0.4, primaryColor(c.background.color1));
+          bg.addColorStop(1, primaryColor(c.background.color2));
+          ctx.fillStyle = bg; ctx.fillRect(0, 0, w, h);
+        } else {
+          ctx.fillStyle = '#000'; ctx.fillRect(0, 0, w, h);
+        }
+        break;
+      case 'ambient':
+        if (c.ambient.visible) {
+          const amb = ctx.createRadialGradient(w * c.ambient.centerX, h * c.ambient.centerY, 0, w * c.ambient.centerX, h * c.ambient.centerY, h * c.ambient.radius);
+          amb.addColorStop(0, resolveColor(ctx, c.ambient.color0, w, h));
+          amb.addColorStop(1, resolveColor(ctx, c.ambient.color1, w, h));
+          ctx.fillStyle = amb; ctx.fillRect(0, 0, w, h);
+        }
+        break;
+      case 'river':
+        if (c.river.visible) {
+          ctx.save();
+          ctx.shadowColor = primaryColor(c.river.shadowColor);
+          ctx.shadowBlur = c.river.shadowBlur;
+          const riverPath = this._getRiverPath();
+          ctx.beginPath();
+          ctx.moveTo(riverPath[0].x, riverPath[0].y);
+          for (let i = 1; i < riverPath.length; i++) {
+            const cp1x = riverPath[i - 1].x + (riverPath[i].x - riverPath[i - 1].x) * 0.5;
+            const cp1y = riverPath[i - 1].y;
+            const cp2x = riverPath[i].x - (riverPath[i].x - riverPath[i - 1].x) * 0.5;
+            const cp2y = riverPath[i].y;
+            ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, riverPath[i].x, riverPath[i].y);
+          }
+          ctx.strokeStyle = resolveColor(ctx, c.river.stroke0, w, h); ctx.lineWidth = c.river.width0; ctx.stroke();
+          ctx.strokeStyle = resolveColor(ctx, c.river.stroke1, w, h); ctx.lineWidth = c.river.width1; ctx.stroke();
+          ctx.restore();
+        }
+        break;
+      case 'leftRock':
+        if (c.leftRock.visible) {
+          ctx.fillStyle = resolveColor(ctx, c.leftRock.fill, w, h);
+          ctx.beginPath();
+          const lp = c.leftRock.points;
+          ctx.moveTo(lp[0][0]*w, lp[0][1]*h);
+          for (let i=1;i<lp.length;i++) ctx.lineTo(lp[i][0]*w, lp[i][1]*h);
+          ctx.closePath(); ctx.fill();
+          ctx.strokeStyle = resolveColor(ctx, c.leftRock.highlight, w, h);
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          for (let i=1;i<=5;i++) ctx.lineTo(lp[i][0]*w, lp[i][1]*h);
+          ctx.stroke();
+        }
+        break;
+      case 'vents':
+        if (c.vents.visible) {
+          c.vents.pipes.forEach(p => {
+            const grad = ctx.createLinearGradient((p.x-p.wBot)*w, 0, (p.x+p.wTop)*w, 0);
+            c.vents.pipeGrad.forEach((col, i) => grad.addColorStop(i/(c.vents.pipeGrad.length-1), primaryColor(col)));
+            ctx.fillStyle = grad;
+            ctx.beginPath();
+            ctx.moveTo((p.x - p.wBot)*w, (p.y + p.h)*h);
+            ctx.lineTo((p.x - p.wTop)*w, p.y*h);
+            ctx.lineTo((p.x + p.wTop)*w, p.y*h);
+            ctx.lineTo((p.x + p.wBot)*w, (p.y + p.h)*h);
+            ctx.closePath(); ctx.fill();
+            ctx.fillStyle = resolveColor(ctx, c.vents.topFill, w, h);
+            ctx.beginPath();
+            ctx.ellipse(p.x*w, p.y*h, p.wTop*w, p.wTop*h*0.6, 0, 0, Math.PI*2);
+            ctx.fill();
+          });
+          ctx.save();
+          ctx.shadowColor = primaryColor(c.vents.crackGlow);
+          ctx.shadowBlur = 6;
+          ctx.strokeStyle = resolveColor(ctx, c.vents.crackColor, w, h);
+          ctx.lineWidth = c.vents.crackWidth;
+          ctx.beginPath();
+          c.vents.cracks.forEach((pt, i) => {
+            if (i===0) ctx.moveTo(pt[0]*w, pt[1]*h); else ctx.lineTo(pt[0]*w, pt[1]*h);
+          });
+          ctx.stroke();
+          ctx.strokeStyle = resolveColor(ctx, c.vents.crack2Color, w, h);
+          ctx.lineWidth = c.vents.crackWidth * 0.75;
+          ctx.beginPath();
+          c.vents.cracks2.forEach((pt, i) => {
+            if (i===0) ctx.moveTo(pt[0]*w, pt[1]*h); else ctx.lineTo(pt[0]*w, pt[1]*h);
+          });
+          ctx.stroke();
+          ctx.restore();
+        }
+        break;
+      case 'rightRock':
+        if (c.rightRock.visible) {
+          ctx.fillStyle = resolveColor(ctx, c.rightRock.fill, w, h);
+          ctx.beginPath();
+          const rp = c.rightRock.points;
+          ctx.moveTo(rp[0][0]*w, rp[0][1]*h);
+          for (let i=1;i<rp.length;i++) ctx.lineTo(rp[i][0]*w, rp[i][1]*h);
+          ctx.closePath(); ctx.fill();
+        }
+        break;
+      case 'fog':
+        if (c.fog.visible) {
+          const fog = ctx.createLinearGradient(0, h, 0, 0);
+          fog.addColorStop(0, resolveColor(ctx, c.fog.color0, w, h));
+          fog.addColorStop(0.4, resolveColor(ctx, c.fog.color1, w, h));
+          fog.addColorStop(1, resolveColor(ctx, c.fog.color2, w, h));
+          ctx.fillStyle = fog; ctx.fillRect(0, 0, w, h);
+        }
+        break;
+      case 'vignette':
+        if (c.vignette.visible) {
+          const vig = ctx.createLinearGradient(0, 0, 0, h * 0.3);
+          vig.addColorStop(0, resolveColor(ctx, c.vignette.color0, w, h));
+          vig.addColorStop(1, resolveColor(ctx, c.vignette.color1, w, h));
+          ctx.fillStyle = vig; ctx.fillRect(0, 0, w, h);
+        }
+        break;
+      default:
+        // 处理 shapes 和 groups
+        if (id.startsWith('shape_')) {
+          const shapeId = parseInt(id.split('_')[1]);
+          const shape = (c.shapes || []).find(s => s.id === shapeId);
+          if (shape && shape.visible !== false && shape.data && shape.data.length > 0) {
+            this._drawSingleShape(ctx, shape, false);
+          }
+        } else if (id.startsWith('group_')) {
+          const group = (c.groups || []).find(g => g.id === id);
+          if (group) {
+            for (const childId of group.children) {
+              this._renderStaticLayer(ctx, childId);
+            }
+          }
+        }
+        break;
+    }
+  }
+
+
+
+  update(dt) {
+    this.t += dt;
+    const c = this.cfg.jellyfish;
+    const j = this.jellyfish;
+    j.y = j.baseY + Math.sin(this.t * c.bobSpeed) * c.bobAmp;
+    j.phase += dt * 1.2;
+
+    for (const p of this.particles) {
+      p.x += p.vx; p.y += p.vy;
+      if (p.x < -10) p.x = this.w + 10; if (p.x > this.w + 10) p.x = -10;
+      if (p.y < -10) p.y = this.h + 10; if (p.y > this.h + 10) p.y = -10;
+    }
+
+    for (const p of this.magmaParticles) {
+      p.x += p.vx + Math.sin(this.t * 2 + p.life * 10) * 0.3;
+      p.y += p.vy;
+      p.life -= p.decay;
+      if (p.life <= 0) {
+        p.life = 1;
+        p.x = p.ventX + (Math.random() - 0.5) * 8;
+        p.y = p.ventY;
+        p.vx = this.cfg.magma.vxMin + Math.random() * (this.cfg.magma.vxMax - this.cfg.magma.vxMin);
+        p.vy = this.cfg.magma.vyMin + Math.random() * (this.cfg.magma.vyMax - this.cfg.magma.vyMin);
+      }
+    }
+
+    for (const g of this.riverGlints) g.phase += dt * g.freq;
+  }
+
+  draw(ctx) {
+    ctx.drawImage(this.staticCanvas, 0, 0);
+    // 按图层顺序渲染动态元素
+    const order = this.cfg.layerOrder || [];
+    for (const id of order) {
+      this._renderDynamicLayer(ctx, id);
+    }
+    this._drawSelection(ctx);
+    this._drawAxisHandles(ctx);
+    this._drawPathHandles(ctx);
+  }
+
+  _renderDynamicLayer(ctx, id) {
+    const c = this.cfg;
+    switch(id) {
+      case 'mountains': if (c.mountains.visible) this._drawMountains(ctx); break;
+      case 'jellyfish': if (c.jellyfish.visible) this._drawJellyfish(ctx); break;
+      case 'particles': if (c.particles.visible) this._drawParticles(ctx); break;
+      case 'magma': if (c.magma.visible) this._drawMagmaParticles(ctx); break;
+      case 'glints': if (c.glints.visible && c.river.visible) this._drawRiverGlints(ctx); break;
+      default:
+        if (id.startsWith('group_')) {
+          const group = (c.groups || []).find(g => g.id === id);
+          if (group) {
+            for (const childId of group.children) {
+              this._renderDynamicLayer(ctx, childId);
+            }
+          }
+        }
+        break;
+    }
+  }
+
+  _drawMountains(ctx) {
+    const c = this.cfg.mountains;
+    const sway = Math.sin(this.t * c.swaySpeed) * c.swayAmp;
+    ctx.save(); ctx.translate(sway, 0);
+    ctx.fillStyle = `rgba(10, 31, 46, ${this.mountains.far.opacity})`;
+    ctx.beginPath();
+    ctx.moveTo(0, this.h);
+    this.mountains.far.points.forEach(p => ctx.lineTo(p.x, p.y));
+    ctx.lineTo(this.w, this.h); ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
+
+  _drawShapes(ctx, isHighlight = false) {
+    const shapes = this.cfg.shapes || [];
+    for (const s of shapes) {
+      if (!s.visible) continue;
+      if (!s.data || s.data.length === 0) continue;
+      this._drawSingleShape(ctx, s, isHighlight);
+    }
+  }
+
+  _drawSingleShape(ctx, s, isHighlight = false) {
+    const w = this.w, h = this.h;
+    ctx.save();
+    // 应用元素透明度
+    if (s.opacity !== undefined && s.opacity < 1) {
+      ctx.globalAlpha = s.opacity;
+    }
+    if (isHighlight) {
+      ctx.strokeStyle = '#58a6ff';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([5, 5]);
+    } else {
+      if (s.fill && s.fill !== 'none') ctx.fillStyle = resolveColor(ctx, s.fill, w, h);
+      if (s.stroke && s.stroke !== 'none') {
+        ctx.strokeStyle = resolveColor(ctx, s.stroke, w, h);
+        ctx.lineWidth = s.strokeWidth || 1;
+      }
+    }
+
+    if (s.type === 'path' && s.data.length >= 2) {
+      const pts = s.data.map(p => ({ x: p[0] * w, y: p[1] * h }));
+      ctx.beginPath();
+      ctx.moveTo(pts[0].x, pts[0].y);
+      for (let i = 1; i < pts.length; i++) {
+        const cp1x = pts[i - 1].x + (pts[i].x - pts[i - 1].x) * 0.5;
+        const cp1y = pts[i - 1].y;
+        const cp2x = pts[i].x - (pts[i].x - pts[i - 1].x) * 0.5;
+        const cp2y = pts[i].y;
+        ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, pts[i].x, pts[i].y);
+      }
+      if (!isHighlight && s.fill && s.fill !== 'none') ctx.fill();
+      if (!isHighlight && s.stroke && s.stroke !== 'none') ctx.stroke();
+      else if (isHighlight) ctx.stroke();
+    } else {
+      ctx.beginPath();
+      s.data.forEach((pt, i) => {
+        const cx = pt[0] * w, cy = pt[1] * h;
+        if (i === 0) ctx.moveTo(cx, cy); else ctx.lineTo(cx, cy);
+      });
+      if (s.closed && s.type !== 'polyline') ctx.closePath();
+      if (!isHighlight && s.fill && s.fill !== 'none' && (s.closed || s.type === 'polygon')) ctx.fill();
+      if (!isHighlight && s.stroke && s.stroke !== 'none') ctx.stroke();
+      else if (isHighlight) ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  _drawRiverGlints(ctx) {
+    const path = this._getRiverPath();
+    ctx.save(); ctx.globalCompositeOperation = 'screen';
+    for (const g of this.riverGlints) {
+      const pos = this._getPointOnPath(path, g.t);
+      const alpha = g.alpha * (0.5 + 0.5 * Math.sin(g.phase));
+      const r = g.r * (0.8 + 0.2 * Math.sin(g.phase * 1.3));
+      ctx.fillStyle = `rgba(168, 255, 240, ${alpha})`;
+      ctx.beginPath(); ctx.arc(pos.x, pos.y + g.offsetY, r, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  _drawMagmaParticles(ctx) {
+    ctx.save(); ctx.globalCompositeOperation = 'screen';
+    for (const p of this.magmaParticles) {
+      const alpha = p.life * p.intensity;
+      const r = p.r + (1 - p.life) * (p.maxR - p.r);
+      const warm = Math.floor(255 * p.life);
+      ctx.fillStyle = `rgba(255, ${Math.floor(100 + warm * 0.6)}, ${Math.floor(60 * p.life)}, ${alpha})`;
+      ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  _drawJellyfish(ctx) {
+    const j = this.jellyfish; const c = this.cfg.jellyfish;
+    const breathe = 1 + Math.sin(this.t * c.breatheSpeed) * c.breatheAmp;
+    ctx.save(); ctx.translate(j.x, j.y); ctx.scale(breathe, breathe);
+
+    ctx.save();
+    ctx.shadowColor = primaryColor(c.glowColor); ctx.shadowBlur = c.glowBlur;
+    const gg = ctx.createRadialGradient(0, 0, 0, 0, 0, j.radiusX);
+    gg.addColorStop(0, 'rgba(168, 255, 240, 0.4)');
+    gg.addColorStop(0.5, 'rgba(107, 255, 232, 0.15)');
+    gg.addColorStop(1, 'rgba(77, 232, 214, 0)');
+    ctx.fillStyle = gg;
+    ctx.beginPath(); ctx.ellipse(0, 0, j.radiusX, j.radiusY, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+
+    for (let i = 0; i < j.tentacles.length; i++) {
+      const t = j.tentacles[i];
+      ctx.save();
+      ctx.strokeStyle = i % 2 === 0 ? 'rgba(107, 255, 232, 0.45)' : 'rgba(168, 255, 240, 0.55)';
+      ctx.lineWidth = i % 2 === 0 ? 2.5 : 2;
+      ctx.beginPath(); ctx.moveTo(t.offsetX, 15);
+      const segs = 8;
+      for (let s = 1; s <= segs; s++) {
+        const sy = 15 + (t.length * s) / segs;
+        const wave = Math.sin(this.t * t.waveFreq + t.phase + s * 0.5) * t.waveAmp * (s / segs);
+        ctx.lineTo(t.offsetX + wave, sy);
+      }
+      ctx.stroke(); ctx.restore();
+    }
+
+    for (let i = 0; i < j.tentacles.length; i++) {
+      const t = j.tentacles[i];
+      const sy = 15 + t.length * 0.6;
+      const wave = Math.sin(this.t * t.waveFreq + t.phase + 3) * t.waveAmp * 0.6;
+      ctx.fillStyle = 'rgba(168, 255, 240, 0.6)';
+      ctx.beginPath(); ctx.arc(t.offsetX + wave, sy, 2, 0, Math.PI * 2); ctx.fill();
+    }
+
+    const bg = ctx.createLinearGradient(0, -j.radiusY, 0, 22);
+    c.bodyGrad.forEach((col, i) => bg.addColorStop(i/(c.bodyGrad.length-1), col));
+    ctx.fillStyle = bg;
+    ctx.beginPath();
+    ctx.moveTo(-35, 0);
+    ctx.bezierCurveTo(-35, -35, -20, -55, 0, -55);
+    ctx.bezierCurveTo(20, -55, 35, -35, 35, 0);
+    ctx.bezierCurveTo(35, 10, 20, 22, 0, 22);
+    ctx.bezierCurveTo(-20, 22, -35, 10, -35, 0);
+    ctx.closePath(); ctx.fill();
+
+    ctx.strokeStyle = 'rgba(168, 255, 240, 0.35)'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(-20, -10); ctx.quadraticCurveTo(-10, -25, 0, -30); ctx.quadraticCurveTo(10, -25, 20, -10); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-15, 0); ctx.quadraticCurveTo(-5, -15, 0, -20); ctx.quadraticCurveTo(5, -15, 15, 0); ctx.stroke();
+
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
+    ctx.beginPath(); ctx.ellipse(-10, -35, 8, 4, -0.26, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+
+  _drawParticles(ctx) {
+    ctx.save(); ctx.globalCompositeOperation = 'screen';
+    for (const p of this.particles) {
+      const alpha = p.baseAlpha * (0.5 + 0.5 * Math.sin(this.t * p.blinkFreq + p.blinkPhase));
+      ctx.fillStyle = primaryColor(p.color); ctx.globalAlpha = alpha;
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.globalAlpha = 1; ctx.restore();
+  }
+
+  // ==================== 点击检测 & 选中高亮 ====================
+  _pointInPolygon(x, y, poly) {
+    let inside = false;
+    for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+      const xi = poly[i][0], yi = poly[i][1];
+      const xj = poly[j][0], yj = poly[j][1];
+      if (((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi))
+        inside = !inside;
+    }
+    return inside;
+  }
+
+  _pointNearPath(x, y, path, threshold) {
+    for (let i = 0; i < path.length - 1; i++) {
+      const a = path[i], b = path[i + 1];
+      const len2 = (b.x - a.x)**2 + (b.y - a.y)**2;
+      if (len2 === 0) {
+        if ((x - a.x)**2 + (y - a.y)**2 <= threshold**2) return true;
+        continue;
+      }
+      let t = ((x - a.x) * (b.x - a.x) + (y - a.y) * (b.y - a.y)) / len2;
+      t = Math.max(0, Math.min(1, t));
+      const dx = x - (a.x + t * (b.x - a.x));
+      const dy = y - (a.y + t * (b.y - a.y));
+      if (dx * dx + dy * dy <= threshold * threshold) return true;
+    }
+    return false;
+  }
+
+  _pointNearPolyline(x, y, points, threshold) {
+    const pts = points.map(p => ({ x: p[0] * this.w, y: p[1] * this.h }));
+    return this._pointNearPath(x, y, pts, threshold);
+  }
+
+  hitTest(mx, my) {
+    const x = mx, y = my;
+    const hits = [];
+    const c = this.cfg;
+
+    // 1. 水母
+    if (c.jellyfish.visible) {
+      const j = this.jellyfish;
+      const jdx = x - j.x, jdy = y - j.y;
+      if ((jdx*jdx)/(j.radiusX*j.radiusX*2) + (jdy*jdy)/(j.radiusY*j.radiusY*2) <= 1) {
+        hits.push({ type: 'jellyfish', label: '水母', path: 'jellyfish' });
+      }
+    }
+
+    // 2. 右侧岩石
+    if (c.rightRock.visible) {
+      const rp = c.rightRock.points.map(p => [p[0]*this.w, p[1]*this.h]);
+      if (this._pointInPolygon(x, y, rp)) {
+        hits.push({ type: 'rightRock', label: '右侧岩石', path: 'rightRock' });
+      }
+    }
+
+    // 3. 左侧岩石
+    if (c.leftRock.visible) {
+      const lp = c.leftRock.points.map(p => [p[0]*this.w, p[1]*this.h]);
+      if (this._pointInPolygon(x, y, lp)) {
+        hits.push({ type: 'leftRock', label: '左侧岩石', path: 'leftRock' });
+      }
+    }
+
+    // 4. 烟囱管道 + 裂缝
+    if (c.vents.visible) {
+      for (const p of c.vents.pipes) {
+        const px = p.x * this.w, py = p.y * this.h;
+        const pw = Math.max(p.wTop, p.wBot) * this.w * 1.5;
+        const ph = p.h * this.h * 1.2;
+        if (x >= px - pw && x <= px + pw && y >= py - ph * 0.1 && y <= py + ph) {
+          hits.push({ type: 'vents', label: '烟囱 & 裂缝', path: 'vents' });
+          break;
+        }
+      }
+      if (!hits.find(h => h.type === 'vents') &&
+          (this._pointNearPolyline(x, y, c.vents.cracks, 15) ||
+           this._pointNearPolyline(x, y, c.vents.cracks2, 12))) {
+        hits.push({ type: 'vents', label: '烟囱 & 裂缝', path: 'vents' });
+      }
+    }
+
+    // 5. 河流
+    if (c.river.visible) {
+      const riverPath = this._getRiverPath();
+      if (this._pointNearPath(x, y, riverPath, 40)) {
+        hits.push({ type: 'river', label: '发光河流', path: 'river' });
+      }
+    }
+
+    // 6. 自定义几何体（按倒序，后画的在上面优先命中，跳过锁定元素）
+    const shapes = c.shapes || [];
+    for (let i = shapes.length - 1; i >= 0; i--) {
+      const s = shapes[i];
+      if (!s.visible || s.locked || !s.data || s.data.length === 0) continue;
+      let hit = false;
+      if (s.type === 'polygon' || (s.closed && s.type !== 'polyline')) {
+        const pts = s.data.map(p => [p[0]*this.w, p[1]*this.h]);
+        hit = this._pointInPolygon(x, y, pts);
+      } else {
+        hit = this._pointNearPolyline(x, y, s.data, 20);
+      }
+      if (hit) {
+        hits.push({ type: 'shape_' + s.id, label: s.name || '未命名形状', path: 'shapes.' + i });
+        break; // 只命中最上层一个 shape
+      }
+    }
+
+    // 7. 山脉
+    if (c.mountains.visible && y > this.h * 0.4 && y < this.h && x > 0 && x < this.w) {
+      hits.push({ type: 'mountains', label: '远景山脉', path: 'mountains' });
+    }
+
+    // 8. 环境光晕
+    if (c.ambient.visible) {
+      const ambCX = this.w * c.ambient.centerX, ambCY = this.h * c.ambient.centerY;
+      const ambR = this.h * c.ambient.radius;
+      const adx = x - ambCX, ady = y - ambCY;
+      if (adx*adx + ady*ady < ambR*ambR * 1.5) {
+        hits.push({ type: 'ambient', label: '环境光晕', path: 'ambient' });
+      }
+    }
+
+    // 9. 背景（总是可点击，放在最后）
+    hits.push({ type: 'background', label: '深海背景', path: 'background' });
+
+    return hits;
+  }
+
+  _drawSelection(ctx) {
+    const type = window.selectedElement;
+    if (!type) return;
+    const c = this.cfg;
+    ctx.save();
+    ctx.strokeStyle = '#58a6ff';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([5, 5]);
+
+    switch (type) {
+      case 'jellyfish': {
+        const j = this.jellyfish;
+        ctx.beginPath();
+        ctx.ellipse(j.x, j.y, j.radiusX + 8, j.radiusY + 8, 0, 0, Math.PI*2);
+        ctx.stroke();
+        break;
+      }
+      case 'rightRock': {
+        const rp = c.rightRock.points;
+        ctx.beginPath();
+        ctx.moveTo(rp[0][0]*this.w, rp[0][1]*this.h);
+        for (let i=1;i<rp.length;i++) ctx.lineTo(rp[i][0]*this.w, rp[i][1]*this.h);
+        ctx.closePath(); ctx.stroke();
+        break;
+      }
+      case 'leftRock': {
+        const lp = c.leftRock.points;
+        ctx.beginPath();
+        ctx.moveTo(lp[0][0]*this.w, lp[0][1]*this.h);
+        for (let i=1;i<lp.length;i++) ctx.lineTo(lp[i][0]*this.w, lp[i][1]*this.h);
+        ctx.closePath(); ctx.stroke();
+        break;
+      }
+      case 'vents': {
+        for (const p of c.vents.pipes) {
+          const px = p.x * this.w, py = p.y * this.h;
+          const pw = Math.max(p.wTop, p.wBot) * this.w;
+          const ph = p.h * this.h;
+          ctx.strokeRect(px - pw - 8, py - 8, pw * 2 + 16, ph + 16);
+        }
+        ctx.strokeStyle = '#ff6b2c';
+        ctx.beginPath();
+        c.vents.cracks.forEach((pt, i) => {
+          if (i===0) ctx.moveTo(pt[0]*this.w, pt[1]*this.h); else ctx.lineTo(pt[0]*this.w, pt[1]*this.h);
+        });
+        ctx.stroke();
+        ctx.beginPath();
+        c.vents.cracks2.forEach((pt, i) => {
+          if (i===0) ctx.moveTo(pt[0]*this.w, pt[1]*this.h); else ctx.lineTo(pt[0]*this.w, pt[1]*this.h);
+        });
+        ctx.stroke();
+        break;
+      }
+      case 'river': {
+        const riverPath = this._getRiverPath();
+        ctx.beginPath();
+        ctx.moveTo(riverPath[0].x, riverPath[0].y);
+        for (let i = 1; i < riverPath.length; i++) {
+          const cp1x = riverPath[i - 1].x + (riverPath[i].x - riverPath[i - 1].x) * 0.5;
+          const cp1y = riverPath[i - 1].y;
+          const cp2x = riverPath[i].x - (riverPath[i].x - riverPath[i - 1].x) * 0.5;
+          const cp2y = riverPath[i].y;
+          ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, riverPath[i].x, riverPath[i].y);
+        }
+        ctx.stroke();
+        ctx.fillStyle = '#58a6ff';
+        riverPath.forEach(p => { ctx.beginPath(); ctx.arc(p.x, p.y, 3, 0, Math.PI*2); ctx.fill(); });
+        break;
+      }
+      case 'fog': {
+        ctx.strokeRect(4, 4, this.w - 8, this.h - 8);
+        break;
+      }
+      case 'vignette': {
+        ctx.strokeRect(4, 4, this.w - 8, this.h - 8);
+        break;
+      }
+      case 'particles': {
+        ctx.strokeRect(4, 4, this.w - 8, this.h - 8);
+        break;
+      }
+      case 'magma': {
+        ctx.strokeRect(4, 4, this.w - 8, this.h - 8);
+        break;
+      }
+      case 'glints': {
+        ctx.strokeRect(4, 4, this.w - 8, this.h - 8);
+        break;
+      }
+      case 'mountains': {
+        ctx.beginPath();
+        ctx.moveTo(0, this.h);
+        this.mountains.far.points.forEach(p => ctx.lineTo(p.x, p.y));
+        ctx.lineTo(this.w, this.h); ctx.closePath(); ctx.stroke();
+        break;
+      }
+      case 'ambient': {
+        const acx = this.w * c.ambient.centerX, acy = this.h * c.ambient.centerY;
+        const ar = this.h * c.ambient.radius;
+        ctx.beginPath(); ctx.arc(acx, acy, ar, 0, Math.PI*2); ctx.stroke();
+        break;
+      }
+      case 'background': {
+        ctx.strokeRect(4, 4, this.w - 8, this.h - 8);
+        break;
+      }
+    }
+    // 自定义几何体高亮
+    if (type && type.startsWith('shape_')) {
+      const sid = type.slice(6);
+      const shape = (c.shapes || []).find(s => s.id === sid);
+      if (shape) {
+        ctx.save();
+        ctx.strokeStyle = '#58a6ff';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([5, 5]);
+        if (shape.type === 'path' && shape.data.length >= 2) {
+          const pts = shape.data.map(p => ({ x: p[0]*this.w, y: p[1]*this.h }));
+          ctx.beginPath();
+          ctx.moveTo(pts[0].x, pts[0].y);
+          for (let i = 1; i < pts.length; i++) {
+            const cp1x = pts[i-1].x + (pts[i].x - pts[i-1].x)*0.5;
+            const cp1y = pts[i-1].y;
+            const cp2x = pts[i].x - (pts[i].x - pts[i-1].x)*0.5;
+            const cp2y = pts[i].y;
+            ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, pts[i].x, pts[i].y);
+          }
+          ctx.stroke();
+        } else {
+          ctx.beginPath();
+          shape.data.forEach((pt, i) => {
+            const cx = pt[0]*this.w, cy = pt[1]*this.h;
+            if (i===0) ctx.moveTo(cx, cy); else ctx.lineTo(cx, cy);
+          });
+          if (shape.closed && shape.type !== 'polyline') ctx.closePath();
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+    }
+    ctx.restore();
+  }
+
+  _drawPathHandles(ctx) {
+    if (!window.pathEditMode) return;
+    const { fieldPath, editMode } = window.pathEditMode;
+    const keys = fieldPath.split('.');
+    let obj = this.cfg;
+    for (let i = 0; i < keys.length - 1; i++) obj = obj[keys[i]];
+    const data = obj[keys[keys.length - 1]];
+    if (!data) return;
+
+    const match = (h, idx, sub) => h && h.index === idx && (sub === undefined || h.subKey === sub);
+
+    const drawCtrl = (cx, cy, label, idx, subKey) => {
+      const isDrag = match(window.draggingHandle, idx, subKey);
+      const isHover = !isDrag && match(window.hoverHandle, idx, subKey);
+      const size = isDrag ? 10 : (isHover ? 9 : 7);
+      const color = isDrag ? '#ff6b2c' : (isHover ? '#ffd700' : '#58a6ff');
+
+      ctx.save();
+      ctx.shadowColor = color;
+      ctx.shadowBlur = isDrag ? 26 : (isHover ? 18 : 10);
+
+      // 十字准星延伸到画布边缘
+      if (isDrag || isHover) {
+        ctx.strokeStyle = isDrag ? 'rgba(255,107,44,0.35)' : 'rgba(255,215,0,0.28)';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([5, 5]);
+        ctx.beginPath();
+        ctx.moveTo(0, cy); ctx.lineTo(this.w, cy);
+        ctx.moveTo(cx, 0); ctx.lineTo(cx, this.h);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+
+      // 方框把手外框
+      ctx.fillStyle = color;
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.rect(cx - size, cy - size, size * 2, size * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      // 中心白点
+      ctx.fillStyle = '#fff';
+      ctx.beginPath();
+      ctx.arc(cx, cy, 2.5, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 对角瞄准线
+      ctx.strokeStyle = 'rgba(255,255,255,0.55)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      const gap = 3;
+      ctx.moveTo(cx - size + gap, cy - size + gap);
+      ctx.lineTo(cx + size - gap, cy + size - gap);
+      ctx.moveTo(cx + size - gap, cy - size + gap);
+      ctx.lineTo(cx - size + gap, cy + size - gap);
+      ctx.stroke();
+
+      ctx.restore();
+
+      // 标签文字
+      ctx.fillStyle = color;
+      ctx.font = 'bold 11px sans-serif';
+      ctx.fillText(label, cx + size + 5, cy - size - 3);
+
+      // 拖拽时显示坐标
+      if (isDrag) {
+        const coord = `(${(cx/this.w).toFixed(3)}, ${(cy/this.h).toFixed(3)})`;
+        ctx.fillStyle = '#ff6b2c';
+        ctx.font = '11px monospace';
+        ctx.fillText(coord, cx + size + 5, cy + size + 13);
+      }
+    };
+
+    ctx.save();
+    ctx.setLineDash([]);
+
+    if (editMode === 'path' || editMode === 'polyline' || editMode === 'polygon') {
+      // 实时预览形状
+      if (editMode === 'polygon') {
+        ctx.fillStyle = 'rgba(88, 166, 255, 0.12)';
+        ctx.strokeStyle = 'rgba(88, 166, 255, 0.7)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        data.forEach((pt, i) => {
+          const cx = pt[0] * this.w, cy = pt[1] * this.h;
+          if (i === 0) ctx.moveTo(cx, cy); else ctx.lineTo(cx, cy);
+        });
+        ctx.closePath();
+        ctx.fill(); ctx.stroke();
+      } else if (editMode === 'path') {
+        const pts = data.map(p => ({ x: p[0] * this.w, y: p[1] * this.h }));
+        ctx.strokeStyle = 'rgba(77, 232, 214, 0.7)';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(pts[0].x, pts[0].y);
+        for (let i = 1; i < pts.length; i++) {
+          const cp1x = pts[i - 1].x + (pts[i].x - pts[i - 1].x) * 0.5;
+          const cp1y = pts[i - 1].y;
+          const cp2x = pts[i].x - (pts[i].x - pts[i - 1].x) * 0.5;
+          const cp2y = pts[i].y;
+          ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, pts[i].x, pts[i].y);
+        }
+        ctx.stroke();
+      } else {
+        ctx.strokeStyle = 'rgba(255, 107, 44, 0.7)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        data.forEach((pt, i) => {
+          const cx = pt[0] * this.w, cy = pt[1] * this.h;
+          if (i === 0) ctx.moveTo(cx, cy); else ctx.lineTo(cx, cy);
+        });
+        ctx.stroke();
+      }
+
+      // 连接虚线
+      ctx.strokeStyle = 'rgba(88, 166, 255, 0.35)';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([4, 4]);
+      ctx.beginPath();
+      data.forEach((pt, i) => {
+        const cx = pt[0] * this.w, cy = pt[1] * this.h;
+        if (i === 0) ctx.moveTo(cx, cy); else ctx.lineTo(cx, cy);
+      });
+      if (editMode === 'polygon') ctx.closePath();
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      data.forEach((pt, i) => {
+        const cx = pt[0] * this.w, cy = pt[1] * this.h;
+        drawCtrl(cx, cy, String(i), i, null);
+      });
+    } else if (editMode === 'pipes') {
+      data.forEach((p, i) => {
+        const cx = p.x * this.w;
+        const cy = p.y * this.h;
+        const h = p.h * this.h;
+        const wTop = p.wTop * this.w;
+        const wBot = p.wBot * this.w;
+        // 预览烟囱轮廓
+        ctx.strokeStyle = 'rgba(88, 166, 255, 0.5)';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(cx - wBot, cy);
+        ctx.lineTo(cx + wBot, cy);
+        ctx.lineTo(cx + wTop, cy - h);
+        ctx.lineTo(cx - wTop, cy - h);
+        ctx.closePath();
+        ctx.stroke();
+        // 连接线
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        ctx.lineTo(cx, cy - h);
+        ctx.stroke();
+        // 两个把手
+        drawCtrl(cx, cy, 'B' + i, i, 'base');
+        drawCtrl(cx, cy - h, 'T' + i, i, 'top');
+      });
+    }
+
+    ctx.restore();
+  }
+
+  // ===================== X/Y 轴位移手柄 =====================
+  _drawAxisHandles(ctx) {
+    const type = window.selectedElement;
+    if (!type || window.pathEditMode) return;
+    // 不需要位移的元素不绘制
+    const noPos = ['fog', 'vignette', 'particles', 'magma', 'glints'];
+    if (noPos.includes(type)) return;
+
+    const center = this._getElementCenter(type);
+    if (!center) return;
+
+    const cx = center.x, cy = center.y;
+    const LEN = 55; // 箭头长度
+    const HEAD = 9;  // 箭头三角大小
+    const HOVER = window.axisHover;   // null, 'x', 'y'
+    const DRAG  = window.axisDragging; // null, 'x', 'y'
+
+    ctx.save();
+
+    // ---- X 轴 (水平箭头，向右) ----
+    const xActive = DRAG === 'x' || HOVER === 'x';
+    const xColor = DRAG === 'x' ? '#ff4444' : (xActive ? '#ff6b2c' : '#e05555');
+    ctx.strokeStyle = xColor;
+    ctx.fillStyle = xColor;
+    ctx.lineWidth = xActive ? 3.5 : 2.5;
+    ctx.shadowColor = xColor;
+    ctx.shadowBlur = xActive ? 14 : 6;
+
+    // 线段
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(cx + LEN, cy);
+    ctx.stroke();
+    // 箭头
+    ctx.beginPath();
+    ctx.moveTo(cx + LEN, cy);
+    ctx.lineTo(cx + LEN - HEAD, cy - HEAD * 0.55);
+    ctx.lineTo(cx + LEN - HEAD, cy + HEAD * 0.55);
+    ctx.closePath();
+    ctx.fill();
+    // 反向小箭头
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(cx + HEAD, cy - HEAD * 0.55);
+    ctx.lineTo(cx + HEAD, cy + HEAD * 0.55);
+    ctx.closePath();
+    ctx.fill();
+    // X 标签
+    ctx.font = 'bold 12px sans-serif';
+    ctx.fillText('X', cx + LEN + 6, cy + 4);
+
+    // ---- Y 轴 (垂直箭头，向下) ----
+    const yActive = DRAG === 'y' || HOVER === 'y';
+    const yColor = DRAG === 'y' ? '#44ff44' : (yActive ? '#4de8d6' : '#44bb88');
+    ctx.strokeStyle = yColor;
+    ctx.fillStyle = yColor;
+    ctx.lineWidth = yActive ? 3.5 : 2.5;
+    ctx.shadowColor = yColor;
+    ctx.shadowBlur = yActive ? 14 : 6;
+
+    // 线段
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(cx, cy + LEN);
+    ctx.stroke();
+    // 箭头
+    ctx.beginPath();
+    ctx.moveTo(cx, cy + LEN);
+    ctx.lineTo(cx - HEAD * 0.55, cy + LEN - HEAD);
+    ctx.lineTo(cx + HEAD * 0.55, cy + LEN - HEAD);
+    ctx.closePath();
+    ctx.fill();
+    // 反向小箭头
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(cx - HEAD * 0.55, cy + HEAD);
+    ctx.lineTo(cx + HEAD * 0.55, cy + HEAD);
+    ctx.closePath();
+    ctx.fill();
+    // Y 标签
+    ctx.fillText('Y', cx + 5, cy + LEN + 14);
+
+    // 中心圆点（可拖拽移动）
+    const centerActive = DRAG === 'center' || HOVER === 'center';
+    const centerSize = centerActive ? 6 : 4;
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = centerActive ? '#ffd700' : '#fff';
+    ctx.shadowColor = centerActive ? '#ffd700' : 'transparent';
+    ctx.shadowBlur = centerActive ? 12 : 0;
+    ctx.beginPath();
+    ctx.arc(cx, cy, centerSize, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = centerActive ? '#ffd700' : '#58a6ff';
+    ctx.lineWidth = centerActive ? 2 : 1.5;
+    ctx.stroke();
+
+    // 拖拽中心时显示十字准星
+    if (centerActive) {
+      ctx.strokeStyle = 'rgba(255, 215, 0, 0.3)';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([4, 4]);
+      ctx.beginPath();
+      ctx.moveTo(0, cy); ctx.lineTo(this.w, cy);
+      ctx.moveTo(cx, 0); ctx.lineTo(cx, this.h);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    ctx.restore();
+  }
+
+  _getElementCenter(type) {
+    const c = this.cfg;
+    const w = this.w, h = this.h;
+    switch (type) {
+      case 'background': return { x: w * c.background.centerX, y: h * c.background.centerY };
+      case 'ambient':    return { x: w * c.ambient.centerX,    y: h * c.ambient.centerY };
+      case 'jellyfish':  return { x: this.jellyfish.x,          y: this.jellyfish.y };
+      case 'river': {
+        const pts = c.river.path;
+        let sx = 0, sy = 0;
+        pts.forEach(p => { sx += p[0]; sy += p[1]; });
+        return { x: sx / pts.length * w, y: sy / pts.length * h };
+      }
+      case 'leftRock': {
+        const pts = c.leftRock.points;
+        let sx = 0, sy = 0;
+        pts.forEach(p => { sx += p[0]; sy += p[1]; });
+        return { x: sx / pts.length * w, y: sy / pts.length * h };
+      }
+      case 'rightRock': {
+        const pts = c.rightRock.points;
+        let sx = 0, sy = 0;
+        pts.forEach(p => { sx += p[0]; sy += p[1]; });
+        return { x: sx / pts.length * w, y: sy / pts.length * h };
+      }
+      case 'vents': {
+        const pipes = c.vents.pipes;
+        let sx = 0, sy = 0;
+        pipes.forEach(p => { sx += p.x; sy += p.y; });
+        return { x: sx / pipes.length * w, y: sy / pipes.length * h };
+      }
+      case 'mountains': {
+        const pts = c.mountains.farPoints;
+        let sx = 0, sy = 0;
+        pts.forEach(p => { sx += p[0]; sy += p[1]; });
+        return { x: sx / pts.length * w, y: sy / pts.length * h };
+      }
+      default:
+        // shapes
+        if (type && type.startsWith('shape_')) {
+          const sid = type.slice(6);
+          const shape = (c.shapes || []).find(s => s.id === sid);
+          if (shape && shape.data && shape.data.length) {
+            let sx = 0, sy = 0;
+            shape.data.forEach(p => { sx += p[0]; sy += p[1]; });
+            return { x: sx / shape.data.length * w, y: sy / shape.data.length * h };
+          }
+        }
+        return null;
+    }
+  }
+}
+
+// ===================== 轴手柄全局状态 =====================
+window.axisHover = null;    // null, 'x', 'y'
+window.axisDragging = null; // null, 'x', 'y'
+let axisDragStartMX = 0, axisDragStartMY = 0;
+
+function hitTestAxisHandle(mx, my) {
+  if (!bg || !window.selectedElement || window.pathEditMode) return null;
+  const center = bg._getElementCenter(window.selectedElement);
+  if (!center) return null;
+
+  const cx = center.x, cy = center.y;
+  const LEN = 55, THICK = 14;
+
+  // 中心白点（优先检测，半径 10px）
+  if ((mx - cx) ** 2 + (my - cy) ** 2 <= 100) return 'center';
+  // X 轴: 从 (cx, cy) 到 (cx+LEN, cy)
+  if (mx >= cx - 5 && mx <= cx + LEN + 5 && Math.abs(my - cy) <= THICK) return 'x';
+  // Y 轴: 从 (cx, cy) 到 (cx, cy+LEN)
+  if (Math.abs(mx - cx) <= THICK && my >= cy - 5 && my <= cy + LEN + 5) return 'y';
+
+  return null;
+}
+
+function moveElementByAxis(type, axis, deltaCanvasX, deltaCanvasY) {
+  if (!bg) return;
+  const c = bg.cfg;
+  const w = bg.w, h = bg.h;
+
+  // 转换为相对坐标增量
+  let dx = 0, dy = 0;
+  if (axis === 'center') {
+    dx = (deltaCanvasX || 0) / w;
+    dy = (deltaCanvasY || 0) / h;
+  } else if (axis === 'x') {
+    dx = deltaCanvasX / w;
+  } else {
+    dy = deltaCanvasX / h; // 旧接口兼容：单轴时 deltaCanvasX 是 delta
+  }
+
+  switch (type) {
+    case 'background':
+      c.background.centerX = Math.max(0, Math.min(1, c.background.centerX + dx));
+      c.background.centerY = Math.max(0, Math.min(1, c.background.centerY + dy));
+      break;
+    case 'ambient':
+      c.ambient.centerX = Math.max(0, Math.min(1, c.ambient.centerX + dx));
+      c.ambient.centerY = Math.max(0, Math.min(1, c.ambient.centerY + dy));
+      break;
+    case 'jellyfish':
+      c.jellyfish.x = Math.max(0, Math.min(1, c.jellyfish.x + dx));
+      c.jellyfish.y = Math.max(0, Math.min(1, c.jellyfish.y + dy));
+      // 同步运行时对象
+      bg.jellyfish.x = w * c.jellyfish.x;
+      bg.jellyfish.y = h * c.jellyfish.y;
+      bg.jellyfish.baseY = h * c.jellyfish.y;
+      break;
+    case 'river':
+      c.river.path.forEach(p => { p[0] += dx; p[1] += dy; });
+      break;
+    case 'leftRock':
+      c.leftRock.points.forEach(p => { p[0] += dx; p[1] += dy; });
+      break;
+    case 'rightRock':
+      c.rightRock.points.forEach(p => { p[0] += dx; p[1] += dy; });
+      break;
+    case 'vents':
+      c.vents.pipes.forEach(p => { p.x += dx; p.y += dy; });
+      c.vents.cracks.forEach(p => { p[0] += dx; p[1] += dy; });
+      c.vents.cracks2.forEach(p => { p[0] += dx; p[1] += dy; });
+      break;
+    case 'mountains':
+      c.mountains.farPoints.forEach(p => { p[0] += dx; p[1] += dy; });
+      c.mountains.midPoints.forEach(p => { p[0] += dx; p[1] += dy; });
+      break;
+    default:
+      if (type && type.startsWith('shape_')) {
+        const sid = type.slice(6);
+        const shape = (c.shapes || []).find(s => s.id === sid);
+        if (shape && shape.data) shape.data.forEach(p => { p[0] += dx; p[1] += dy; });
+      }
+      break;
+  }
+}
+
+// ===================== 预览循环 =====================
+const canvas = document.getElementById('preview');
+const ctx = canvas.getContext('2d');
+let bg, lastTime = 0;
+
+function resize() {
+  canvas.width = config.canvas.width;
+  canvas.height = config.canvas.height;
+  const maxW = canvas.parentElement.clientWidth - 40;
+  const maxH = canvas.parentElement.clientHeight - 40;
+  const scale = Math.min(maxW / canvas.width, maxH / canvas.height, 1);
+  canvas.style.width = (canvas.width * scale) + 'px';
+  canvas.style.height = (canvas.height * scale) + 'px';
+  document.getElementById('canvasInfo').textContent = `${canvas.width}×${canvas.height} @ ${(scale*100).toFixed(0)}%`;
+}
+
+function rebuild() {
+  resize();
+  bg = new EditableDynamicBG(config);
+}
+
+function animate(ts) {
+  if (!lastTime) lastTime = ts;
+  const dt = Math.min((ts - lastTime) / 1000, 0.05);
+  lastTime = ts;
+  if (bg) {
+    bg.update(dt);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    bg.draw(ctx);
+  }
+  requestAnimationFrame(animate);
+}
+
+// ===================== 文件操作 =====================
+function saveConfig() {
+  const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'dynamic-bg-config.json';
+  a.click();
+}
+
+function loadConfig() {
+  document.getElementById('fileInput').click();
+}
+
+function handleFile(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      const data = JSON.parse(ev.target.result);
+      config = Object.assign({}, DEFAULT_CONFIG, data);
+      buildUI();
+      rebuild();
+    } catch (err) { alert('JSON 解析失败: ' + err.message); }
+  };
+  reader.readAsText(file);
+}
+
+function exportCode() {
+  const code = `const CONFIG = ${JSON.stringify(config, null, 2)};\n\n// 将 CONFIG 传入 EditableDynamicBG 构造函数即可`;
+  document.getElementById('modalTitle').textContent = '导出配置代码';
+  document.getElementById('modalText').value = code;
+  document.getElementById('modal').classList.add('active');
+}
+
+function resetConfig() {
+  if (confirm('确定重置为默认配置？未保存的修改将丢失。')) {
+    config = JSON.parse(JSON.stringify(DEFAULT_CONFIG));
+    buildUI();
+    rebuild();
+  }
+}
+
+function closeModal() { document.getElementById('modal').classList.remove('active'); }
+function copyModal() {
+  const ta = document.getElementById('modalText');
+  ta.select();
+  document.execCommand('copy');
+}
+
+// ===================== 属性编辑 Schema =====================
+const PROPERTY_SCHEMAS = {
+  jellyfish: {
+    label: '水母',
+    fields: [
+      { path: 'jellyfish.visible', label: '可见', type: 'bool' },
+      { path: 'jellyfish.x', label: '位置 X', type: 'range', min: 0, max: 1, step: 0.01 },
+      { path: 'jellyfish.y', label: '位置 Y', type: 'range', min: 0, max: 1, step: 0.01 },
+      { path: 'jellyfish.radiusX', label: '伞盖半径 X', type: 'range', min: 20, max: 150 },
+      { path: 'jellyfish.radiusY', label: '伞盖半径 Y', type: 'range', min: 20, max: 120 },
+      { path: 'jellyfish.bobSpeed', label: '浮动速度', type: 'range', min: 0, max: 2, step: 0.1 },
+      { path: 'jellyfish.bobAmp', label: '浮动幅度', type: 'range', min: 0, max: 30 },
+      { path: 'jellyfish.breatheSpeed', label: '呼吸速度', type: 'range', min: 0, max: 3, step: 0.1 },
+      { path: 'jellyfish.breatheAmp', label: '呼吸幅度', type: 'range', min: 0, max: 0.2, step: 0.01 },
+      { path: 'jellyfish.glowColor', label: '辉光颜色', type: 'color' },
+      { path: 'jellyfish.glowBlur', label: '辉光半径', type: 'range', min: 0, max: 60 },
+      { path: 'jellyfish.tentacleCount', label: '触手数量', type: 'range', min: 1, max: 12 },
+      { path: 'jellyfish.tentacleSpacing', label: '触手间距', type: 'range', min: 5, max: 30 },
+      { path: 'jellyfish.tentacleLenMin', label: '触手最短长度', type: 'range', min: 20, max: 200 },
+      { path: 'jellyfish.tentacleLenMax', label: '触手最长长度', type: 'range', min: 20, max: 250 },
+      { path: 'jellyfish.tentacleWaveFreqMin', label: '波动频率最小', type: 'range', min: 0.1, max: 3, step: 0.1 },
+      { path: 'jellyfish.tentacleWaveFreqMax', label: '波动频率最大', type: 'range', min: 0.1, max: 3, step: 0.1 },
+      { path: 'jellyfish.tentacleWaveAmpMin', label: '波动幅度最小', type: 'range', min: 0, max: 30 },
+      { path: 'jellyfish.tentacleWaveAmpMax', label: '波动幅度最大', type: 'range', min: 0, max: 30 },
+      { path: 'jellyfish.bodyGrad.0', label: '身体渐变色1', type: 'colorAlpha' },
+      { path: 'jellyfish.bodyGrad.1', label: '身体渐变色2', type: 'colorAlpha' },
+      { path: 'jellyfish.bodyGrad.2', label: '身体渐变色3', type: 'colorAlpha' },
+    ]
+  },
+  background: {
+    label: '深海背景',
+    fields: [
+      { path: 'background.visible', label: '可见', type: 'bool' },
+      { path: 'background.centerX', label: '中心 X', type: 'range', min: 0, max: 1, step: 0.01 },
+      { path: 'background.centerY', label: '中心 Y', type: 'range', min: 0, max: 1, step: 0.01 },
+      { path: 'background.radius', label: '半径', type: 'range', min: 0.2, max: 2, step: 0.05 },
+      { path: 'background.color0', label: '内圈颜色', type: 'color' },
+      { path: 'background.color1', label: '中圈颜色', type: 'color' },
+      { path: 'background.color2', label: '外圈颜色', type: 'color' },
+    ]
+  },
+  ambient: {
+    label: '环境光晕',
+    fields: [
+      { path: 'ambient.visible', label: '可见', type: 'bool' },
+      { path: 'ambient.centerX', label: '中心 X', type: 'range', min: 0, max: 1, step: 0.01 },
+      { path: 'ambient.centerY', label: '中心 Y', type: 'range', min: 0, max: 1, step: 0.01 },
+      { path: 'ambient.radius', label: '半径', type: 'range', min: 0.2, max: 1.5, step: 0.05 },
+      { path: 'ambient.color0', label: '内圈颜色', type: 'colorAlpha' },
+      { path: 'ambient.color1', label: '外圈颜色', type: 'colorAlpha' },
+    ]
+  },
+  river: {
+    label: '发光河流',
+    fields: [
+      { path: 'river.visible', label: '可见', type: 'bool' },
+      { path: 'river.shadowColor', label: '辉光颜色', type: 'color' },
+      { path: 'river.shadowBlur', label: '辉光半径', type: 'range', min: 0, max: 40 },
+      { path: 'river.stroke0', label: '主线条颜色', type: 'colorAlpha' },
+      { path: 'river.width0', label: '主线条宽度', type: 'range', min: 1, max: 80 },
+      { path: 'river.stroke1', label: '副线条颜色', type: 'colorAlpha' },
+      { path: 'river.width1', label: '副线条宽度', type: 'range', min: 1, max: 30 },
+      { path: 'river.path', label: '路径点 (JSON)', type: 'json', editMode: 'path' },
+    ]
+  },
+  leftRock: {
+    label: '左侧岩石',
+    fields: [
+      { path: 'leftRock.visible', label: '可见', type: 'bool' },
+      { path: 'leftRock.fill', label: '填充颜色', type: 'color' },
+      { path: 'leftRock.highlight', label: '高光颜色', type: 'colorAlpha' },
+      { path: 'leftRock.points', label: '轮廓点 (JSON)', type: 'json', editMode: 'polygon' },
+    ]
+  },
+  rightRock: {
+    label: '右侧岩石',
+    fields: [
+      { path: 'rightRock.visible', label: '可见', type: 'bool' },
+      { path: 'rightRock.fill', label: '填充颜色', type: 'color' },
+      { path: 'rightRock.points', label: '轮廓点 (JSON)', type: 'json', editMode: 'polygon' },
+    ]
+  },
+  vents: {
+    label: '烟囱 & 裂缝',
+    fields: [
+      { path: 'vents.visible', label: '可见', type: 'bool' },
+      { path: 'vents.pipeGrad.0', label: '管渐变1', type: 'color' },
+      { path: 'vents.pipeGrad.1', label: '管渐变2', type: 'color' },
+      { path: 'vents.pipeGrad.2', label: '管渐变3', type: 'color' },
+      { path: 'vents.pipeGrad.3', label: '管渐变4', type: 'color' },
+      { path: 'vents.topFill', label: '顶部颜色', type: 'color' },
+      { path: 'vents.crackColor', label: '裂缝颜色', type: 'colorAlpha' },
+      { path: 'vents.crackGlow', label: '裂缝辉光', type: 'color' },
+      { path: 'vents.crackWidth', label: '裂缝宽度', type: 'range', min: 0.5, max: 6, step: 0.5 },
+      { path: 'vents.crack2Color', label: '裂缝2颜色', type: 'colorAlpha' },
+      { path: 'vents.pipes', label: '烟囱数据 (JSON)', type: 'json', editMode: 'pipes' },
+      { path: 'vents.cracks', label: '裂缝点 (JSON)', type: 'json', editMode: 'polyline' },
+      { path: 'vents.cracks2', label: '裂缝2点 (JSON)', type: 'json', editMode: 'polyline' },
+    ]
+  },
+  mountains: {
+    label: '远景山脉',
+    fields: [
+      { path: 'mountains.visible', label: '可见', type: 'bool' },
+      { path: 'mountains.farBaseY', label: '远基线 Y', type: 'range', min: 0.3, max: 0.8, step: 0.01 },
+      { path: 'mountains.farRoughness', label: '远粗糙度', type: 'range', min: 10, max: 150 },
+      { path: 'mountains.farOpacity', label: '远透明度', type: 'range', min: 0, max: 1, step: 0.05 },
+      { path: 'mountains.midBaseY', label: '中基线 Y', type: 'range', min: 0.3, max: 0.9, step: 0.01 },
+      { path: 'mountains.midRoughness', label: '中粗糙度', type: 'range', min: 10, max: 120 },
+      { path: 'mountains.midOpacity', label: '中透明度', type: 'range', min: 0, max: 1, step: 0.05 },
+      { path: 'mountains.steps', label: '分段数', type: 'range', min: 5, max: 50 },
+      { path: 'mountains.swaySpeed', label: '摇摆速度', type: 'range', min: 0.05, max: 1, step: 0.05 },
+      { path: 'mountains.swayAmp', label: '摇摆幅度', type: 'range', min: 0, max: 10 },
+      { path: 'mountains.farPoints', label: '远轮廓点 (JSON)', type: 'json', editMode: 'polyline' },
+      { path: 'mountains.midPoints', label: '中轮廓点 (JSON)', type: 'json', editMode: 'polyline' },
+    ]
+  },
+  fog: {
+    label: '迷雾',
+    fields: [
+      { path: 'fog.visible', label: '可见', type: 'bool' },
+      { path: 'fog.color0', label: '底部颜色', type: 'colorAlpha' },
+      { path: 'fog.color1', label: '中部颜色', type: 'colorAlpha' },
+      { path: 'fog.color2', label: '顶部颜色', type: 'colorAlpha' },
+    ]
+  },
+  vignette: {
+    label: '暗角',
+    fields: [
+      { path: 'vignette.visible', label: '可见', type: 'bool' },
+      { path: 'vignette.color0', label: '顶部颜色', type: 'colorAlpha' },
+      { path: 'vignette.color1', label: '底部颜色', type: 'colorAlpha' },
+    ]
+  },
+  particles: {
+    label: '荧光微粒',
+    fields: [
+      { path: 'particles.visible', label: '可见', type: 'bool' },
+      { path: 'particles.count', label: '数量', type: 'range', min: 0, max: 150 },
+      { path: 'particles.vxMin', label: '最小速度X', type: 'range', min: -1, max: 1, step: 0.01 },
+      { path: 'particles.vxMax', label: '最大速度X', type: 'range', min: -1, max: 1, step: 0.01 },
+      { path: 'particles.vyMin', label: '最小速度Y', type: 'range', min: -1, max: 1, step: 0.01 },
+      { path: 'particles.vyMax', label: '最大速度Y', type: 'range', min: -1, max: 1, step: 0.01 },
+      { path: 'particles.rMin', label: '最小半径', type: 'range', min: 0.1, max: 5, step: 0.1 },
+      { path: 'particles.rMax', label: '最大半径', type: 'range', min: 0.1, max: 10, step: 0.1 },
+      { path: 'particles.alphaMin', label: '最小透明度', type: 'range', min: 0, max: 1, step: 0.05 },
+      { path: 'particles.alphaMax', label: '最大透明度', type: 'range', min: 0, max: 1, step: 0.05 },
+      { path: 'particles.blinkFreqMin', label: '最小闪烁频率', type: 'range', min: 0.1, max: 3, step: 0.1 },
+      { path: 'particles.blinkFreqMax', label: '最大闪烁频率', type: 'range', min: 0.1, max: 3, step: 0.1 },
+      { path: 'particles.colors.0', label: '颜色1', type: 'color' },
+      { path: 'particles.colors.1', label: '颜色2', type: 'color' },
+      { path: 'particles.colors.2', label: '颜色3', type: 'color' },
+    ]
+  },
+  magma: {
+    label: '热液粒子',
+    fields: [
+      { path: 'magma.visible', label: '可见', type: 'bool' },
+      { path: 'magma.countPerVent', label: '每口数量', type: 'range', min: 5, max: 60 },
+      { path: 'magma.vxMin', label: '最小速度X', type: 'range', min: -1, max: 1, step: 0.1 },
+      { path: 'magma.vxMax', label: '最大速度X', type: 'range', min: -1, max: 1, step: 0.1 },
+      { path: 'magma.vyMin', label: '最小速度Y', type: 'range', min: -3, max: 0, step: 0.1 },
+      { path: 'magma.vyMax', label: '最大速度Y', type: 'range', min: -3, max: 0, step: 0.1 },
+      { path: 'magma.rMin', label: '最小半径', type: 'range', min: 0.5, max: 8, step: 0.5 },
+      { path: 'magma.rMax', label: '最大半径', type: 'range', min: 0.5, max: 15, step: 0.5 },
+      { path: 'magma.maxRMin', label: '最大扩散最小', type: 'range', min: 1, max: 15, step: 0.5 },
+      { path: 'magma.maxRMax', label: '最大扩散最大', type: 'range', min: 1, max: 25, step: 0.5 },
+      { path: 'magma.decayMin', label: '最小衰减', type: 'range', min: 0.001, max: 0.02, step: 0.001 },
+      { path: 'magma.decayMax', label: '最大衰减', type: 'range', min: 0.001, max: 0.02, step: 0.001 },
+    ]
+  },
+  glints: {
+    label: '河流微光',
+    fields: [
+      { path: 'glints.visible', label: '可见', type: 'bool' },
+      { path: 'glints.count', label: '数量', type: 'range', min: 0, max: 100 },
+      { path: 'glints.rMin', label: '最小半径', type: 'range', min: 0.5, max: 8, step: 0.5 },
+      { path: 'glints.rMax', label: '最大半径', type: 'range', min: 0.5, max: 10, step: 0.5 },
+      { path: 'glints.alphaMin', label: '最小透明度', type: 'range', min: 0, max: 1, step: 0.05 },
+      { path: 'glints.alphaMax', label: '最大透明度', type: 'range', min: 0, max: 1, step: 0.05 },
+      { path: 'glints.freqMin', label: '最小频率', type: 'range', min: 0.1, max: 3, step: 0.1 },
+      { path: 'glints.freqMax', label: '最大频率', type: 'range', min: 0.1, max: 3, step: 0.1 },
+    ]
+  },
+};
+
+let selectedElement = null;
+
+function buildPropertyEditor(type) {
+  let schema = PROPERTY_SCHEMAS[type];
+  // shape 动态 schema
+  if (type && type.startsWith('shape_')) {
+    const sid = type.slice(6);
+    const idx = config.shapes.findIndex(s => s.id === sid);
+    const shape = config.shapes[idx];
+    if (!shape) return;
+    schema = {
+      label: shape.name || '未命名形状',
+      fields: [
+        { path: `shapes.${idx}.name`, label: '名称', type: 'text' },
+        { path: `shapes.${idx}.type`, label: '类型', type: 'select', options: [['polygon','闭合多边形'],['polyline','折线'],['path','曲线']] },
+        { path: `shapes.${idx}.visible`, label: '可见', type: 'bool' },
+        { path: `shapes.${idx}.closed`, label: '闭合', type: 'bool' },
+        { path: `shapes.${idx}.fill`, label: '填充色', type: 'colorAlpha' },
+        { path: `shapes.${idx}.stroke`, label: '描边色', type: 'colorAlpha' },
+        { path: `shapes.${idx}.strokeWidth`, label: '描边宽', type: 'range', min: 0, max: 20, step: 0.5 },
+        { path: `shapes.${idx}.data`, label: '数据点 (JSON)', type: 'json', editMode: shape.type === 'path' ? 'path' : (shape.closed ? 'polygon' : 'polyline') },
+      ]
+    };
+  }
+  if (!schema) return;
+  const body = document.getElementById('propEditorBody');
+  body.innerHTML = `<h3 style="color:#58a6ff;margin-bottom:14px;font-size:15px;">${schema.label}</h3>`;
+
+  schema.fields.forEach(f => {
+    const wrap = document.createElement('div');
+    wrap.className = 'field';
+    wrap.style.marginBottom = '10px';
+
+    const row = document.createElement('div');
+    row.className = 'field-row';
+
+    const label = document.createElement('label');
+    label.textContent = f.label;
+    label.style.minWidth = '90px';
+    row.appendChild(label);
+
+    const keys = f.path.split('.');
+    let obj = config;
+    for (let i = 0; i < keys.length - 1; i++) obj = obj[keys[i]];
+    const k = keys[keys.length - 1];
+
+    if (f.type === 'range') {
+      const rangeWrap = document.createElement('div');
+      rangeWrap.className = 'field-row'; rangeWrap.style.flex = '1';
+      const input = document.createElement('input');
+      input.type = 'range'; input.min = f.min; input.max = f.max; input.step = f.step || 1;
+      input.value = obj[k];
+      const val = document.createElement('span'); val.className = 'val'; val.textContent = obj[k];
+      input.oninput = () => {
+        obj[k] = f.step && f.step < 1 ? parseFloat(input.value) : parseFloat(input.value);
+        val.textContent = input.value;
+        rebuild();
+      };
+      rangeWrap.appendChild(input); rangeWrap.appendChild(val);
+      row.appendChild(rangeWrap);
+    } else if (f.type === 'color' || f.type === 'colorAlpha') {
+      const withAlpha = f.type === 'colorAlpha';
+      const picker = createGradientPicker(obj[k], withAlpha, (val) => { obj[k] = val; rebuild(); });
+      row.appendChild(picker);
+    } else if (f.type === 'json') {
+      const taWrap = document.createElement('div');
+      taWrap.style.flex = '1';
+      taWrap.style.display = 'flex';
+      taWrap.style.flexDirection = 'column';
+      taWrap.style.gap = '6px';
+
+      if (f.editMode) {
+        const btn = document.createElement('button');
+        btn.className = 'btn';
+        btn.textContent = '🖱 在画布上编辑点';
+        btn.style.alignSelf = 'flex-start';
+        btn.onclick = () => {
+          if (window.pathEditMode && window.pathEditMode.fieldPath === f.path) {
+            exitCanvasEdit();
+            btn.textContent = '🖱 在画布上编辑点';
+          } else {
+            enterCanvasEdit(f.path, f.editMode, input);
+            btn.textContent = '✓ 正在画布编辑（点击退出）';
+          }
+        };
+        taWrap.appendChild(btn);
+      }
+
+      const input = document.createElement('textarea');
+      input.style.width = '100%'; input.style.height = '70px';
+      input.style.background = '#0d1117'; input.style.border = '1px solid #30363d';
+      input.style.color = '#c9d1d9'; input.style.borderRadius = '4px';
+      input.style.padding = '6px'; input.style.fontFamily = 'monospace'; input.style.fontSize = '11px';
+      input.style.resize = 'vertical';
+      input.value = JSON.stringify(obj[k], null, 2);
+      input.onchange = () => {
+        try {
+          obj[k] = JSON.parse(input.value);
+          rebuild();
+        } catch(e) { alert('JSON 格式错误: ' + e.message); }
+      };
+      taWrap.appendChild(input);
+      row.appendChild(taWrap);
+    } else if (f.type === 'text') {
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.value = obj[k];
+      input.style.flex = '1';
+      input.style.background = '#0d1117';
+      input.style.border = '1px solid #30363d';
+      input.style.color = '#c9d1d9';
+      input.style.borderRadius = '4px';
+      input.style.padding = '4px 8px';
+      input.style.fontSize = '12px';
+      input.onchange = () => { obj[k] = input.value; rebuild(); };
+      row.appendChild(input);
+    } else if (f.type === 'select') {
+      const select = document.createElement('select');
+      select.style.flex = '1';
+      for (const [val, lbl] of f.options) {
+        const opt = document.createElement('option');
+        opt.value = val; opt.textContent = lbl;
+        select.appendChild(opt);
+      }
+      select.value = obj[k];
+      select.onchange = () => { obj[k] = select.value; rebuild(); buildPropertyEditor(type); };
+      row.appendChild(select);
+    } else if (f.type === 'bool') {
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.checked = !!obj[k];
+      cb.style.width = '18px'; cb.style.height = '18px'; cb.style.cursor = 'pointer';
+      cb.onchange = () => { obj[k] = cb.checked; rebuild(); };
+      row.appendChild(cb);
+    }
+
+    wrap.appendChild(row);
+    body.appendChild(wrap);
+  });
+}
+
+function openPropertyEditor(type) {
+  buildPropertyEditor(type);
+  document.getElementById('propEditor').classList.add('active');
+}
+
+function closePropertyEditor() {
+  document.getElementById('propEditor').classList.remove('active');
+  exitCanvasEdit();
+  window.selectedElement = null;
+  buildUI();
+}
+
+// ===================== 浮动面板拖拽 =====================
+(function initPanelDrag() {
+  const panel = document.getElementById('propEditor');
+  const header = document.getElementById('propEditorHeader');
+  let dragging = false, startX, startY, startLeft, startTop;
+
+  header.addEventListener('mousedown', (e) => {
+    dragging = true;
+    startX = e.clientX;
+    startY = e.clientY;
+    const rect = panel.getBoundingClientRect();
+    startLeft = rect.left;
+    startTop = rect.top;
+    panel.style.right = 'auto';
+    panel.style.left = startLeft + 'px';
+    panel.style.top = startTop + 'px';
+    header.style.cursor = 'grabbing';
+    e.preventDefault();
+  });
+
+  window.addEventListener('mousemove', (e) => {
+    if (!dragging) return;
+    const dx = e.clientX - startX;
+    const dy = e.clientY - startY;
+    panel.style.left = Math.max(0, Math.min(window.innerWidth - panel.offsetWidth, startLeft + dx)) + 'px';
+    panel.style.top = Math.max(0, Math.min(window.innerHeight - panel.offsetHeight, startTop + dy)) + 'px';
+  });
+
+  window.addEventListener('mouseup', () => {
+    if (dragging) {
+      dragging = false;
+      header.style.cursor = 'grab';
+    }
+  });
+})();
+
+// ===================== Canvas 点击交互 =====================
+function showHitMenu(x, y, hits) {
+  const menu = document.getElementById('hitMenu');
+  menu.innerHTML = '';
+  menu.style.display = 'block';
+  menu.style.left = Math.min(x + 10, window.innerWidth - 180) + 'px';
+  menu.style.top = Math.min(y + 10, window.innerHeight - hits.length * 36 - 20) + 'px';
+
+  hits.forEach(h => {
+    const item = document.createElement('div');
+    item.textContent = h.label;
+    item.style.padding = '8px 14px'; item.style.cursor = 'pointer';
+    item.style.fontSize = '13px'; item.style.color = '#c9d1d9';
+    item.style.borderBottom = '1px solid #21262d';
+    item.onmouseenter = () => item.style.background = '#21262d';
+    item.onmouseleave = () => item.style.background = 'transparent';
+    item.onclick = () => {
+      selectedElement = h.type;
+      openPropertyEditor(h.type);
+      menu.style.display = 'none';
+      buildUI();
+    };
+    menu.appendChild(item);
+  });
+
+  // 点击别处关闭
+  requestAnimationFrame(() => {
+    document.addEventListener('click', function close(e) {
+      if (!menu.contains(e.target)) { menu.style.display = 'none'; document.removeEventListener('click', close); }
+    }, { once: true });
+  });
+}
+
+canvas.addEventListener('click', (e) => {
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
+  const mx = (e.clientX - rect.left) * scaleX;
+  const my = (e.clientY - rect.top) * scaleY;
+
+  if (!bg) return;
+  // 路径编辑模式下忽略元素选择
+  if (window.pathEditMode) return;
+
+  const hits = bg.hitTest(mx, my);
+
+  if (hits.length > 1) {
+    // 多个命中，弹出选择菜单（排除总是命中的背景，如果前面已有具体元素）
+    const realHits = hits.filter(h => h.type !== 'background');
+    if (realHits.length >= 1) {
+      showHitMenu(e.clientX, e.clientY, realHits.length >= 2 ? realHits : realHits.concat(hits.filter(h=>h.type==='background')));
+    } else {
+      selectedElement = 'background';
+      openPropertyEditor('background');
+      buildUI();
+    }
+  } else if (hits.length === 1) {
+    selectedElement = hits[0].type;
+    openPropertyEditor(selectedElement);
+    buildUI();
+  }
+});
+
+// 鼠标移动时显示当前元素提示
+canvas.addEventListener('mousemove', (e) => {
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
+  const mx = (e.clientX - rect.left) * scaleX;
+  const my = (e.clientY - rect.top) * scaleY;
+  if (!bg) return;
+  if (window.pathEditMode) return; // 路径编辑模式下由专用逻辑控制光标
+  // 轴手柄优先
+  if (window.selectedElement) {
+    const axis = hitTestAxisHandle(mx, my);
+    if (axis) {
+      canvas.style.cursor = axis === 'x' ? 'ew-resize' : 'ns-resize';
+      return;
+    }
+  }
+  const hits = bg.hitTest(mx, my).filter(h => h.type !== 'background');
+  canvas.style.cursor = hits.length > 0 ? 'pointer' : 'default';
+});
+
+// ===================== 画布路径点 WYSIWYG 编辑 =====================
+window.pathEditMode = null; // { fieldPath, editMode, textarea }
+window.draggingHandle = null; // { fieldPath, editMode, index, subKey }
+window.hoverHandle = null;
+let dragStartMX = 0, dragStartMY = 0;
+
+function enterCanvasEdit(fieldPath, editMode, textarea) {
+  window.pathEditMode = { fieldPath, editMode, textarea };
+}
+
+function exitCanvasEdit() {
+  window.pathEditMode = null;
+  window.draggingHandle = null;
+  window.hoverHandle = null;
+}
+
+function getPathData(fieldPath) {
+  if (!bg) return null;
+  const keys = fieldPath.split('.');
+  let obj = bg.cfg;
+  for (let i = 0; i < keys.length - 1; i++) obj = obj[keys[i]];
+  return obj[keys[keys.length - 1]];
+}
+
+function hitTestPathHandle(mx, my) {
+  if (!window.pathEditMode || !bg) return null;
+  const { fieldPath, editMode } = window.pathEditMode;
+  const data = getPathData(fieldPath);
+  if (!data) return null;
+  const TH = 12;
+
+  if (editMode === 'path' || editMode === 'polyline' || editMode === 'polygon') {
+    for (let i = 0; i < data.length; i++) {
+      const cx = data[i][0] * bg.w;
+      const cy = data[i][1] * bg.h;
+      if ((mx - cx) ** 2 + (my - cy) ** 2 <= TH ** 2) {
+        return { fieldPath, editMode, index: i, subKey: null };
+      }
+    }
+  } else if (editMode === 'pipes') {
+    for (let i = 0; i < data.length; i++) {
+      const p = data[i];
+      const cx = p.x * bg.w;
+      const cy = p.y * bg.h;
+      const h = p.h * bg.h;
+      if ((mx - cx) ** 2 + (my - cy) ** 2 <= TH ** 2) {
+        return { fieldPath, editMode, index: i, subKey: 'base' };
+      }
+      if ((mx - cx) ** 2 + (my - (cy - h)) ** 2 <= TH ** 2) {
+        return { fieldPath, editMode, index: i, subKey: 'top' };
+      }
+    }
+  }
+  return null;
+}
+
+function updatePathHandle(handle, mx, my) {
+  const data = getPathData(handle.fieldPath);
+  if (!data) return;
+
+  if (handle.editMode === 'path' || handle.editMode === 'polyline' || handle.editMode === 'polygon') {
+    data[handle.index][0] = Math.max(-0.2, Math.min(1.2, mx / bg.w));
+    data[handle.index][1] = Math.max(-0.2, Math.min(1.2, my / bg.h));
+  } else if (handle.editMode === 'pipes') {
+    const p = data[handle.index];
+    if (handle.subKey === 'base') {
+      p.x = Math.max(0, Math.min(1, mx / bg.w));
+      p.y = Math.max(0, Math.min(1, my / bg.h));
+    } else if (handle.subKey === 'top') {
+      p.h = Math.max(0.01, Math.min(0.8, (p.y * bg.h - my) / bg.h));
+    }
+  }
+
+  if (window.pathEditMode && window.pathEditMode.textarea) {
+    window.pathEditMode.textarea.value = JSON.stringify(data, null, 2);
+  }
+}
+
+canvas.addEventListener('mousedown', (e) => {
+  if (!bg) return;
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
+  const mx = (e.clientX - rect.left) * scaleX;
+  const my = (e.clientY - rect.top) * scaleY;
+
+  // 轴手柄拖拽（优先级最高）
+  if (!window.pathEditMode && window.selectedElement) {
+    const axis = hitTestAxisHandle(mx, my);
+    if (axis) {
+      window.axisDragging = axis;
+      axisDragStartMX = mx;
+      axisDragStartMY = my;
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
+  }
+
+  if (!window.pathEditMode) return;
+
+  const handle = hitTestPathHandle(mx, my);
+  if (handle) {
+    window.draggingHandle = handle;
+    dragStartMX = mx;
+    dragStartMY = my;
+    e.preventDefault();
+    e.stopPropagation();
+  }
+});
+
+// 覆盖 mousemove 以支持拖拽
+const origMouseMove = canvas.onmousemove;
+canvas.addEventListener('mousemove', (e) => {
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
+  const mx = (e.clientX - rect.left) * scaleX;
+  const my = (e.clientY - rect.top) * scaleY;
+  if (!bg) return;
+
+  // 轴手柄拖拽中
+  if (window.axisDragging) {
+    if (window.axisDragging === 'center') {
+      const dx = mx - axisDragStartMX;
+      const dy = my - axisDragStartMY;
+      moveElementByAxis(window.selectedElement, 'center', dx, dy);
+      axisDragStartMX = mx;
+      axisDragStartMY = my;
+      canvas.style.cursor = 'move';
+    } else {
+      const delta = window.axisDragging === 'x' ? (mx - axisDragStartMX) : (my - axisDragStartMY);
+      moveElementByAxis(window.selectedElement, window.axisDragging, delta);
+      if (window.axisDragging === 'x') axisDragStartMX = mx;
+      else axisDragStartMY = my;
+      canvas.style.cursor = window.axisDragging === 'x' ? 'ew-resize' : 'ns-resize';
+    }
+    bg._renderStatic(); // 重绘静态层
+    return;
+  }
+
+  // 轴手柄悬停检测
+  if (!window.pathEditMode && window.selectedElement) {
+    const axis = hitTestAxisHandle(mx, my);
+    window.axisHover = axis || null;
+    if (axis) {
+      canvas.style.cursor = axis === 'center' ? 'move' : (axis === 'x' ? 'ew-resize' : 'ns-resize');
+      return;
+    }
+  } else {
+    window.axisHover = null;
+  }
+
+  if (window.draggingHandle) {
+    updatePathHandle(window.draggingHandle, mx, my);
+    window.hoverHandle = window.draggingHandle;
+    canvas.style.cursor = 'grabbing';
+    return;
+  }
+
+  if (window.pathEditMode) {
+    const handle = hitTestPathHandle(mx, my);
+    window.hoverHandle = handle || null;
+    canvas.style.cursor = handle ? 'pointer' : 'default';
+    return;
+  }
+});
+
+canvas.addEventListener('mouseup', () => {
+  if (window.axisDragging) {
+    window.axisDragging = null;
+    window.axisHover = null;
+    rebuild();
+    return;
+  }
+  if (window.draggingHandle) {
+    window.draggingHandle = null;
+    window.hoverHandle = null;
+    rebuild();
+  }
+});
+
+canvas.addEventListener('mouseleave', () => {
+  if (window.axisDragging) {
+    window.axisDragging = null;
+    window.axisHover = null;
+    rebuild();
+  } else if (window.draggingHandle) {
+    window.draggingHandle = null;
+    window.hoverHandle = null;
+    rebuild();
+  } else {
+    window.hoverHandle = null;
+    window.axisHover = null;
+  }
+});
+
+window.addEventListener('resize', resize);
+
+// 启动
+buildUI();
+rebuild();
+requestAnimationFrame(animate);
+</script>
+</body>
+</html>

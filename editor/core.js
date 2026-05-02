@@ -1,0 +1,1387 @@
+/**
+ * BackgroundEditor 核心模块
+ * 提供空白画布起步、配置管理、状态管理、撤销重做等核心功能
+ */
+
+import { EditableDynamicBG } from './renderer.js';
+
+// 默认空白画布配置
+const EMPTY_CONFIG = {
+  canvas: { width: 960, height: 540 },
+  background: {
+    visible: true,
+    gradientType: 'radial',
+    centerX: 0.5,
+    centerY: 0.5,
+    radius: 0.8,
+    angle: 90,
+    color0: '#1a1a2e',
+    color1: '#16213e',
+    color2: '#0f3460'
+  },
+  ambient: { visible: false },
+  river: { visible: false },
+  leftRock: { visible: false },
+  rightRock: { visible: false },
+  vents: { visible: false },
+  fog: { visible: false },
+  vignette: { visible: false },
+  jellyfish: { visible: false },
+  particles: { visible: false },
+  magma: { visible: false },
+  glints: { visible: false },
+  mountains: { visible: false },
+  shapes: [],
+  layerOrder: ['background'],
+  groups: []
+};
+
+// 预设模板
+const PRESETS = {
+  deepSea: { /* 深海场景配置 */ },
+  forest: { /* 森林场景配置 */ },
+  desert: { /* 沙漠场景配置 */ },
+  space: { /* 太空场景配置 */ }
+};
+
+class BackgroundEditor {
+  constructor(containerId) {
+    this.container = document.getElementById(containerId);
+    this.config = JSON.parse(JSON.stringify(EMPTY_CONFIG));
+    this.canvas = null;
+    this.ctx = null;
+    this.bg = null;
+    this.selectedElement = null;
+    this.selectedElements = []; // 多选元素ID列表
+    this.layerOrder = [];
+    this.history = [];
+    this.historyIndex = -1;
+    this.maxHistory = 50;
+    this.isDirty = false;
+    this.animationId = null;
+    this.lastTime = 0;
+    this.transformState = null;
+    this.controlPointState = null; // 控制点拖拽状态
+    this.drawMode = null; // null, 'polyline', 'path'
+    this.drawPoints = []; // 正在绘制的点
+    this.isDrawingPath = false;
+    
+    this.init();
+  }
+
+  init() {
+    this.createCanvas();
+    this.setupEventListeners();
+    this.startAnimation();
+  }
+
+  createCanvas() {
+    this.canvas = document.createElement('canvas');
+    this.canvas.id = 'editor-canvas';
+    this.canvas.style.cssText = `
+      box-shadow: 0 0 30px rgba(0,0,0,0.8);
+      cursor: crosshair;
+    `;
+    this.container.appendChild(this.canvas);
+    this.ctx = this.canvas.getContext('2d');
+    this.resizeCanvas();
+  }
+
+  resizeCanvas() {
+    if (!this.canvas) return;
+    
+    this.canvas.width = this.config.canvas.width;
+    this.canvas.height = this.config.canvas.height;
+    
+    const container = this.canvas.parentElement;
+    const maxW = container.clientWidth - 40;
+    const maxH = container.clientHeight - 40;
+    const scale = Math.min(maxW / this.canvas.width, maxH / this.canvas.height, 1);
+    
+    this.canvas.style.width = (this.canvas.width * scale) + 'px';
+    this.canvas.style.height = (this.canvas.height * scale) + 'px';
+    
+    this.updateCanvasInfo();
+  }
+
+  updateCanvasInfo() {
+    const info = document.getElementById('canvas-info');
+    if (info) {
+      const scale = this.canvas.clientWidth / this.canvas.width;
+      info.textContent = `${this.canvas.width}×${this.canvas.height} @ ${(scale*100).toFixed(0)}%`;
+    }
+  }
+
+  setupEventListeners() {
+    window.addEventListener('resize', () => this.resizeCanvas());
+
+    // 画布鼠标事件
+    this.canvas.addEventListener('mousedown', (e) => this.handleCanvasMouseDown(e));
+    this.canvas.addEventListener('mousemove', (e) => this.handleCanvasMouseMove(e));
+    this.canvas.addEventListener('mouseup', (e) => this.handleCanvasMouseUp(e));
+    this.canvas.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      this.handleCanvasRightClick(e);
+    });
+
+    // 键盘事件
+    document.addEventListener('keydown', (e) => this.handleKeyDown(e));
+  }
+
+  // 设置绘制模式
+  setDrawMode(mode) {
+    this.drawMode = mode;
+    this.drawPoints = [];
+    this.isDrawingPath = false;
+    if (mode) {
+      this.canvas.style.cursor = mode === 'polyline' ? 'crosshair' : 'crosshair';
+    } else {
+      this.canvas.style.cursor = 'crosshair';
+    }
+  }
+
+  _getCanvasMouse(e) {
+    const rect = this.canvas.getBoundingClientRect();
+    const scaleX = this.canvas.width / rect.width;
+    const scaleY = this.canvas.height / rect.height;
+    return {
+      x: (e.clientX - rect.left) * scaleX,
+      y: (e.clientY - rect.top) * scaleY
+    };
+  }
+
+  handleCanvasMouseDown(e) {
+    if (e.button !== 0) return; // 只处理左键
+    const { x, y } = this._getCanvasMouse(e);
+    const relX = x / this.canvas.width;
+    const relY = y / this.canvas.height;
+
+    // 绘制模式处理
+    if (this.drawMode === 'polyline') {
+      this.drawPoints.push([relX, relY]);
+      this.rebuild();
+      return;
+    }
+
+    if (this.drawMode === 'path') {
+      this.isDrawingPath = true;
+      if (this.drawPoints.length === 0) {
+        this.drawPoints.push([relX, relY]);
+      }
+      this.rebuild();
+      return;
+    }
+
+    // 检查是否点击了选中元素的 Transform 手柄
+    if (this.selectedElement && this.selectedElement.startsWith('shape_') && this.bg) {
+      const shapeId = this.selectedElement.replace('shape_', '');
+      const shape = this.config.shapes?.find(s => s.id === shapeId);
+      if (shape && !shape.locked) {
+        // 检查是否点击了控制点（polyline/path）
+        if ((shape.type === 'polyline' || shape.type === 'path') && shape.points) {
+          const cpIdx = this.bg.getControlPointAt(shape, x, y);
+          if (cpIdx >= 0) {
+            this.controlPointState = {
+              shapeId: shapeId,
+              pointIndex: cpIdx,
+              startX: x,
+              startY: y,
+              startPoint: [...shape.points[cpIdx]]
+            };
+            this.canvas.style.cursor = 'move';
+            return;
+          }
+        }
+        
+        const handle = this.bg.getTransformHandle(x, y, shape);
+        if (handle) {
+          this.transformState = {
+            mode: handle,
+            startX: x,
+            startY: y,
+            startProps: { ...shape }
+          };
+          this.canvas.style.cursor = this._getCursorForHandle(handle);
+          return;
+        }
+      }
+    }
+
+    // 执行点击选择
+    if (this.bg) {
+      const hits = this.bg.hitTest(x, y);
+      const unlockedHit = hits.find(h => {
+        if (h.type && h.type.startsWith('shape_')) {
+          const shapeId = h.type.replace('shape_', '');
+          const shape = this.config.shapes?.find(s => s.id === shapeId);
+          return shape && !shape.locked;
+        }
+        return true;
+      });
+      
+      // Shift+点击：多选/取消选择
+      if (e.shiftKey && unlockedHit && unlockedHit.type.startsWith('shape_')) {
+        const idx = this.selectedElements.indexOf(unlockedHit.type);
+        if (idx >= 0) {
+          // 已选中，取消选择
+          this.selectedElements.splice(idx, 1);
+          if (this.selectedElement === unlockedHit.type) {
+            this.selectedElement = this.selectedElements[0] || null;
+          }
+        } else {
+          // 未选中，添加到选择
+          this.selectedElements.push(unlockedHit.type);
+          this.selectedElement = unlockedHit.type;
+        }
+        this.updateUI();
+        this.updatePropertyPanel();
+      } else if (unlockedHit) {
+        this.selectElement(unlockedHit.type);
+      } else {
+        this.selectElement(null);
+      }
+    }
+  }
+
+  // 缩放基于控制点的形状（折线、曲线）
+  _resizePointsShape(shape, startProps, dx, dy, w, h, direction) {
+    if (!startProps.points || startProps.points.length === 0) return;
+    const pts = startProps.points;
+    const xs = pts.map(p => p[0]), ys = pts.map(p => p[1]);
+    const minX = Math.min(...xs), maxX = Math.max(...xs);
+    const minY = Math.min(...ys), maxY = Math.max(...ys);
+    const rangeX = maxX - minX || 0.01;
+    const rangeY = maxY - minY || 0.01;
+    
+    let scaleX = 1, scaleY = 1;
+    if (direction.includes('e')) scaleX = 1 + dx / (w * rangeX);
+    if (direction.includes('w')) scaleX = 1 - dx / (w * rangeX);
+    if (direction.includes('s')) scaleY = 1 + dy / (h * rangeY);
+    if (direction.includes('n')) scaleY = 1 - dy / (h * rangeY);
+    scaleX = Math.max(0.1, Math.min(3, scaleX));
+    scaleY = Math.max(0.1, Math.min(3, scaleY));
+    
+    const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2;
+    shape.points = pts.map(p => [
+      Math.max(0, Math.min(1, cx + (p[0] - cx) * scaleX)),
+      Math.max(0, Math.min(1, cy + (p[1] - cy) * scaleY))
+    ]);
+  }
+
+  _getCursorForHandle(handle) {
+    const map = {
+      'move': 'move',
+      'rotate': `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z' fill='%2358a6ff'/%3E%3C/svg%3E") 12 12, crosshair`,
+      'resize-nw': 'nwse-resize',
+      'resize-se': 'nwse-resize',
+      'resize-ne': 'nesw-resize',
+      'resize-sw': 'nesw-resize',
+      'resize-n': 'ns-resize',
+      'resize-s': 'ns-resize',
+      'resize-e': 'ew-resize',
+      'resize-w': 'ew-resize'
+    };
+    return map[handle] || 'crosshair';
+  }
+
+  handleCanvasMouseMove(e) {
+    const { x, y } = this._getCanvasMouse(e);
+    const relX = x / this.canvas.width;
+    const relY = y / this.canvas.height;
+
+    // 路径绘制模式：拖动时添加点
+    if (this.drawMode === 'path' && this.isDrawingPath) {
+      const lastPt = this.drawPoints[this.drawPoints.length - 1];
+      const dist = Math.hypot(relX - lastPt[0], relY - lastPt[1]);
+      if (dist > 0.02) { // 最小距离阈值，避免点太密集
+        this.drawPoints.push([relX, relY]);
+        this.rebuild();
+      }
+      return;
+    }
+
+    // 处理控制点拖拽
+    if (this.controlPointState) {
+      const shape = this.config.shapes?.find(s => s.id === this.controlPointState.shapeId);
+      if (shape && shape.points) {
+        const relX = x / this.canvas.width;
+        const relY = y / this.canvas.height;
+        shape.points[this.controlPointState.pointIndex] = [
+          Math.max(0, Math.min(1, relX)),
+          Math.max(0, Math.min(1, relY))
+        ];
+        this.rebuild();
+      }
+      return;
+    }
+
+    // 更新鼠标样式
+    if (!this.transformState && this.selectedElement && this.selectedElement.startsWith('shape_') && this.bg) {
+      const shapeId = this.selectedElement.replace('shape_', '');
+      const shape = this.config.shapes?.find(s => s.id === shapeId);
+      if (shape && !shape.locked) {
+        // 检查是否悬停在控制点上
+        if ((shape.type === 'polyline' || shape.type === 'path') && shape.points) {
+          const cpIdx = this.bg.getControlPointAt(shape, x, y);
+          if (cpIdx >= 0) {
+            this.canvas.style.cursor = 'move';
+            return;
+          }
+        }
+        const handle = this.bg.getTransformHandle(x, y, shape);
+        this.canvas.style.cursor = handle ? this._getCursorForHandle(handle) : 'crosshair';
+      }
+    }
+
+    // 处理 Transform 拖拽
+    if (!this.transformState) return;
+
+    const shapeId = this.selectedElement.replace('shape_', '');
+    const shape = this.config.shapes?.find(s => s.id === shapeId);
+    if (!shape) return;
+
+    const dx = x - this.transformState.startX;
+    const dy = y - this.transformState.startY;
+    const sp = this.transformState.startProps;
+    const w = this.canvas.width, h = this.canvas.height;
+
+    switch (this.transformState.mode) {
+      case 'move':
+        if (shape.type === 'rectangle' || shape.type === 'circle' || shape.type === 'polygon' || shape.type === 'particles') {
+          shape.x = Math.max(0, Math.min(1, sp.x + dx / w));
+          shape.y = Math.max(0, Math.min(1, sp.y + dy / h));
+        } else if (shape.type === 'polyline' || shape.type === 'path') {
+          // 折线/曲线：偏移所有控制点
+          if (sp.points) {
+            const offsetX = dx / w;
+            const offsetY = dy / h;
+            shape.points = sp.points.map(p => [
+              Math.max(0, Math.min(1, p[0] + offsetX)),
+              Math.max(0, Math.min(1, p[1] + offsetY))
+            ]);
+          }
+        }
+        break;
+
+      case 'resize-nw':
+        if (shape.type === 'rectangle') {
+          const newX = Math.max(0, Math.min(sp.x + sp.width - 0.01, sp.x + dx / w));
+          const newY = Math.max(0, Math.min(sp.y + sp.height - 0.01, sp.y + dy / h));
+          shape.width = Math.max(0.01, sp.width + sp.x - newX);
+          shape.height = Math.max(0.01, sp.height + sp.y - newY);
+          shape.x = newX;
+          shape.y = newY;
+        } else if (shape.type === 'circle') {
+          shape.radiusX = Math.max(0.01, (sp.radiusX || sp.radius) - dx / w);
+          shape.radiusY = Math.max(0.01, (sp.radiusY || sp.radius) - dy / h);
+        } else if (shape.type === 'polygon') {
+          shape.radius = Math.max(0.01, sp.radius - Math.max(dx, dy) / Math.min(w, h));
+        } else if (shape.type === 'polyline' || shape.type === 'path') {
+          this._resizePointsShape(shape, sp, dx, dy, w, h, 'nw');
+        }
+        break;
+
+      case 'resize-se':
+        if (shape.type === 'rectangle') {
+          shape.width = Math.max(0.01, sp.width + dx / w);
+          shape.height = Math.max(0.01, sp.height + dy / h);
+        } else if (shape.type === 'circle') {
+          shape.radiusX = Math.max(0.01, (sp.radiusX || sp.radius) + dx / w);
+          shape.radiusY = Math.max(0.01, (sp.radiusY || sp.radius) + dy / h);
+        } else if (shape.type === 'polygon') {
+          shape.radius = Math.max(0.01, sp.radius + Math.max(dx, dy) / Math.min(w, h));
+        } else if (shape.type === 'polyline' || shape.type === 'path') {
+          this._resizePointsShape(shape, sp, dx, dy, w, h, 'se');
+        }
+        break;
+
+      case 'resize-ne':
+        if (shape.type === 'rectangle') {
+          const newY = Math.max(0, Math.min(sp.y + sp.height - 0.01, sp.y + dy / h));
+          shape.width = Math.max(0.01, sp.width + dx / w);
+          shape.height = Math.max(0.01, sp.height + sp.y - newY);
+          shape.y = newY;
+        } else if (shape.type === 'circle') {
+          shape.radiusX = Math.max(0.01, (sp.radiusX || sp.radius) + dx / w);
+          shape.radiusY = Math.max(0.01, (sp.radiusY || sp.radius) - dy / h);
+        } else if (shape.type === 'polygon') {
+          shape.radius = Math.max(0.01, sp.radius + Math.max(dx, -dy) / Math.min(w, h));
+        } else if (shape.type === 'polyline' || shape.type === 'path') {
+          this._resizePointsShape(shape, sp, dx, dy, w, h, 'ne');
+        }
+        break;
+
+      case 'resize-sw':
+        if (shape.type === 'rectangle') {
+          const newX = Math.max(0, Math.min(sp.x + sp.width - 0.01, sp.x + dx / w));
+          shape.width = Math.max(0.01, sp.width + sp.x - newX);
+          shape.height = Math.max(0.01, sp.height + dy / h);
+          shape.x = newX;
+        } else if (shape.type === 'circle') {
+          shape.radiusX = Math.max(0.01, (sp.radiusX || sp.radius) - dx / w);
+          shape.radiusY = Math.max(0.01, (sp.radiusY || sp.radius) + dy / h);
+        } else if (shape.type === 'polygon') {
+          shape.radius = Math.max(0.01, sp.radius + Math.max(-dx, dy) / Math.min(w, h));
+        } else if (shape.type === 'polyline' || shape.type === 'path') {
+          this._resizePointsShape(shape, sp, dx, dy, w, h, 'sw');
+        }
+        break;
+
+      case 'resize-n':
+        if (shape.type === 'rectangle') {
+          const newY = Math.max(0, Math.min(sp.y + sp.height - 0.01, sp.y + dy / h));
+          shape.height = Math.max(0.01, sp.height + sp.y - newY);
+          shape.y = newY;
+        } else if (shape.type === 'circle') {
+          shape.radiusY = Math.max(0.01, (sp.radiusY || sp.radius) - dy / h);
+        } else if (shape.type === 'polygon') {
+          shape.radius = Math.max(0.01, sp.radius - dy / Math.min(w, h));
+        } else if (shape.type === 'polyline' || shape.type === 'path') {
+          this._resizePointsShape(shape, sp, dx, dy, w, h, 'n');
+        }
+        break;
+
+      case 'resize-s':
+        if (shape.type === 'rectangle') {
+          shape.height = Math.max(0.01, sp.height + dy / h);
+        } else if (shape.type === 'circle') {
+          shape.radiusY = Math.max(0.01, (sp.radiusY || sp.radius) + dy / h);
+        } else if (shape.type === 'polygon') {
+          shape.radius = Math.max(0.01, sp.radius + dy / Math.min(w, h));
+        } else if (shape.type === 'polyline' || shape.type === 'path') {
+          this._resizePointsShape(shape, sp, dx, dy, w, h, 's');
+        }
+        break;
+
+      case 'resize-e':
+        if (shape.type === 'rectangle') {
+          shape.width = Math.max(0.01, sp.width + dx / w);
+        } else if (shape.type === 'circle') {
+          shape.radiusX = Math.max(0.01, (sp.radiusX || sp.radius) + dx / w);
+        } else if (shape.type === 'polygon') {
+          shape.radius = Math.max(0.01, sp.radius + dx / Math.min(w, h));
+        } else if (shape.type === 'polyline' || shape.type === 'path') {
+          this._resizePointsShape(shape, sp, dx, dy, w, h, 'e');
+        }
+        break;
+
+      case 'resize-w':
+        if (shape.type === 'rectangle') {
+          const newX = Math.max(0, Math.min(sp.x + sp.width - 0.01, sp.x + dx / w));
+          shape.width = Math.max(0.01, sp.width + sp.x - newX);
+          shape.x = newX;
+        } else if (shape.type === 'circle') {
+          shape.radiusX = Math.max(0.01, (sp.radiusX || sp.radius) - dx / w);
+        } else if (shape.type === 'polygon') {
+          shape.radius = Math.max(0.01, sp.radius - dx / Math.min(w, h));
+        } else if (shape.type === 'polyline' || shape.type === 'path') {
+          this._resizePointsShape(shape, sp, dx, dy, w, h, 'w');
+        }
+        break;
+
+      case 'resize-se':
+        if (shape.type === 'rectangle') {
+          shape.width = Math.max(0.01, sp.width + dx / w);
+          shape.height = Math.max(0.01, sp.height + dy / h);
+        } else if (shape.type === 'circle') {
+          shape.radiusX = Math.max(0.01, (sp.radiusX || sp.radius) + dx / w);
+          shape.radiusY = Math.max(0.01, (sp.radiusY || sp.radius) + dy / h);
+        } else if (shape.type === 'polygon') {
+          shape.radius = Math.max(0.01, sp.radius + Math.max(dx, dy) / Math.min(w, h));
+        } else if (shape.type === 'polyline' || shape.type === 'path') {
+          this._resizePointsShape(shape, sp, dx, dy, w, h, 'se');
+        }
+        break;
+
+      case 'resize-ne':
+        if (shape.type === 'rectangle') {
+          const newY = Math.max(0, Math.min(sp.y + sp.height - 0.01, sp.y + dy / h));
+          shape.width = Math.max(0.01, sp.width + dx / w);
+          shape.height = Math.max(0.01, sp.height + sp.y - newY);
+          shape.y = newY;
+        } else if (shape.type === 'circle') {
+          shape.radiusX = Math.max(0.01, (sp.radiusX || sp.radius) + dx / w);
+          shape.radiusY = Math.max(0.01, (sp.radiusY || sp.radius) - dy / h);
+        } else if (shape.type === 'polygon') {
+          shape.radius = Math.max(0.01, sp.radius + Math.max(dx, -dy) / Math.min(w, h));
+        } else if (shape.type === 'polyline' || shape.type === 'path') {
+          this._resizePointsShape(shape, sp, dx, dy, w, h, 'ne');
+        }
+        break;
+
+      case 'resize-sw':
+        if (shape.type === 'rectangle') {
+          const newX = Math.max(0, Math.min(sp.x + sp.width - 0.01, sp.x + dx / w));
+          shape.width = Math.max(0.01, sp.width + sp.x - newX);
+          shape.height = Math.max(0.01, sp.height + dy / h);
+          shape.x = newX;
+        } else if (shape.type === 'circle') {
+          shape.radiusX = Math.max(0.01, (sp.radiusX || sp.radius) - dx / w);
+          shape.radiusY = Math.max(0.01, (sp.radiusY || sp.radius) + dy / h);
+        } else if (shape.type === 'polygon') {
+          shape.radius = Math.max(0.01, sp.radius + Math.max(-dx, dy) / Math.min(w, h));
+        } else if (shape.type === 'polyline' || shape.type === 'path') {
+          this._resizePointsShape(shape, sp, dx, dy, w, h, 'sw');
+        }
+        break;
+
+      case 'resize-n':
+        if (shape.type === 'rectangle') {
+          const newY = Math.max(0, Math.min(sp.y + sp.height - 0.01, sp.y + dy / h));
+          shape.height = Math.max(0.01, sp.height + sp.y - newY);
+          shape.y = newY;
+        } else if (shape.type === 'circle') {
+          shape.radiusY = Math.max(0.01, (sp.radiusY || sp.radius) - dy / h);
+        } else if (shape.type === 'polygon') {
+          shape.radius = Math.max(0.01, sp.radius - dy / Math.min(w, h));
+        } else if (shape.type === 'polyline' || shape.type === 'path') {
+          this._resizePointsShape(shape, sp, dx, dy, w, h, 'n');
+        }
+        break;
+
+      case 'resize-s':
+        if (shape.type === 'rectangle') {
+          shape.height = Math.max(0.01, sp.height + dy / h);
+        } else if (shape.type === 'circle') {
+          shape.radiusY = Math.max(0.01, (sp.radiusY || sp.radius) + dy / h);
+        } else if (shape.type === 'polygon') {
+          shape.radius = Math.max(0.01, sp.radius + dy / Math.min(w, h));
+        } else if (shape.type === 'polyline' || shape.type === 'path') {
+          this._resizePointsShape(shape, sp, dx, dy, w, h, 's');
+        }
+        break;
+
+      case 'resize-e':
+        if (shape.type === 'rectangle') {
+          shape.width = Math.max(0.01, sp.width + dx / w);
+        } else if (shape.type === 'circle') {
+          shape.radiusX = Math.max(0.01, (sp.radiusX || sp.radius) + dx / w);
+        } else if (shape.type === 'polygon') {
+          shape.radius = Math.max(0.01, sp.radius + dx / Math.min(w, h));
+        } else if (shape.type === 'polyline' || shape.type === 'path') {
+          this._resizePointsShape(shape, sp, dx, dy, w, h, 'e');
+        }
+        break;
+
+      case 'resize-w':
+        if (shape.type === 'rectangle') {
+          const newX = Math.max(0, Math.min(sp.x + sp.width - 0.01, sp.x + dx / w));
+          shape.width = Math.max(0.01, sp.width + sp.x - newX);
+          shape.x = newX;
+        } else if (shape.type === 'circle') {
+          shape.radiusX = Math.max(0.01, (sp.radiusX || sp.radius) - dx / w);
+        } else if (shape.type === 'polygon') {
+          shape.radius = Math.max(0.01, sp.radius - dx / Math.min(w, h));
+        } else if (shape.type === 'polyline' || shape.type === 'path') {
+          this._resizePointsShape(shape, sp, dx, dy, w, h, 'w');
+        }
+        break;
+
+      case 'rotate':
+        // 简单旋转：更新 rotation 属性（如果有）
+        if (shape.rotation !== undefined) {
+          const bounds = this.bg.getShapeBounds(shape);
+          const cx = bounds.x + bounds.width / 2;
+          const cy = bounds.y + bounds.height / 2;
+          const startAngle = Math.atan2(this.transformState.startY - cy, this.transformState.startX - cx);
+          const currentAngle = Math.atan2(y - cy, x - cx);
+          shape.rotation = (sp.rotation || 0) + (currentAngle - startAngle) * 180 / Math.PI;
+        }
+        break;
+    }
+
+    this.rebuild();
+  }
+
+  handleCanvasMouseUp(e) {
+    if (this.drawMode === 'path') {
+      this.isDrawingPath = false;
+      return;
+    }
+    if (this.controlPointState) {
+      this.controlPointState = null;
+      this.canvas.style.cursor = 'crosshair';
+      this.markDirty();
+    }
+    if (this.transformState) {
+      this.transformState = null;
+      this.canvas.style.cursor = 'crosshair';
+      this.markDirty();
+    }
+  }
+
+  handleCanvasRightClick(e) {
+    // 右键完成绘制
+    if (this.drawMode === 'polyline' || this.drawMode === 'path') {
+      if (this.drawPoints.length >= 2) {
+        const type = this.drawMode;
+        let points = [...this.drawPoints];
+        // 曲线模式：简化点数，保留形状
+        if (type === 'path' && points.length > 4) {
+          points = this._simplifyPoints(points, 0.015);
+        }
+
+        // 检查起点和终点是否靠近（10像素内）
+        const startPt = points[0];
+        const endPt = points[points.length - 1];
+        const dx = (startPt[0] - endPt[0]) * this.canvas.width;
+        const dy = (startPt[1] - endPt[1]) * this.canvas.height;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        const isNearby = dist <= 10;
+
+        const createShape = (closed) => {
+          const properties = {
+            points: points,
+            fill: closed ? 'rgba(88, 166, 255, 0.2)' : 'none',
+            stroke: 'rgba(255, 255, 255, 0.8)',
+            strokeWidth: 2,
+            closed: closed,
+            rotation: 0,
+            blendMode: 'source-over'
+          };
+          this.addElement(type, properties);
+          this.setDrawMode(null);
+          this.rebuild();
+        };
+
+        // 检查是否设置了"不再询问"
+        const skipCloseAsk = localStorage.getItem('editor_skipCloseAsk') === 'true';
+
+        if (isNearby) {
+          if (skipCloseAsk) {
+            // 不再询问，自动闭合
+            createShape(true);
+          } else {
+            // 显示闭合询问对话框
+            this._showCloseDialog(createShape);
+          }
+        } else {
+          createShape(false);
+        }
+      } else {
+        this.setDrawMode(null);
+        this.rebuild();
+      }
+    }
+  }
+
+  _showCloseDialog(callback) {
+    const overlay = document.createElement('div');
+    overlay.style.cssText = `
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.6); z-index: 10000;
+      display: flex; align-items: center; justify-content: center;
+    `;
+
+    const dialog = document.createElement('div');
+    dialog.style.cssText = `
+      background: #161b22; border: 1px solid #30363d; border-radius: 8px;
+      padding: 20px; min-width: 280px; color: #c9d1d9;
+    `;
+
+    const title = document.createElement('div');
+    title.style.cssText = 'font-size: 14px; font-weight: 600; margin-bottom: 12px; color: #58a6ff;';
+    title.textContent = '闭合图形';
+
+    const msg = document.createElement('div');
+    msg.style.cssText = 'font-size: 12px; margin-bottom: 16px; color: #8b949e;';
+    msg.textContent = '起点和终点很接近，是否闭合图形？';
+
+    const checkboxWrap = document.createElement('label');
+    checkboxWrap.style.cssText = 'display: flex; align-items: center; gap: 6px; font-size: 11px; color: #8b949e; margin-bottom: 16px; cursor: pointer;';
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.addEventListener('change', () => {
+      localStorage.setItem('editor_skipCloseAsk', checkbox.checked ? 'true' : 'false');
+    });
+    checkboxWrap.appendChild(checkbox);
+    checkboxWrap.appendChild(document.createTextNode('不再询问，自动闭合'));
+
+    const btnWrap = document.createElement('div');
+    btnWrap.style.cssText = 'display: flex; gap: 8px; justify-content: flex-end;';
+
+    const btnYes = document.createElement('button');
+    btnYes.className = 'btn primary';
+    btnYes.textContent = '闭合';
+    btnYes.addEventListener('click', () => { overlay.remove(); callback(true); });
+
+    const btnNo = document.createElement('button');
+    btnNo.className = 'btn';
+    btnNo.textContent = '不闭合';
+    btnNo.addEventListener('click', () => { overlay.remove(); callback(false); });
+
+    btnWrap.appendChild(btnNo);
+    btnWrap.appendChild(btnYes);
+    dialog.appendChild(title);
+    dialog.appendChild(msg);
+    dialog.appendChild(checkboxWrap);
+    dialog.appendChild(btnWrap);
+    overlay.appendChild(dialog);
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) { overlay.remove(); callback(false); } });
+    document.body.appendChild(overlay);
+  }
+
+  // Ramer-Douglas-Peucker 点简化算法
+  _simplifyPoints(points, epsilon) {
+    if (points.length <= 2) return points;
+    
+    // 找到距离首尾连线最远的点
+    let maxDist = 0;
+    let maxIdx = 0;
+    const start = points[0];
+    const end = points[points.length - 1];
+    
+    for (let i = 1; i < points.length - 1; i++) {
+      const dist = this._pointLineDistance(points[i], start, end);
+      if (dist > maxDist) {
+        maxDist = dist;
+        maxIdx = i;
+      }
+    }
+    
+    // 如果最大距离大于阈值，递归简化
+    if (maxDist > epsilon) {
+      const left = this._simplifyPoints(points.slice(0, maxIdx + 1), epsilon);
+      const right = this._simplifyPoints(points.slice(maxIdx), epsilon);
+      return [...left.slice(0, -1), ...right];
+    }
+    
+    // 否则只保留首尾
+    return [start, end];
+  }
+
+  // 点到直线的距离
+  _pointLineDistance(point, lineStart, lineEnd) {
+    const dx = lineEnd[0] - lineStart[0];
+    const dy = lineEnd[1] - lineStart[1];
+    const len2 = dx * dx + dy * dy;
+    if (len2 === 0) return Math.hypot(point[0] - lineStart[0], point[1] - lineStart[1]);
+    
+    let t = ((point[0] - lineStart[0]) * dx + (point[1] - lineStart[1]) * dy) / len2;
+    t = Math.max(0, Math.min(1, t));
+    
+    const projX = lineStart[0] + t * dx;
+    const projY = lineStart[1] + t * dy;
+    return Math.hypot(point[0] - projX, point[1] - projY);
+  }
+
+  handleKeyDown(e) {
+    // 处理键盘快捷键
+    if (e.ctrlKey || e.metaKey) {
+      switch(e.key) {
+        case 'z':
+          e.preventDefault();
+          if (e.shiftKey) {
+            this.redo();
+          } else {
+            this.undo();
+          }
+          break;
+        case 's':
+          e.preventDefault();
+          this.saveConfig();
+          break;
+        case 'c':
+          if (this.selectedElement) {
+            this.copyElement(this.selectedElement);
+          }
+          break;
+        case 'v':
+          this.pasteElement();
+          break;
+      }
+    } else {
+      switch(e.key) {
+        case 'Delete':
+        case 'Backspace':
+          if (this.selectedElement) {
+            this.deleteElement(this.selectedElement);
+          }
+          break;
+        case 'Escape':
+          if (this.drawMode) {
+            this.setDrawMode(null);
+          } else {
+            this.selectElement(null);
+          }
+          break;
+      }
+    }
+  }
+
+  // 配置管理
+  loadConfig(config) {
+    this.saveToHistory();
+    this.config = { ...EMPTY_CONFIG, ...config };
+    this.rebuild();
+    this.markDirty();
+  }
+
+  resetConfig() {
+    if (confirm('确定重置为空白画布？未保存的修改将丢失。')) {
+      this.saveToHistory();
+      this.config = JSON.parse(JSON.stringify(EMPTY_CONFIG));
+      this.rebuild();
+      this.markDirty();
+    }
+  }
+
+  saveConfig() {
+    const blob = new Blob([JSON.stringify(this.config, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'background-config.json';
+    a.click();
+    URL.revokeObjectURL(a.href);
+    this.markClean();
+  }
+
+  loadFromFile() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json';
+    input.onchange = (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        try {
+          const config = JSON.parse(ev.target.result);
+          this.loadConfig(config);
+        } catch (err) {
+          alert('JSON 解析失败: ' + err.message);
+        }
+      };
+      reader.readAsText(file);
+    };
+    input.click();
+  }
+
+  // 本地存储
+  saveToStorage() {
+    try {
+      localStorage.setItem('bg-editor-config', JSON.stringify(this.config));
+      this.markClean();
+    } catch (e) {
+      console.warn('保存到本地存储失败:', e);
+    }
+  }
+
+  loadFromStorage() {
+    try {
+      const saved = localStorage.getItem('bg-editor-config');
+      if (saved) {
+        this.config = JSON.parse(saved);
+        this.rebuild();
+      }
+    } catch (e) {
+      console.warn('从本地存储加载失败:', e);
+    }
+  }
+
+  // 撤销重做
+  saveToHistory() {
+    // 移除当前位置之后的历史
+    this.history = this.history.slice(0, this.historyIndex + 1);
+    
+    // 添加当前状态
+    this.history.push(JSON.parse(JSON.stringify(this.config)));
+    
+    // 限制历史长度
+    if (this.history.length > this.maxHistory) {
+      this.history.shift();
+    }
+    
+    this.historyIndex = this.history.length - 1;
+  }
+
+  undo() {
+    if (this.historyIndex > 0) {
+      this.historyIndex--;
+      this.config = JSON.parse(JSON.stringify(this.history[this.historyIndex]));
+      this.rebuild();
+      this.markDirty();
+    }
+  }
+
+  redo() {
+    if (this.historyIndex < this.history.length - 1) {
+      this.historyIndex++;
+      this.config = JSON.parse(JSON.stringify(this.history[this.historyIndex]));
+      this.rebuild();
+      this.markDirty();
+    }
+  }
+
+  // 元素管理
+  selectElement(elementId) {
+    this.selectedElement = elementId;
+    this.selectedElements = elementId ? [elementId] : [];
+    this.updateUI();
+    this.updatePropertyPanel();
+  }
+
+  // 多选元素（框选）
+  selectMultipleElements(elementIds) {
+    if (!elementIds || elementIds.length === 0) return;
+    this.selectedElements = [...elementIds];
+    // 单选第一个，用于属性面板显示
+    this.selectedElement = elementIds[0];
+    this.updateUI();
+    this.updatePropertyPanel();
+  }
+  
+  // 重命名选中的元素
+  renameSelectedElement() {
+    if (!this.selectedElement || !this.selectedElement.startsWith('shape_')) return;
+    
+    const shapeId = this.selectedElement.replace('shape_', '');
+    const shape = this.config.shapes.find(s => s.id === shapeId);
+    if (!shape || shape.locked) return;
+    
+    // 触发UI层的重命名
+    if (this.triggerRename) {
+      this.triggerRename(shape);
+    }
+  }
+
+  addElement(type, properties = {}) {
+    this.saveToHistory();
+
+    const rawId = properties.id ? String(properties.id).replace('shape_', '') : `${Date.now()}`;
+    const elementId = `shape_${rawId}`;
+    const element = {
+      id: rawId,
+      type: type,
+      visible: true,
+      locked: false,
+      opacity: 1,
+      ...properties,
+      id: rawId
+    };
+    
+    if (!this.config.shapes) {
+      this.config.shapes = [];
+    }
+    
+    this.config.shapes.push(element);
+    
+    if (!this.config.layerOrder) {
+      this.config.layerOrder = [];
+    }
+    this.config.layerOrder.push(elementId);
+    
+    // 保存变更后的状态到历史记录
+    this.saveToHistory();
+    
+    this.rebuild();
+    this.selectElement(elementId);
+    this.markDirty();
+    
+    return elementId;
+  }
+
+  deleteElement(elementId) {
+    if (elementId.startsWith('shape_')) {
+      const shapeId = elementId.replace('shape_', '');
+      const shape = this.config.shapes.find(s => s.id === shapeId);
+      // 防止删除锁定的元素
+      if (shape && shape.locked) return;
+      
+      this.saveToHistory();
+      this.config.shapes = this.config.shapes.filter(s => s.id !== shapeId);
+      this.config.layerOrder = this.config.layerOrder.filter(id => id !== elementId);
+      
+      // 保存变更后的状态到历史记录
+      this.saveToHistory();
+      
+      if (this.selectedElement === elementId) {
+        this.selectElement(null);
+      }
+      
+      this.rebuild();
+      this.markDirty();
+    }
+  }
+
+  copyElement(elementId) {
+    if (!elementId) return;
+    
+    let element;
+    if (elementId.startsWith('shape_')) {
+      const shapeId = elementId.replace('shape_', '');
+      element = this.config.shapes.find(s => s.id === shapeId);
+    }
+    
+    if (element) {
+      this.clipboard = JSON.parse(JSON.stringify(element));
+    }
+  }
+
+  pasteElement() {
+    if (!this.clipboard) return;
+    
+    const newElement = {
+      ...this.clipboard,
+      id: `shape_${Date.now()}`,
+      name: `${this.clipboard.name || '未命名'} (副本)`
+    };
+    
+    this.addElement(newElement.type, newElement);
+  }
+
+  // 图层上移（快捷键用）
+  moveElementForward(elementId) {
+    this.moveElementUp(elementId || this.selectedElement);
+  }
+
+  // 图层下移（快捷键用）
+  moveElementBackward(elementId) {
+    this.moveElementDown(elementId || this.selectedElement);
+  }
+
+  // 图层上移
+  moveElementUp(elementId) {
+    if (!elementId) return;
+    const order = this.config.layerOrder;
+    const index = order.indexOf(elementId);
+    if (index === -1 || index >= order.length - 1) return;
+    
+    this.saveToHistory();
+    [order[index], order[index + 1]] = [order[index + 1], order[index]];
+    this.rebuild();
+    this.markDirty();
+  }
+
+  // 图层下移
+  moveElementDown(elementId) {
+    if (!elementId) return;
+    const order = this.config.layerOrder;
+    const index = order.indexOf(elementId);
+    if (index <= 0) return;
+    
+    this.saveToHistory();
+    [order[index], order[index - 1]] = [order[index - 1], order[index]];
+    this.rebuild();
+    this.markDirty();
+  }
+
+  // 图层移到顶层
+  moveElementToFront(elementId) {
+    if (!elementId) elementId = this.selectedElement;
+    if (!elementId) return;
+    const order = this.config.layerOrder;
+    const index = order.indexOf(elementId);
+    if (index === -1 || index === order.length - 1) return;
+    
+    this.saveToHistory();
+    order.splice(index, 1);
+    order.push(elementId);
+    this.rebuild();
+    this.markDirty();
+  }
+
+  // 图层移到底层
+  moveElementToBack(elementId) {
+    if (!elementId) elementId = this.selectedElement;
+    if (!elementId) return;
+    const order = this.config.layerOrder;
+    const index = order.indexOf(elementId);
+    if (index <= 0) return;
+    
+    this.saveToHistory();
+    order.splice(index, 1);
+    order.unshift(elementId);
+    this.rebuild();
+    this.markDirty();
+  }
+
+  // 打组：将选中的多个元素组合为一个组
+  groupElements(elementIds) {
+    if (!elementIds || elementIds.length < 2) return;
+    
+    this.saveToHistory();
+    
+    if (!this.config.groups) this.config.groups = [];
+    
+    const groupId = `group_${Date.now()}`;
+    const group = {
+      id: groupId,
+      name: `组 ${this.config.groups.length + 1}`,
+      children: [...elementIds]
+    };
+    
+    this.config.groups.push(group);
+    
+    // 在 layerOrder 中替换：移除子元素，插入组
+    const order = this.config.layerOrder;
+    const firstIndex = Math.min(...elementIds.map(id => order.indexOf(id)).filter(i => i !== -1));
+    
+    // 移除子元素
+    this.config.layerOrder = order.filter(id => !elementIds.includes(id));
+    
+    // 在第一个子元素位置插入组
+    this.config.layerOrder.splice(firstIndex, 0, groupId);
+    
+    this.rebuild();
+    this.selectElement(groupId);
+    this.markDirty();
+    
+    return groupId;
+  }
+
+  // 取消打组
+  ungroupElements(groupId) {
+    if (!groupId || !groupId.startsWith('group_')) return;
+    
+    const group = (this.config.groups || []).find(g => g.id === groupId);
+    if (!group) return;
+    
+    this.saveToHistory();
+    
+    const order = this.config.layerOrder;
+    const groupIndex = order.indexOf(groupId);
+    if (groupIndex === -1) return;
+    
+    // 移除组，插入子元素
+    order.splice(groupIndex, 1, ...group.children);
+    
+    // 从 groups 中移除
+    this.config.groups = this.config.groups.filter(g => g.id !== groupId);
+    
+    this.rebuild();
+    this.selectElement(group.children[0]);
+    this.markDirty();
+  }
+
+  // 获取组内的元素
+  getGroupChildren(groupId) {
+    const group = (this.config.groups || []).find(g => g.id === groupId);
+    if (!group) return [];
+    return group.children.map(childId => {
+      if (childId.startsWith('shape_')) {
+        const shapeId = childId.replace('shape_', '');
+        return this.config.shapes.find(s => s.id === shapeId);
+      }
+      return null;
+    }).filter(Boolean);
+  }
+
+  // 重建渲染
+  rebuild() {
+    this.resizeCanvas();
+    
+    if (this.bg) {
+      this.bg = null;
+    }
+    
+    // 创建新的渲染器
+    this.bg = new EditableDynamicBG(this.config);
+    
+    this.updateUI();
+  }
+
+  // 动画循环
+  startAnimation() {
+    const animate = (ts) => {
+      if (!this.lastTime) this.lastTime = ts;
+      const dt = Math.min((ts - this.lastTime) / 1000, 0.05);
+      this.lastTime = ts;
+
+      if (this.bg) {
+        this.bg.update(dt);
+        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        this.bg.draw(this.ctx);
+
+        // 绘制网格和参考线
+        if (this.canvasManager) {
+          this.canvasManager.drawGrid(this.ctx, this.canvas.width, this.canvas.height);
+          this.canvasManager.drawGuides(this.ctx, this.canvas.width, this.canvas.height);
+        }
+
+        // 绘制选中元素的 Transform 控制器
+        if (this.selectedElement && this.selectedElement.startsWith('shape_')) {
+          const shapeId = this.selectedElement.replace('shape_', '');
+          const shape = this.config.shapes?.find(s => s.id === shapeId);
+          if (shape && shape.visible !== false && !shape.locked) {
+            this.bg.drawTransform(this.ctx, shape);
+          }
+        }
+
+        // 绘制框选区域
+        if (this.canvasManager && this.canvasManager.selectionBox) {
+          this.canvasManager.drawSelectionBox(this.ctx);
+        }
+
+        // 绘制过程中的临时路径
+        if (this.drawMode && this.drawPoints.length >= 1) {
+          this.ctx.save();
+          this.ctx.strokeStyle = '#58a6ff';
+          this.ctx.lineWidth = 2;
+          this.ctx.setLineDash([5, 5]);
+          this.ctx.beginPath();
+          const pts = this.drawPoints;
+          this.ctx.moveTo(pts[0][0] * this.canvas.width, pts[0][1] * this.canvas.height);
+          for (let i = 1; i < pts.length; i++) {
+            this.ctx.lineTo(pts[i][0] * this.canvas.width, pts[i][1] * this.canvas.height);
+          }
+          this.ctx.stroke();
+          // 绘制点标记
+          this.ctx.fillStyle = '#58a6ff';
+          pts.forEach(pt => {
+            this.ctx.beginPath();
+            this.ctx.arc(pt[0] * this.canvas.width, pt[1] * this.canvas.height, 3, 0, Math.PI * 2);
+            this.ctx.fill();
+          });
+          this.ctx.restore();
+        }
+      }
+
+      this.animationId = requestAnimationFrame(animate);
+    };
+
+    this.animationId = requestAnimationFrame(animate);
+  }
+
+  stopAnimation() {
+    if (this.animationId) {
+      cancelAnimationFrame(this.animationId);
+      this.animationId = null;
+    }
+  }
+
+  // 状态管理
+  markDirty() {
+    this.isDirty = true;
+    this.updateTitle();
+    // 属性变化时重新渲染静态画布，确保实时更新
+    if (this.bg && this.bg.refreshStatic) {
+      this.bg.refreshStatic();
+    }
+  }
+
+  markClean() {
+    this.isDirty = false;
+    this.updateTitle();
+  }
+
+  updateTitle() {
+    document.title = `DynamicBG 编辑器 ${this.isDirty ? '(未保存)' : ''}`;
+  }
+
+  // UI 更新（需要子类或外部实现）
+  updateUI() {
+    // 由外部实现
+  }
+
+  updatePropertyPanel() {
+    // 由外部实现
+  }
+
+  // 设置画布尺寸
+  setCanvasSize(width, height) {
+    this.saveToHistory();
+    this.config.canvas.width = width;
+    this.config.canvas.height = height;
+    this.rebuild();
+    this.markDirty();
+  }
+
+  // 导出功能
+  exportPNG() {
+    if (!this.bg) return;
+    
+    // 创建临时画布
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = this.config.canvas.width;
+    tempCanvas.height = this.config.canvas.height;
+    const tempCtx = tempCanvas.getContext('2d');
+    
+    // 绘制当前帧
+    this.bg.draw(tempCtx);
+    
+    // 下载
+    const link = document.createElement('a');
+    link.download = 'background.png';
+    link.href = tempCanvas.toDataURL('image/png');
+    link.click();
+  }
+
+  exportJSON() {
+    return JSON.parse(JSON.stringify(this.config));
+  }
+
+  exportCode() {
+    return `const CONFIG = ${JSON.stringify(this.config, null, 2)};\n\n// 将 CONFIG 传入 EditableDynamicBG 构造函数即可`;
+  }
+
+  // AI 接口
+  getAIInterface() {
+    return {
+      // 获取当前配置
+      getConfig: () => this.exportJSON(),
+      
+      // 设置配置
+      setConfig: (config) => this.loadConfig(config),
+      
+      // 添加元素
+      addElement: (type, props) => this.addElement(type, props),
+      
+      // 删除元素
+      deleteElement: (id) => this.deleteElement(id),
+      
+      // 修改元素属性
+      updateElement: (id, props) => {
+        this.saveToHistory();
+        if (id.startsWith('shape_')) {
+          const shapeId = id.replace('shape_', '');
+          const shape = this.config.shapes.find(s => s.id === shapeId);
+          if (shape) {
+            Object.assign(shape, props);
+            this.rebuild();
+            this.markDirty();
+          }
+        }
+      },
+      
+      // 获取所有元素
+      getElements: () => {
+        return this.config.shapes || [];
+      },
+      
+      // 获取选中元素
+      getSelectedElement: () => this.selectedElement,
+      
+      // 选择元素
+      selectElement: (id) => this.selectElement(id),
+      
+      // 撤销/重做
+      undo: () => this.undo(),
+      redo: () => this.redo(),
+      
+      // 导出
+      exportPNG: () => this.exportPNG(),
+      exportJSON: () => this.exportJSON(),
+      
+      // 画布尺寸
+      setCanvasSize: (width, height) => {
+        this.saveToHistory();
+        this.config.canvas.width = width;
+        this.config.canvas.height = height;
+        this.rebuild();
+        this.markDirty();
+      },
+      
+      // 预设模板
+      loadPreset: (presetName) => {
+        if (PRESETS[presetName]) {
+          this.loadConfig(PRESETS[presetName]);
+        }
+      }
+    };
+  }
+}
+
+// 导出
+export { BackgroundEditor, EMPTY_CONFIG, PRESETS };

@@ -267,11 +267,14 @@ export class Enemy {
             }
 
             // 三叶虫击退撤离（从幼体方向弹开）— 标量运算
-            const bdx = this.pos.x - juv.head.x;
-            const bdy = this.pos.y - juv.head.y;
-            const bmag = Math.sqrt(bdx * bdx + bdy * bdy);
-            this.knockbackVelocity = new Vector(bmag > 0 ? bdx / bmag * 6 : 0, bmag > 0 ? bdy / bmag * 6 : 0);
-            this.knockbackTimer = CONFIG.FAMILY.ENEMY_KNOCKBACK_DURATION;
+            // 幼体可能已死亡（segments被清空），此时head为undefined，跳过击退
+            if (juv.head) {
+                const bdx = this.pos.x - juv.head.x;
+                const bdy = this.pos.y - juv.head.y;
+                const bmag = Math.sqrt(bdx * bdx + bdy * bdy);
+                this.knockbackVelocity = new Vector(bmag > 0 ? bdx / bmag * 6 : 0, bmag > 0 ? bdy / bmag * 6 : 0);
+                this.knockbackTimer = CONFIG.FAMILY.ENEMY_KNOCKBACK_DURATION;
+            }
 
             // 释放幼体并切换到漫游状态
             this.release();
@@ -283,7 +286,7 @@ export class Enemy {
 
     // 更新绕圈观察状态
     updateCircling(dt) {
-        if (!this.circleTarget.isAlive || !this.circleTarget.isJuvenile) {
+        if (!this.circleTarget.isAlive || !this.circleTarget.isJuvenile || !this.circleTarget.head) {
             this.isCircling = false;
             this.circleTarget = null;
             return;
@@ -317,6 +320,7 @@ export class Enemy {
 
     // 更新追击幼体状态
     updateChasing(nearestJuvenile) {
+        if (!nearestJuvenile.head) return;  // 幼体已死亡，跳过
         if (!this.isCircling) {
             this.isCircling = true;
             this.circleTarget = nearestJuvenile;

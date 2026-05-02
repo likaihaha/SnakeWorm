@@ -14,6 +14,7 @@ import { Enemy } from './enemy.js';
 import { BrokenTail } from './broken-tail.js';
 import { DeadBody } from './dead-body.js';
 import { Leaderboard } from './leaderboard.js';
+import { DynamicBG } from './dynamic-bg.js';
 
 export class Game {
     constructor() {
@@ -64,6 +65,13 @@ export class Game {
         this.gridCanvas.height = CONFIG.CANVAS_HEIGHT;
         this.gridCtx = this.gridCanvas.getContext('2d');
         this.preRenderGrid();
+
+        // 动态程序化背景（默认配置，随后加载外部 JSON）
+        this.bg = new DynamicBG(CONFIG.CANVAS_WIDTH, CONFIG.CANVAS_HEIGHT);
+        fetch('src/dynamic-bg-config.json')
+            .then(r => r.json())
+            .then(cfg => this.bg.applyConfig(cfg))
+            .catch(err => console.warn('动态背景配置加载失败，使用默认配置', err));
         // FPS相关
         this.showFPS = CONFIG.SHOW_FPS;
         this.targetFPS = CONFIG.TARGET_FPS;
@@ -526,6 +534,8 @@ export class Game {
         this.slowedWorms = new Map();
         this.score = 0;
         this.splitCount = 0;
+        // 生成 demo 元素（背景中游动的虫虫和宝珠）
+        this._spawnDemoElements();
         // 显示开始界面
         const startScreen = document.getElementById('startScreen');
         if (startScreen) startScreen.style.display = 'block';
@@ -535,6 +545,59 @@ export class Game {
         if (leaderboardBtn) leaderboardBtn.style.display = '';
         const audioLoading = document.getElementById('audioLoading');
         if (audioLoading) audioLoading.style.display = 'none';
+    }
+
+    /**
+     * 生成 demo 模式元素：几条 AI 虫虫和宝珠在背景中游动
+     */
+    _spawnDemoElements() {
+        const colors = ['#4ecca3', '#4ecdc4', '#ffe66d', '#ff8b94', '#a8e6cf', '#c7ceea'];
+        // 生成 3-4 条 AI 虫虫
+        const count = 3 + Math.floor(Math.random() * 2);
+        for (let i = 0; i < count; i++) {
+            const margin = CONFIG.WALL_MARGIN * 3;
+            const x = margin + Math.random() * (CONFIG.CANVAS_WIDTH - margin * 2);
+            const y = margin + Math.random() * (CONFIG.CANVAS_HEIGHT - margin * 2);
+            const color = colors[i % colors.length];
+            const worm = new Worm(x, y, 5 + Math.floor(Math.random() * 6), color, false);
+            worm.aiWanderDir = Vector.randomDir();
+            worm.aiWanderTimer = 2 + Math.random() * 3;
+            this.worms.push(worm);
+        }
+        // 生成一些宝珠
+        for (const type of CONFIG.FOOD_TYPES) {
+            const n = Math.min(type.maxCount, 2);
+            for (let i = 0; i < n; i++) {
+                this.foods.push(Food.random(type));
+            }
+        }
+    }
+
+    /**
+     * demo 模式更新：只更新 AI 虫虫和宝珠，不处理碰撞/分数等
+     */
+    _updateDemo(dt) {
+        // 更新虫虫
+        for (const worm of this.worms) {
+            if (!worm.isAlive || worm.segments.length === 0) continue;
+            worm.update(null, dt, this.foods, this.worms);
+            // 碰墙反弹
+            if (worm.checkWallCollision()) {
+                worm.aiWanderDir = Vector.randomDir();
+                const margin = CONFIG.WALL_MARGIN + CONFIG.SEGMENT_RADIUS;
+                worm.segments[0].x = Math.max(margin, Math.min(CONFIG.CANVAS_WIDTH - margin, worm.segments[0].x));
+                worm.segments[0].y = Math.max(margin, Math.min(CONFIG.CANVAS_HEIGHT - margin, worm.segments[0].y));
+            }
+        }
+        // 更新宝珠
+        for (const food of this.foods) food.update(dt);
+        // 补充宝珠（保持数量）
+        for (const type of CONFIG.FOOD_TYPES) {
+            const existing = this.foods.filter(f => f.type === type).length;
+            if (existing < type.maxCount && Math.random() < 0.01) {
+                this.foods.push(Food.random(type));
+            }
+        }
     }
 
     restart() {
@@ -675,10 +738,15 @@ export class Game {
                     if (this.state === GAME_STATE.PLAYING || this.deadBodies.length > 0 || this.playerDeadWaitingForBodies || this.spectating) {
                         this.update(targetInterval);
                     }
+                } else if (this.state === GAME_STATE.IDLE) {
+                    // demo 模式：只更新 AI 虫虫和宝珠
+                    this._updateDemo(targetInterval);
                 }
                 this.fpsAccumulator -= targetInterval;
             }
 
+            // 更新背景动画（菜单/游戏中均持续播放）
+            this.bg.update(deltaTime);
             this.draw();
         } catch (e) {
             console.error('[Game.loop] 主循环异常:', e);
@@ -1015,6 +1083,11 @@ export class Game {
                         } else {
                             this.showSplitNotice();
                         }
+                    } else {
+                        // 无法生成新虫（达到上限等），转为尸体下沉并产出食物，避免白白消失
+                        if (tail.segments && tail.segments.length > 0) {
+                            this.deadBodies.push(new DeadBody(tail.segments, tail.newColor));
+                        }
                     }
                 }
             }
@@ -1034,15 +1107,15 @@ export class Game {
                 // 每一段碰底的尸体转化为宝珠，从该段位置向上发射
                 for (const emit of emitted) {
                     const food = new Food(emit.x, emit.y, emit.type);
-                    const angle = (5 + Math.random() * 170) * Math.PI / 180;
-                    const speed = 4.0 + Math.random() * 4.0;
+                    const angle = (CONFIG.DEAD_BODY.EMIT_ANGLE_MIN + Math.random() * CONFIG.DEAD_BODY.EMIT_ANGLE_SPREAD) * Math.PI / 180;
+                    const speed = CONFIG.DEAD_BODY.EMIT_SPEED_MIN + Math.random() * CONFIG.DEAD_BODY.EMIT_SPEED_SPREAD;
                     food.velocity.x = speed * Math.cos(angle);
                     food.velocity.y = -speed * Math.sin(angle);
-                    food.inactiveTimer = 2.0;
+                    food.inactiveTimer = CONFIG.DEAD_BODY.EMIT_INACTIVE_TIME;
                     food.birthPhase = 'white';
-                    food.birthTimer = 1.2;
+                    food.birthTimer = CONFIG.DEAD_BODY.EMIT_BIRTH_TIME;
                     this.foods.push(food);
-                    for (let j = 0; j < 6; j++) {
+                    for (let j = 0; j < CONFIG.DEAD_BODY.EMIT_PARTICLE_COUNT; j++) {
                         this.particles.push(Particle.acquire(emit.x, emit.y, emit.type.color));
                     }
                 }
@@ -1727,6 +1800,32 @@ export class Game {
                         }
                     }
                 }
+
+                // 检测敌人与AI成年体虫虫碰撞（AI保护幼体时撞向敌人）
+                for (const worm of this.worms) {
+                    if (!worm.isAlive || worm.isPlayer || worm.isJuvenile || !worm.head) continue;
+                    if (!enemy.isDying && enemy.checkCollisionWithPlayer(worm)) {
+                        worm.adultHitCount++;
+                        const whx = enemy.pos.x - worm.head.x;
+                        const why = enemy.pos.y - worm.head.y;
+                        const whd = Math.sqrt(whx * whx + why * why);
+                        const hitDir = new Vector(whd > 0 ? whx / whd : 0, whd > 0 ? why / whd : 0);
+                        const killed = enemy.takeDamage(hitDir);
+                        if (killed) {
+                            this.floatingTexts.push(FloatingText.acquire(enemy.segments[0].x, enemy.segments[0].y - 20, 'KILL!', '#ff6b6b'));
+                        } else {
+                            this.floatingTexts.push(FloatingText.acquire(enemy.segments[0].x, enemy.segments[0].y - 20, `${enemy.health}/${enemy.maxHealth}`, '#ffa500'));
+                        }
+                        if (worm.adultHitCount >= CONFIG.FAMILY.ADULT_HITS_TO_LOSE) {
+                            worm.adultHitCount = 0;
+                            if (worm.segments.length > 3) {
+                                worm.segments.pop();
+                                worm.targetLength = worm.segments.length;
+                                worm.syncBlueToBody();
+                            }
+                        }
+                    }
+                }
                 
                 // 保留存活的敌人
                 if (enemy.isAlive) {
@@ -1796,6 +1895,8 @@ export class Game {
             for (let j = this.brokenTails.length - 1; j >= 0; j--) {
                 const tail = this.brokenTails[j];
                 if (!tail.segments || tail.segments.length === 0) continue;
+                // 只允许同父代的幼体吃断尾（父代已死的断尾任何幼体都能吃）
+                if (tail.parentWorm && tail.parentWorm.isAlive && worm.parentWorm !== tail.parentWorm) continue;
                 const dist = worm.head.dist(tail.segments[0]);
                 if (dist < CONFIG.FAMILY.JUVENILE_EAT_RADIUS) {
                     if (worm.segments.length < CONFIG.FAMILY.JUVENILE_MAX_LENGTH + 1) {
@@ -1871,8 +1972,8 @@ export class Game {
      * 显示死亡后观战界面的操作按钮（重新开始 / 排行榜）
      */
     _showPostDeathOverlay() {
-        this.spectating = true;
         this._hidePostDeathOverlay();
+        this.spectating = true;
 
         const overlay = document.createElement('div');
         overlay.id = 'postDeathOverlay';
@@ -1954,8 +2055,8 @@ export class Game {
     }
 
     draw() {
-        ctx.fillStyle = '#2d2d3a';
-        ctx.fillRect(0, 0, CONFIG.CANVAS_WIDTH, CONFIG.CANVAS_HEIGHT);
+        // 绘制程序化动态背景（替代纯色填充）
+        this.bg.draw(ctx);
 
         this.drawGrid();
 

@@ -44,7 +44,32 @@ export const WormDrawMixin = {
                 : segRaw;
             // 嘴部（索引 0）永远不属于尾巴区域，避免双重标识
             const isTail = i > 0 && tailIndices.has(i);
-            const sizeRatio = isHead ? 1.0 : (0.7 + 0.3 * (1 - i / this.segments.length));
+            
+            // 基础 sizeRatio：头部 1.0，身体从尾部 0.7 到头部附近 1.0 线性变化
+            let sizeRatio = isHead ? 1.0 : (0.7 + 0.3 * (1 - i / this.segments.length));
+            
+            // 长粗效果：当虫子长度 >= 20 节时，身体中间段按正态分布逐渐变粗
+            // 长度 20 开始生效，30 节时完全生效
+            if (!isHead && this.segments.length >= 20) {
+                const len = this.segments.length;
+                // 计算效果强度：20节开始，30节完全生效
+                const thicknessFactor = Math.min(1.0, (len - 20) / 10);
+                
+                // 正态分布：中间粗，两头保持原样
+                // i 归一化到 0-1（0=头部，1=尾部）
+                const t = i / len;
+                // 高斯函数：峰值在 t=0.4（稍微偏向头部）
+                const mu = 0.4;
+                const sigma = 0.22;  // 控制分布宽度，稍窄让中间更突出
+                const gaussian = Math.exp(-((t - mu) ** 2) / (2 * sigma ** 2));
+                
+                // 最大加粗倍数：中间段可以变粗 120%
+                const maxThickBonus = 1.2;
+                const thickBonus = gaussian * maxThickBonus * thicknessFactor;
+                
+                sizeRatio *= (1 + thickBonus);
+            }
+            
             let radius = CONFIG.SEGMENT_RADIUS * sizeRatio;
             if (isHead) {
                 radius *= this.headScale;  // 头部缩放比例
