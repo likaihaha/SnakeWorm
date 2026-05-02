@@ -15,6 +15,7 @@ import { BrokenTail } from './broken-tail.js';
 import { DeadBody } from './dead-body.js';
 import { Leaderboard } from './leaderboard.js';
 import { DynamicBG } from './dynamic-bg.js';
+import { DebugLogger } from './debug-log.js';
 
 export class Game {
     constructor() {
@@ -104,8 +105,11 @@ export class Game {
             this.foodRespawnTimers[type.score] = 0;
         });
 
+        // 调试日志系统
+        this.debugLogger = new DebugLogger();
+
         this.setupInput();
-        
+
         // 初始化时调整 Canvas 尺寸
         this.resizeCanvas();
         
@@ -855,6 +859,7 @@ export class Game {
                 }
                 // 检查玩家是否饿死
                 if (!worm.isAlive) {
+                    this.debugLogger.logHungerDeath(worm, this.gameTime);
                     this.gameOver('hunger');
                     return;
                 }
@@ -903,6 +908,7 @@ export class Game {
         
         // 2.1 玩家撞死亡线（游戏结束）
         if (this.mouseInCanvas && player && player.isAlive && !player.isEntering && player.checkWallCollision()) {
+            this.debugLogger.logWallDeath(player, this.gameTime);
             this.gameOver('wall');
             return;
         }
@@ -915,6 +921,9 @@ export class Game {
                 const food = this.foods[eatenIndex];
                 const foodPos = food.pos;
                 this.foods.splice(eatenIndex, 1);
+
+                // 调试日志：记录进食
+                this.debugLogger.logEat(worm, food, this.gameTime);
                 
                 // 黄色宝珠特殊处理：先闪光，闪完后逐节长2格
                 if (food.type.score === 30) {  // 黄色宝珠
@@ -1005,7 +1014,7 @@ export class Game {
                 // 检测咬到自己尾巴
                 const selfTailBiteIndex = worm.checkSelfTailBite();
                 if (selfTailBiteIndex !== -1) {
-
+                    this.debugLogger.logSelfBiteSplit(worm, selfTailBiteIndex, this.gameTime);
                     this.handleSplit(worm, selfTailBiteIndex);
                     this.splitCooldown = 2.0;
                     break;  // 每次只处理一个虫虫的诞生
@@ -1027,6 +1036,7 @@ export class Game {
                 const biteType = worm.isPlayer ? '玩家' : 'AI';
                 const biteeType = tailBite.worm.isPlayer ? '玩家' : 'AI';
 
+                this.debugLogger.logTailBite(worm, tailBite.worm, tailBite.segmentIndex, this.gameTime);
                 this.handleTailBiteSplit(tailBite.worm, tailBite.segmentIndex);
                 this.splitCooldown = 2.0;
                 break;  // 每次只处理一个虫虫的诞生
@@ -1042,6 +1052,7 @@ export class Game {
                 const biter = worm.isPlayer ? '玩家' : 'AI';
                 const bitee = neckBite.worm.isPlayer ? '玩家' : 'AI';
 
+                this.debugLogger.logNeckBiteDeath(worm, neckBite.worm, neckBite.segmentIndex, this.gameTime);
                 this.handleNeckBiteDeath(neckBite.worm, neckBite.segmentIndex);
                 this.splitCooldown = 2.0;
                 break;
@@ -1057,6 +1068,7 @@ export class Game {
                     // 玩家处于无敌状态，不被吞噬也不咬断对方
                 } else {
                     // 玩家碰到其他虫虫身体，被吞噬
+                    this.debugLogger.logCollisionDeath(player, otherCollision.worm, this.gameTime);
                     this.gameOver();
                     return;
                 }
@@ -1077,6 +1089,8 @@ export class Game {
                     const newWorm = tail.spawnWorm(tail.parentWorm);
                     if (newWorm && this.worms.length < CONFIG.MAX_WORMS) {
                         this.worms.push(newWorm);
+                        // 调试日志：幼体诞生
+                        this.debugLogger.logJuvenileBorn(newWorm, tail.parentWorm, tail.birthMethod || 'self-bite', this.gameTime);
                         this.splitCount++;
                         if (this.splitCount === 1) {
                             this.showFamilyNotice();
@@ -1263,8 +1277,10 @@ export class Game {
                             const killed = enemy.takeDamage(hitDir);
                             if (killed) {
                                 this.floatingTexts.push(FloatingText.acquire(enemyHead.x, enemyHead.y - 20, 'KILL!', '#ff6b6b'));
+                                this.debugLogger.logEnemyDeath(enemy, this.gameTime);
                             } else {
                                 this.floatingTexts.push(FloatingText.acquire(enemyHead.x, enemyHead.y - 20, `HIT! ${enemy.health}/${enemy.maxHealth}`, '#4dabf7'));
+                                this.debugLogger.logEnemyHit(enemy, enemy.health, this.gameTime);
                             }
                             hit = true;
                             break;
@@ -1672,6 +1688,7 @@ export class Game {
 
         // 创建断尾（保存父代引用）
         const brokenTail = new BrokenTail(tailSegments, worm.color, worm);
+        brokenTail.birthMethod = 'tail-bite';  // 标记诞生方式
         this.brokenTails.push(brokenTail);
 
 
@@ -1771,6 +1788,8 @@ export class Game {
                         const segIndex = enemy.checkCollisionWithJuvenile(worm);
                         if (segIndex >= 0) {
                             enemy.latch(worm, segIndex);
+                            // 调试日志：敌人咬住幼体
+                            this.debugLogger.logEnemyLatch(enemy, worm, segIndex, this.gameTime);
                             break;
                         }
                     }
@@ -1780,14 +1799,18 @@ export class Game {
                 if (player && player.isAlive && !player.isJuvenile && !enemy.isDying) {
                     if (enemy.checkCollisionWithPlayer(player)) {
                         player.adultHitCount++;
+                        // 调试日志：玩家被敌人撞击
+                        this.debugLogger.logAdultHitByEnemy(player, enemy, player.adultHitCount, this.gameTime);
                         const phx = enemy.pos.x - player.head.x;
                         const phy = enemy.pos.y - player.head.y;
                         const phd = Math.sqrt(phx * phx + phy * phy);
                         const hitDir = new Vector(phd > 0 ? phx / phd : 0, phd > 0 ? phy / phd : 0);
                         const killed = enemy.takeDamage(hitDir);
                         if (killed) {
+                            this.debugLogger.logEnemyDeath(enemy, this.gameTime);
                             this.floatingTexts.push(FloatingText.acquire(enemy.segments[0].x, enemy.segments[0].y - 20, 'KILL!', '#ff6b6b'));
                         } else {
+                            this.debugLogger.logEnemyHit(enemy, enemy.health, this.gameTime);
                             this.floatingTexts.push(FloatingText.acquire(enemy.segments[0].x, enemy.segments[0].y - 20, `${enemy.health}/${enemy.maxHealth}`, '#ffa500'));
                         }
                         if (player.adultHitCount >= CONFIG.FAMILY.ADULT_HITS_TO_LOSE) {
@@ -1796,6 +1819,7 @@ export class Game {
                                 player.segments.pop();
                                 player.targetLength = player.segments.length;
                                 player.syncBlueToBody();  // 同步弹舱状态
+                                this.debugLogger.logAdultLoseSegment(player, this.gameTime);
                             }
                         }
                     }
@@ -1806,6 +1830,7 @@ export class Game {
                     if (!worm.isAlive || worm.isPlayer || worm.isJuvenile || !worm.head) continue;
                     if (!enemy.isDying && enemy.checkCollisionWithPlayer(worm)) {
                         worm.adultHitCount++;
+                        this.debugLogger.logAdultHitByEnemy(worm, enemy, worm.adultHitCount, this.gameTime);
                         const whx = enemy.pos.x - worm.head.x;
                         const why = enemy.pos.y - worm.head.y;
                         const whd = Math.sqrt(whx * whx + why * why);
@@ -1813,8 +1838,10 @@ export class Game {
                         const killed = enemy.takeDamage(hitDir);
                         if (killed) {
                             this.floatingTexts.push(FloatingText.acquire(enemy.segments[0].x, enemy.segments[0].y - 20, 'KILL!', '#ff6b6b'));
+                            this.debugLogger.logEnemyDeath(enemy, this.gameTime);
                         } else {
                             this.floatingTexts.push(FloatingText.acquire(enemy.segments[0].x, enemy.segments[0].y - 20, `${enemy.health}/${enemy.maxHealth}`, '#ffa500'));
+                            this.debugLogger.logEnemyHit(enemy, enemy.health, this.gameTime);
                         }
                         if (worm.adultHitCount >= CONFIG.FAMILY.ADULT_HITS_TO_LOSE) {
                             worm.adultHitCount = 0;
@@ -1822,6 +1849,7 @@ export class Game {
                                 worm.segments.pop();
                                 worm.targetLength = worm.segments.length;
                                 worm.syncBlueToBody();
+                                this.debugLogger.logAdultLoseSegment(worm, this.gameTime);
                             }
                         }
                     }
@@ -1860,7 +1888,9 @@ export class Game {
                     case 2: x = margin + Math.random() * (CONFIG.CANVAS_WIDTH - margin * 2); y = margin; break;
                     case 3: x = margin + Math.random() * (CONFIG.CANVAS_WIDTH - margin * 2); y = CONFIG.CANVAS_HEIGHT - margin; break;
                 }
-                this.enemies.push(new Enemy(x, y));
+                const newEnemy = new Enemy(x, y);
+                this.enemies.push(newEnemy);
+                this.debugLogger.logEnemySpawn(newEnemy, this.gameTime);
             }
         }
     }
@@ -1869,6 +1899,7 @@ export class Game {
     matureJuvenile(worm) {
         worm.isJuvenile = false;
         worm.invincibleTimer = 10.0;  // 成年后给10秒无敌，防止刚成年就被碰死
+        this.debugLogger.logJuvenileMature(worm, this.gameTime);
         // 成年动画：释放咬住的敌人
         for (const e of this.enemies) {
             if (e.latchedJuvenile === worm) {
@@ -1908,6 +1939,7 @@ export class Game {
                         }
                     }
                     worm.feedCooldown = CONFIG.FAMILY.JUVENILE_FEED_COOLDOWN;  // 吃完设冷却
+                    this.debugLogger.logJuvenileEat(worm, '断尾', this.gameTime);
                     tail.segments.pop();
                     if (tail.segments.length === 0) {
                         this.brokenTails.splice(j, 1);
@@ -1940,6 +1972,7 @@ export class Game {
                             }
                         }
                         worm.feedCooldown = CONFIG.FAMILY.JUVENILE_FEED_COOLDOWN;  // 吃完设冷却
+                        this.debugLogger.logJuvenileEat(worm, '灰色尾巴', this.gameTime);
                         sourceWorm.shrinkingSegments.splice(j, 1);
                         ate = true;
                         break;
@@ -2255,6 +2288,7 @@ export class Game {
     gameOver(reason = 'eaten', existingBodies = null) {
         if (this.state === GAME_STATE.GAME_OVER) return;  // 防止重复触发
         this.isMouseDown = false;  // 停止连续射击
+        this.debugLogger.logGameOver(reason, this.gameTime);
         this.state = GAME_STATE.GAME_OVER;
         const player = this.worms.find(w => w.isPlayer);
         

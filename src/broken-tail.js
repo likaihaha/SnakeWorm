@@ -9,6 +9,7 @@ export class BrokenTail {
         this.originalColor = originalColor;
         this.newColor = CONFIG.SPLIT_COLORS[Math.floor(Math.random() * CONFIG.SPLIT_COLORS.length)];
         this.parentWorm = parentWorm;  // 保存父代引用
+        this.birthMethod = 'self-bite';  // 诞生方式，默认自噬
 
         this.colorTimer = CONFIG.SPLIT_COLOR_DURATION;
         this.growHeadTimer = CONFIG.SPLIT_GROW_HEAD_TIME;

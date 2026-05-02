@@ -240,10 +240,17 @@ export class Enemy {
                 if (typeof game !== 'undefined' && game.floatingTexts) {
                     game.floatingTexts.push(FloatingText.acquire(lostSegment.x, lostSegment.y - 15, 'OUCH!', '#ff6b6b'));
                 }
+                // 调试日志
+                if (typeof game !== 'undefined' && game.debugLogger) {
+                    game.debugLogger.logEnemyBiteDamage(this, juv, game.gameTime);
+                }
             } else {
                 // 身体太短，直接死亡
                 const deathX = juv.head ? juv.head.x : this.pos.x;
                 const deathY = juv.head ? juv.head.y : this.pos.y;
+                if (typeof game !== 'undefined' && game.debugLogger) {
+                    game.debugLogger.logJuvenileDeath(juv, '被敌人咬死', game.gameTime);
+                }
                 juv.isAlive = false;
                 juv.segments = [];
                 if (typeof game !== 'undefined' && game.floatingTexts) {

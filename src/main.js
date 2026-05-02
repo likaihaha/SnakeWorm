@@ -27,6 +27,9 @@ window.game = game;
 const debugPanel = new DebugPanel(game);
 window.debugPanel = debugPanel;
 
+// 注册调试日志系统到全局（Ctrl+L 呼出）
+window.debugLogger = game.debugLogger;
+
 // 绑定按钮事件（替代 HTML inline onclick）
 const startBtn = document.getElementById('startBtn');
 if (startBtn) startBtn.addEventListener('click', () => {
