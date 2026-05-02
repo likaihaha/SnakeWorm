@@ -276,8 +276,8 @@ export class Game {
                 
                 // 等待玩家控制阶段：检测鼠标是否移入白圈
                 if (this.waitingForPlayer) {
-                    const centerX = CONFIG.MAP_WIDTH / 2;
-                    const centerY = CONFIG.MAP_HEIGHT / 2;
+                    const centerX = CONFIG.MAP_WIDTH * 0.2;
+                    const centerY = CONFIG.MAP_HEIGHT * 0.25;
                     const cursorRadius = 18;  // 白圈半径
                     const dx = x - centerX;
                     const dy = y - centerY;
@@ -2263,10 +2263,10 @@ export class Game {
         const player = this.worms[0];
         const hasBlueSegments = player && player.blueSegments > 0;
         
-        // 等待玩家控制阶段：白圈固定在地图中央
+        // 等待玩家控制阶段：白圈在虫虫出生点
         if (this.waitingForPlayer) {
-            worldX = CONFIG.MAP_WIDTH / 2;
-            worldY = CONFIG.MAP_HEIGHT / 2;
+            worldX = CONFIG.MAP_WIDTH * 0.2;
+            worldY = CONFIG.MAP_HEIGHT * 0.25;
         }
         
         // 世界坐标转屏幕坐标
