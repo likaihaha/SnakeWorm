@@ -622,11 +622,12 @@ class EditableDynamicBG {
     const pts = s.points;
     const baseWidth = s.strokeWidth || 2;
     const widthNodes = s.widthNodes;
+    const N = pts.length;
 
     // 计算总长度
     let totalLength = 0;
     const segLens = [];
-    for (let i = 1; i < pts.length; i++) {
+    for (let i = 1; i < N; i++) {
       const dx = (pts[i][0] - pts[i - 1][0]) * w;
       const dy = (pts[i][1] - pts[i - 1][1]) * h;
       segLens.push(Math.sqrt(dx * dx + dy * dy));
@@ -636,9 +637,10 @@ class EditableDynamicBG {
 
     const hasPathGrad = s.pathGradient && s.pathGradient.stops && s.pathGradient.stops.length >= 2;
     const pathStops = hasPathGrad ? s.pathGradient.stops : null;
-    const numSub = 20; // 每段细分数，消除拐角裂痕+渐变平滑
+    const numSub = 20;
     let currentLength = 0;
 
+    // 绘制每段细分梯形
     for (let i = 0; i < segLens.length; i++) {
       const segLen = segLens[i];
       const segStartRatio = currentLength / totalLength;
@@ -672,6 +674,60 @@ class EditableDynamicBG {
       }
       currentLength += segLen;
     }
+
+    // 补拐角三角形：填满两条线段梯形在外角处的缺口
+    for (let i = 1; i < N - 1; i++) {
+      const cornerRatio = this._getCornerRatio(segLens, totalLength, i);
+      const wCorner = this._getWidthAtRatio(widthNodes, cornerRatio, baseWidth);
+      if (wCorner < 0.01) continue;
+
+      // 前一段方向 (pts[i-1] -> pts[i])
+      const dx0 = (pts[i][0] - pts[i - 1][0]) * w;
+      const dy0 = (pts[i][1] - pts[i - 1][1]) * h;
+      const len0 = Math.sqrt(dx0 * dx0 + dy0 * dy0) || 1;
+      // 后一段方向 (pts[i] -> pts[i+1])
+      const dx1 = (pts[i + 1][0] - pts[i][0]) * w;
+      const dy1 = (pts[i + 1][1] - pts[i][1]) * h;
+      const len1 = Math.sqrt(dx1 * dx1 + dy1 * dy1) || 1;
+
+      // 用叉积判断拐角朝向，只补外角
+      const cross = dx0 * dy1 - dy0 * dx1;
+      if (Math.abs(cross) < 0.001) continue; // 共线，无缺口
+
+      const cornerX = pts[i][0] * w;
+      const cornerY = pts[i][1] * h;
+      const half = wCorner / 2;
+
+      if (cross > 0) {
+        // 路径左转 → 右侧(法线反方向)是外角
+        const nx0 = dy0 / len0, ny0 = -dx0 / len0;
+        const nx1 = dy1 / len1, ny1 = -dx1 / len1;
+        ctx.beginPath();
+        ctx.moveTo(cornerX + nx0 * half, cornerY + ny0 * half);
+        ctx.lineTo(cornerX + nx1 * half, cornerY + ny1 * half);
+        ctx.lineTo(cornerX, cornerY);
+        ctx.closePath();
+      } else {
+        // 路径右转 → 左侧(法线方向)是外角
+        const nx0 = -dy0 / len0, ny0 = dx0 / len0;
+        const nx1 = -dy1 / len1, ny1 = dx1 / len1;
+        ctx.beginPath();
+        ctx.moveTo(cornerX + nx0 * half, cornerY + ny0 * half);
+        ctx.lineTo(cornerX + nx1 * half, cornerY + ny1 * half);
+        ctx.lineTo(cornerX, cornerY);
+        ctx.closePath();
+      }
+      const color = pathStops ? this._getGradientColor(pathStops, cornerRatio) : (s.stroke || '#fff');
+      ctx.fillStyle = color;
+      ctx.fill();
+    }
+  }
+
+  /** 计算顶点 i 处的路径比例（累计长度 / 总长度） */
+  _getCornerRatio(segLens, totalLength, i) {
+    let len = 0;
+    for (let k = 0; k < i; k++) len += segLens[k];
+    return len / totalLength;
   }
 
   _drawTaperedPolyline(ctx, s, w, h) {
