@@ -19,6 +19,7 @@ import { DebugLogger } from './debug-log.js';
 import { Camera } from './camera.js';
 import { FamilyGate } from './family-gate.js';
 import { ZoneManager } from './zone-manager.js';
+import { Barrier, generateBarriers } from './barrier.js';
 
 export class Game {
     constructor() {
@@ -62,6 +63,9 @@ export class Game {
         this.zoneManager = new ZoneManager();
         this.zoneManager.loadProgress();
         this.showZoneDebug = false;  // Ctrl+Z 切换区域调试视图
+        
+        // === Phase B: Barrier 门系统 ===
+        this.barriers = generateBarriers(this.zoneManager);
         this.playerDeathLength = 0;  // 玩家死亡时的长度（用于显示）
         this.maxLengthReached = 0;  // 玩家达到过的最大长度（用于排行榜）
         this.waitingForPlayer = false;  // 等待玩家鼠标移入白圈
@@ -886,10 +890,11 @@ export class Game {
         for (const worm of this.worms) {
             if (!worm.isAlive || worm.segments.length === 0) continue;
             
-            // 传递敌人、断尾和家族门引用给AI
+            // 传递敌人、断尾、家族门和 Barrier 引用给AI
             worm._enemies = this.enemies;
             worm._brokenTails = this.brokenTails;
             worm._familyGates = this.familyGates;
+            worm._barriers = this.barriers;
 
             if (worm.isPlayer) {
                 // 出场动画期间，继续执行updateEntering，跳过普通update
@@ -1212,6 +1217,19 @@ export class Game {
             if (Math.floor(this.gameTime) % 10 === 0 && Math.floor(this.gameTime) !== Math.floor(this.gameTime - dt)) {
                 this.zoneManager.saveProgress();
             }
+        }
+
+        // 8.8 Phase B: 更新 Barrier 门
+        const playerState = {
+            score: this.score,
+            length: player ? player.length : 0,
+            juvenileCount: this.worms.filter(w => w.isAlive && w.isJuvenile).length,
+            adultCount: this.worms.filter(w => w.isAlive && w.isAdult).length,
+            killCount: this.zoneManager.killCount,
+        };
+        for (const barrier of this.barriers) {
+            barrier.update(dt, playerState, this.zoneManager);
+            if (player) barrier.checkPlayerNear(player);
         }
         
         // 9. 更新尸体下沉动画（紧凑过滤替代splice）
@@ -2352,6 +2370,11 @@ export class Game {
         const playerWorm = this.worms[0];
         for (const gate of this.familyGates) {
             gate.drawHint(ctx, playerWorm);
+        }
+
+        // Phase B: 绘制 Barrier 门
+        for (const barrier of this.barriers) {
+            barrier.draw(ctx, this.gameTime);
         }
 
         // 绘制地图边界（在世界坐标中）

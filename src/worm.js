@@ -506,17 +506,20 @@ export class Worm {
             const newX = head.x + this.velocity.x * speedDt;
             const newY = head.y + this.velocity.y * speedDt;
 
-            // Phase 3: 家族门阻挡检测
-            if (this._familyGates) {
+            // Phase 3: 家族门 + Phase B: Barrier 门 阻挡检测
+            if (this._familyGates || this._barriers) {
                 let blocked = false;
-                for (const gate of this._familyGates) {
-                    if (gate.isBlocking(this)) {
-                        blocked = true;
-                        break;
+                if (this._familyGates) {
+                    for (const gate of this._familyGates) {
+                        if (gate.isBlocking(this)) { blocked = true; break; }
+                    }
+                }
+                if (!blocked && this._barriers) {
+                    for (const barrier of this._barriers) {
+                        if (barrier.isBlocking(this)) { blocked = true; break; }
                     }
                 }
                 if (blocked) {
-                    // 被门挡住，回退到原位
                     this.isMoving = false;
                 } else {
                     head.x = newX;
