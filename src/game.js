@@ -18,6 +18,7 @@ import { DynamicBG } from './dynamic-bg.js';
 import { DebugLogger } from './debug-log.js';
 import { Camera } from './camera.js';
 import { FamilyGate } from './family-gate.js';
+import { ZoneManager } from './zone-manager.js';
 
 export class Game {
     constructor() {
@@ -56,6 +57,11 @@ export class Game {
         this.enemies = [];  // 敌人列表
         this.familyGates = [];  // 家族门列表
         this.enemySpawnTimer = 0;  // 敌人生成计时器
+
+        // === Phase A: ZoneManager 关卡区域系统 ===
+        this.zoneManager = new ZoneManager();
+        this.zoneManager.loadProgress();
+        this.showZoneDebug = false;  // Ctrl+Z 切换区域调试视图
         this.playerDeathLength = 0;  // 玩家死亡时的长度（用于显示）
         this.maxLengthReached = 0;  // 玩家达到过的最大长度（用于排行榜）
         this.waitingForPlayer = false;  // 等待玩家鼠标移入白圈
@@ -414,6 +420,11 @@ export class Game {
             // F键切换FPS显示
             if (e.key === 'f' || e.key === 'F') {
                 this.showFPS = !this.showFPS;
+            }
+            // Ctrl+Z 切换区域调试视图
+            if (e.ctrlKey && (e.key === 'z' || e.key === 'Z')) {
+                e.preventDefault();
+                this.showZoneDebug = !this.showZoneDebug;
             }
         });
     }
@@ -1192,6 +1203,15 @@ export class Game {
         // 8.6 Phase 3: 更新家族门
         for (const gate of this.familyGates) {
             gate.update(dt, this.worms);
+        }
+        
+        // 8.7 Phase A: 更新区域系统
+        if (player && player.isAlive) {
+            this.zoneManager.getCurrentZone(player);
+            // 定期保存进度（每10秒）
+            if (Math.floor(this.gameTime) % 10 === 0 && Math.floor(this.gameTime) !== Math.floor(this.gameTime - dt)) {
+                this.zoneManager.saveProgress();
+            }
         }
         
         // 9. 更新尸体下沉动画（紧凑过滤替代splice）
@@ -2337,6 +2357,11 @@ export class Game {
         // 绘制地图边界（在世界坐标中）
         this.drawMapBorder();
 
+        // Phase A: 区域调试视图
+        if (this.showZoneDebug) {
+            this.zoneManager.drawDebug(ctx);
+        }
+
         // 恢复相机偏移
         ctx.restore();
 
@@ -2345,6 +2370,8 @@ export class Game {
         if (this.showFPS) {
             this.drawFPS();
         }
+        // Phase A: 区域 HUD 信息
+        this.zoneManager.drawHUD(ctx, CONFIG.CANVAS_WIDTH, CONFIG.CANVAS_HEIGHT);
     }
 
     preRenderGrid() {
