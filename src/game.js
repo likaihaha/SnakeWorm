@@ -33,7 +33,7 @@ export class Game {
         this.crosshairHintTimer = 0;  // 瞄准镜提示计时器
         this.slowedWorms = new Map();  // 减速的虫虫 {worm: slowTimer}
         this.musicSystem = new MusicSystem();  // 音效系统
-        this.mousePos = new Vector(CONFIG.MAP_WIDTH * 0.2, CONFIG.MAP_HEIGHT * 0.25);  // 左下方偏高
+        this.mousePos = new Vector(400, 2800);  // 左下方偏高
         this.isMouseDown = false;  // 鼠标按下状态（连续射击）
         this.fireCooldown = 0;  // 射击冷却计时器
         this.score = 0;
@@ -235,7 +235,7 @@ export class Game {
         this.joystickDirection = normalizedDir;
         
         // 更新鼠标位置（在摇杆方向上）
-        const head = this.worms[0] ? this.worms[0].head : new Vector(CONFIG.MAP_WIDTH * 0.2, CONFIG.MAP_HEIGHT * 0.25);
+        const head = this.worms[0] ? this.worms[0].head : new Vector(400, 2800);
         const targetX = head.x + normalizedDir.x * 100;
         const targetY = head.y + normalizedDir.y * 100;
         this.mousePos = new Vector(targetX, targetY);
@@ -276,8 +276,8 @@ export class Game {
                 
                 // 等待玩家控制阶段：检测鼠标是否移入白圈
                 if (this.waitingForPlayer) {
-                    const centerX = CONFIG.MAP_WIDTH * 0.2;
-                    const centerY = CONFIG.MAP_HEIGHT * 0.25;
+                    const centerX = 400;
+                    const centerY = 2800;
                     const cursorRadius = 18;  // 白圈半径
                     const dx = x - centerX;
                     const dy = y - centerY;
@@ -456,7 +456,7 @@ export class Game {
             this.restart();
             
             // 设置初始状态：白圈在画面中央，等待玩家鼠标移入
-            this.mousePos = new Vector(CONFIG.MAP_WIDTH * 0.2, CONFIG.MAP_HEIGHT * 0.25);
+            this.mousePos = new Vector(400, 2800);
             this.mouseInCanvas = true;
             this.waitingForPlayer = true;  // 等待玩家鼠标移入白圈
             
@@ -571,7 +571,7 @@ export class Game {
         const count = 3 + Math.floor(Math.random() * 2);
         for (let i = 0; i < count; i++) {
             // Demo 模式：在左下方偏高区域生成
-            const cx = CONFIG.MAP_WIDTH * 0.2, cy = CONFIG.MAP_HEIGHT * 0.25;
+            const cx = 400, cy = 2800;
             const x = cx - 300 + Math.random() * 600;
             const y = cy - 200 + Math.random() * 400;
             const color = colors[i % colors.length];
@@ -652,8 +652,8 @@ export class Game {
         this.fireCooldown = 0;  // 重置射击冷却
 
         // 玩家虫虫从框外左边开始（完全不可见）
-        const spawnX = CONFIG.MAP_WIDTH * 0.2;   // 左侧20%位置
-        const spawnY = CONFIG.MAP_HEIGHT * 0.25;  // 上方25%位置（高一点）
+        const spawnX = 400;   // 左下方偏高
+        const spawnY = 2800;
         const player = new Worm(
             spawnX,    // 目标位置（左下方偏高）
             spawnY,
@@ -2265,8 +2265,8 @@ export class Game {
         
         // 等待玩家控制阶段：白圈在虫虫出生点
         if (this.waitingForPlayer) {
-            worldX = CONFIG.MAP_WIDTH * 0.2;
-            worldY = CONFIG.MAP_HEIGHT * 0.25;
+            worldX = 400;
+            worldY = 2800;
         }
         
         // 世界坐标转屏幕坐标
