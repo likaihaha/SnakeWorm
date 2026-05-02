@@ -102,9 +102,9 @@ export class DebugLogger {
         const id = worm.isPlayer ? '玩家' : `AI-${worm._debugId || '?'}`;
         this._log('SELF_BITE', `${id} 自噬断尾`, {
             断尾段索引: segIndex,
-            断尾前长度: worm.segments.length + '(待计算)',
+            断尾前长度: worm.segments.length,
             剩余长度: segIndex,
-            �截断长度: '(待计算)',
+            截断部分长度: '(见brokenTail)',
         }, gameTime);
     }
 
