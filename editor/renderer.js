@@ -715,11 +715,19 @@ class EditableDynamicBG {
       const ax = cornerX + n0x * half, ay = cornerY + n0y * half;
       const bx = cornerX + n1x * half, by = cornerY + n1y * half;
 
+      // 圆角三角形：始终绘制，填满靠近拐角的缺口
+      ctx.beginPath();
+      ctx.moveTo(ax, ay);
+      ctx.lineTo(bx, by);
+      ctx.lineTo(cornerX, cornerY);
+      ctx.closePath();
+      const color = pathStops ? this._getGradientColor(pathStops, cornerRatio) : (s.stroke || '#fff');
+      ctx.fillStyle = color;
+      ctx.fill();
+
+      // 尖角三角形：额外绘制，外侧边缘延长线相交形成尖角
       if (sharp) {
-        // 尖角模式：两条外侧边缘延长线求交
-        // 线A: 过(ax,ay)方向(dx0,dy0)  线B: 过(bx,by)方向(dx1,dy1)
         const det = dx0 * dy1 - dy0 * dx1;
-        let drawn = false;
         if (Math.abs(det) > 0.001) {
           const t = ((bx - ax) * dy1 - (by - ay) * dx1) / det;
           if (t > 0) {
@@ -729,28 +737,10 @@ class EditableDynamicBG {
             ctx.lineTo(ix, iy);
             ctx.lineTo(bx, by);
             ctx.closePath();
-            drawn = true;
+            ctx.fill();
           }
         }
-        if (!drawn) {
-          // 交点在后方（拐角≤90°），回退圆角
-          ctx.beginPath();
-          ctx.moveTo(ax, ay);
-          ctx.lineTo(bx, by);
-          ctx.lineTo(cornerX, cornerY);
-          ctx.closePath();
-        }
-      } else {
-        // 圆角模式：用法线偏移点
-        ctx.beginPath();
-        ctx.moveTo(ax, ay);
-        ctx.lineTo(bx, by);
-        ctx.lineTo(cornerX, cornerY);
-        ctx.closePath();
       }
-      const color = pathStops ? this._getGradientColor(pathStops, cornerRatio) : (s.stroke || '#fff');
-      ctx.fillStyle = color;
-      ctx.fill();
     }
   }
 
