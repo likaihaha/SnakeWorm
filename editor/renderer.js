@@ -676,6 +676,7 @@ class EditableDynamicBG {
     }
 
     // 补拐角三角形：填满两条线段梯形在外角处的缺口
+    const sharp = s.sharpCorners === true;
     for (let i = 1; i < N - 1; i++) {
       const cornerRatio = this._getCornerRatio(segLens, totalLength, i);
       const wCorner = this._getWidthAtRatio(widthNodes, cornerRatio, baseWidth);
@@ -698,22 +699,52 @@ class EditableDynamicBG {
       const cornerY = pts[i][1] * h;
       const half = wCorner / 2;
 
+      // 计算外侧法线
+      let n0x, n0y, n1x, n1y;
       if (cross > 0) {
-        // 路径左转 → 右侧(法线反方向)是外角
-        const nx0 = dy0 / len0, ny0 = -dx0 / len0;
-        const nx1 = dy1 / len1, ny1 = -dx1 / len1;
-        ctx.beginPath();
-        ctx.moveTo(cornerX + nx0 * half, cornerY + ny0 * half);
-        ctx.lineTo(cornerX + nx1 * half, cornerY + ny1 * half);
-        ctx.lineTo(cornerX, cornerY);
-        ctx.closePath();
+        // 路径左转 → 右侧是外角
+        n0x = dy0 / len0; n0y = -dx0 / len0;
+        n1x = dy1 / len1; n1y = -dx1 / len1;
       } else {
-        // 路径右转 → 左侧(法线方向)是外角
-        const nx0 = -dy0 / len0, ny0 = dx0 / len0;
-        const nx1 = -dy1 / len1, ny1 = dx1 / len1;
+        // 路径右转 → 左侧是外角
+        n0x = -dy0 / len0; n0y = dx0 / len0;
+        n1x = -dy1 / len1; n1y = dx1 / len1;
+      }
+
+      // 外侧角点（前段末端、后段首端各自的梯形外角）
+      const ax = cornerX + n0x * half, ay = cornerY + n0y * half;
+      const bx = cornerX + n1x * half, by = cornerY + n1y * half;
+
+      if (sharp) {
+        // 尖角模式：两条外侧边缘延长线求交
+        // 线A: 过(ax,ay)方向(dx0,dy0)  线B: 过(bx,by)方向(dx1,dy1)
+        const det = dx0 * dy1 - dy0 * dx1;
+        let drawn = false;
+        if (Math.abs(det) > 0.001) {
+          const t = ((bx - ax) * dy1 - (by - ay) * dx1) / det;
+          if (t > 0) {
+            const ix = ax + t * dx0, iy = ay + t * dy0;
+            ctx.beginPath();
+            ctx.moveTo(ax, ay);
+            ctx.lineTo(ix, iy);
+            ctx.lineTo(bx, by);
+            ctx.closePath();
+            drawn = true;
+          }
+        }
+        if (!drawn) {
+          // 交点在后方（拐角≤90°），回退圆角
+          ctx.beginPath();
+          ctx.moveTo(ax, ay);
+          ctx.lineTo(bx, by);
+          ctx.lineTo(cornerX, cornerY);
+          ctx.closePath();
+        }
+      } else {
+        // 圆角模式：用法线偏移点
         ctx.beginPath();
-        ctx.moveTo(cornerX + nx0 * half, cornerY + ny0 * half);
-        ctx.lineTo(cornerX + nx1 * half, cornerY + ny1 * half);
+        ctx.moveTo(ax, ay);
+        ctx.lineTo(bx, by);
         ctx.lineTo(cornerX, cornerY);
         ctx.closePath();
       }
