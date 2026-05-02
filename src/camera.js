@@ -9,6 +9,7 @@ export class Camera {
         this.x = 0;  // 视口左上角在世界坐标中的x
         this.y = 0;  // 视口左上角在世界坐标中的y
         this.smooth = 0.08; // 跟随平滑度（0=不动, 1=瞬间跟上）
+        this._initialized = false; // 首帧是否已snap到位
     }
 
     /**
@@ -22,10 +23,17 @@ export class Camera {
         const goalX = targetX - CONFIG.CANVAS_WIDTH / 2;
         const goalY = targetY - CONFIG.CANVAS_HEIGHT / 2;
 
-        // 平滑插值跟上，dt补偿帧率差异
-        const lerpFactor = 1 - Math.pow(1 - this.smooth, dt * 60);
-        this.x += (goalX - this.x) * lerpFactor;
-        this.y += (goalY - this.y) * lerpFactor;
+        // 首帧直接snap到位，避免从(0,0)慢慢飘过去
+        if (!this._initialized) {
+            this.x = goalX;
+            this.y = goalY;
+            this._initialized = true;
+        } else {
+            // 平滑插值跟上，dt补偿帧率差异
+            const lerpFactor = 1 - Math.pow(1 - this.smooth, dt * 60);
+            this.x += (goalX - this.x) * lerpFactor;
+            this.y += (goalY - this.y) * lerpFactor;
+        }
 
         // 钳制到地图边界，不超出地图范围
         this.x = Math.max(0, Math.min(CONFIG.MAP_WIDTH - CONFIG.CANVAS_WIDTH, this.x));
