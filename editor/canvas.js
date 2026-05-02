@@ -66,8 +66,14 @@ class CanvasManager {
         this.lastMouseY = e.clientY;
         this.canvas.style.cursor = 'grabbing';
       } else if (e.button === 0 && e.shiftKey) {
-        // Shift+左键 - 开始框选
-        this.startSelection(e);
+        // Shift+左键 - 检查是否点击在元素上
+        const pos = this.screenToCanvas(e.clientX, e.clientY);
+        const hitElement = this.editor.bg && this.editor.bg.hitTest(pos.x, pos.y).length > 0;
+        if (!hitElement) {
+          // 点在空白处 → 启动框选
+          this.startSelection(e);
+        }
+        // 点在元素上 → 交给 core.js 的 handleCanvasMouseDown 处理多选
       }
     });
     
@@ -266,30 +272,25 @@ class CanvasManager {
 
   // 框选功能
   startSelection(e) {
-    const rect = this.canvas.getBoundingClientRect();
-    const scaleX = this.canvas.width / rect.width;
-    const scaleY = this.canvas.height / rect.height;
-    
+    const pos = this.screenToCanvas(e.clientX, e.clientY);
+
     this.selectionBox = {
-      startX: (e.clientX - rect.left) * scaleX,
-      startY: (e.clientY - rect.top) * scaleY,
-      endX: (e.clientX - rect.left) * scaleX,
-      endY: (e.clientY - rect.top) * scaleY
+      startX: pos.x,
+      startY: pos.y,
+      endX: pos.x,
+      endY: pos.y
     };
-    
+
     this.isSelecting = true;
   }
 
   updateSelection(e) {
     if (!this.selectionBox) return;
-    
-    const rect = this.canvas.getBoundingClientRect();
-    const scaleX = this.canvas.width / rect.width;
-    const scaleY = this.canvas.height / rect.height;
-    
-    this.selectionBox.endX = (e.clientX - rect.left) * scaleX;
-    this.selectionBox.endY = (e.clientY - rect.top) * scaleY;
-    
+
+    const pos = this.screenToCanvas(e.clientX, e.clientY);
+    this.selectionBox.endX = pos.x;
+    this.selectionBox.endY = pos.y;
+
     this.editor.rebuild();
   }
 
@@ -341,15 +342,15 @@ class CanvasManager {
     ctx.restore();
   }
 
-  // 坐标转换
+  // 坐标转换（考虑平移和缩放）
   screenToCanvas(screenX, screenY) {
     const rect = this.canvas.getBoundingClientRect();
     const scaleX = this.canvas.width / rect.width;
     const scaleY = this.canvas.height / rect.height;
-    
+
     return {
-      x: (screenX - rect.left) * scaleX,
-      y: (screenY - rect.top) * scaleY
+      x: (screenX - rect.left - this.panX) / this.zoom * scaleX,
+      y: (screenY - rect.top - this.panY) / this.zoom * scaleY
     };
   }
 
@@ -357,10 +358,10 @@ class CanvasManager {
     const rect = this.canvas.getBoundingClientRect();
     const scaleX = rect.width / this.canvas.width;
     const scaleY = rect.height / this.canvas.height;
-    
+
     return {
-      x: canvasX * scaleX + rect.left,
-      y: canvasY * scaleY + rect.top
+      x: canvasX * scaleX * this.zoom + this.panX + rect.left,
+      y: canvasY * scaleY * this.zoom + this.panY + rect.top
     };
   }
 

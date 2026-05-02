@@ -148,9 +148,13 @@ class BackgroundEditor {
     const rect = this.canvas.getBoundingClientRect();
     const scaleX = this.canvas.width / rect.width;
     const scaleY = this.canvas.height / rect.height;
+    const cm = this.canvasManager;
+    const zoom = cm ? cm.zoom : 1;
+    const panX = cm ? cm.panX : 0;
+    const panY = cm ? cm.panY : 0;
     return {
-      x: (e.clientX - rect.left) * scaleX,
-      y: (e.clientY - rect.top) * scaleY
+      x: (e.clientX - rect.left - panX) / zoom * scaleX,
+      y: (e.clientY - rect.top - panY) / zoom * scaleY
     };
   }
 
