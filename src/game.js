@@ -33,7 +33,7 @@ export class Game {
         this.crosshairHintTimer = 0;  // 瞄准镜提示计时器
         this.slowedWorms = new Map();  // 减速的虫虫 {worm: slowTimer}
         this.musicSystem = new MusicSystem();  // 音效系统
-        this.mousePos = new Vector(CONFIG.MAP_WIDTH / 2, CONFIG.MAP_HEIGHT / 2);  // 世界坐标
+        this.mousePos = new Vector(CONFIG.MAP_WIDTH * 0.2, CONFIG.MAP_HEIGHT * 0.25);  // 左下方偏高
         this.isMouseDown = false;  // 鼠标按下状态（连续射击）
         this.fireCooldown = 0;  // 射击冷却计时器
         this.score = 0;
@@ -235,7 +235,7 @@ export class Game {
         this.joystickDirection = normalizedDir;
         
         // 更新鼠标位置（在摇杆方向上）
-        const head = this.worms[0] ? this.worms[0].head : new Vector(CONFIG.MAP_WIDTH / 2, CONFIG.MAP_HEIGHT / 2);
+        const head = this.worms[0] ? this.worms[0].head : new Vector(CONFIG.MAP_WIDTH * 0.2, CONFIG.MAP_HEIGHT * 0.25);
         const targetX = head.x + normalizedDir.x * 100;
         const targetY = head.y + normalizedDir.y * 100;
         this.mousePos = new Vector(targetX, targetY);
@@ -456,7 +456,7 @@ export class Game {
             this.restart();
             
             // 设置初始状态：白圈在画面中央，等待玩家鼠标移入
-            this.mousePos = new Vector(CONFIG.MAP_WIDTH / 2, CONFIG.MAP_HEIGHT / 2);
+            this.mousePos = new Vector(CONFIG.MAP_WIDTH * 0.2, CONFIG.MAP_HEIGHT * 0.25);
             this.mouseInCanvas = true;
             this.waitingForPlayer = true;  // 等待玩家鼠标移入白圈
             
@@ -570,8 +570,8 @@ export class Game {
         // 生成 3-4 条 AI 虫虫（在视口中央区域）
         const count = 3 + Math.floor(Math.random() * 2);
         for (let i = 0; i < count; i++) {
-            // Demo 模式：在地图中央区域生成（约视口范围）
-            const cx = CONFIG.MAP_WIDTH / 2, cy = CONFIG.MAP_HEIGHT / 2;
+            // Demo 模式：在左下方偏高区域生成
+            const cx = CONFIG.MAP_WIDTH * 0.2, cy = CONFIG.MAP_HEIGHT * 0.25;
             const x = cx - 300 + Math.random() * 600;
             const y = cy - 200 + Math.random() * 400;
             const color = colors[i % colors.length];
@@ -652,19 +652,21 @@ export class Game {
         this.fireCooldown = 0;  // 重置射击冷却
 
         // 玩家虫虫从框外左边开始（完全不可见）
+        const spawnX = CONFIG.MAP_WIDTH * 0.2;   // 左侧20%位置
+        const spawnY = CONFIG.MAP_HEIGHT * 0.25;  // 上方25%位置（高一点）
         const player = new Worm(
-            CONFIG.MAP_WIDTH / 2,  // 目标位置（地图中间）
-            CONFIG.MAP_HEIGHT / 2,
+            spawnX,    // 目标位置（左下方偏高）
+            spawnY,
             CONFIG.WORM_INITIAL_LENGTH,
             '#4ecca3',
             true
         );
         // 设置出场动画参数
-        player.enterStartPos = new Vector(-50, CONFIG.MAP_HEIGHT / 2);  // 从框外左边开始
-        player.enterMidPos = new Vector(CONFIG.MAP_WIDTH / 2, CONFIG.MAP_HEIGHT / 2);  // 地图中央
+        player.enterStartPos = new Vector(-50, spawnY);  // 从框外左边开始
+        player.enterMidPos = new Vector(spawnX, spawnY);  // 左下方偏高
         // 初始化虫虫身体位置到框外（这样一开始就不可见）
         for (let i = 0; i < player.segments.length; i++) {
-            player.segments[i] = new Vector(-50 - i * 14, CONFIG.MAP_HEIGHT / 2);
+            player.segments[i] = new Vector(-50 - i * 14, spawnY);
         }
         // 给玩家添加无敌时间，出场动画期间不会被吞噬
         player.invincibleTimer = 3.5;  // 3.5 秒无敌（2 秒动画 + 1.5 秒游向鼠标）
