@@ -261,7 +261,7 @@ export class MusicSystem {
             let panner = null;
             if (screenX !== undefined && this.audioContext.createStereoPanner) {
                 panner = this.audioContext.createStereoPanner();
-                const panValue = (screenX / CONFIG.CANVAS_WIDTH) * 2 - 1;
+                const panValue = (screenX / CONFIG.MAP_WIDTH) * 2 - 1;
                 panner.pan.setValueAtTime(Math.max(-1, Math.min(1, panValue)), now);
             }
 

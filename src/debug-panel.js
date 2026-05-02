@@ -190,8 +190,8 @@ export class DebugPanel {
         }
         const colors = ['#ff6b6b', '#4ecdc4', '#ffe66d', '#a8e6cf', '#ff8b94', '#c7ceea', '#ff9f43', '#a29bfe'];
         const color = colors[Math.floor(Math.random() * colors.length)];
-        const x = 100 + Math.random() * (CONFIG.CANVAS_WIDTH - 200);
-        const y = 100 + Math.random() * (CONFIG.CANVAS_HEIGHT - 200);
+        const x = 100 + Math.random() * (CONFIG.MAP_WIDTH - 200);
+        const y = 100 + Math.random() * (CONFIG.MAP_HEIGHT - 200);
         const length = 5 + Math.floor(Math.random() * 15);
         const worm = new Worm(x, y, length, color, false);
         g.worms.push(worm);
@@ -201,8 +201,8 @@ export class DebugPanel {
     _spawnEnemy() {
         const g = this.game;
         const margin = 60;
-        const x = margin + Math.random() * (CONFIG.CANVAS_WIDTH - margin * 2);
-        const y = margin + Math.random() * (CONFIG.CANVAS_HEIGHT - margin * 2);
+        const x = margin + Math.random() * (CONFIG.MAP_WIDTH - margin * 2);
+        const y = margin + Math.random() * (CONFIG.MAP_HEIGHT - margin * 2);
         const enemy = new Enemy(x, y);
         g.enemies.push(enemy);
         // 强制设置计时器避免立即被清理
@@ -249,8 +249,8 @@ export class DebugPanel {
             return;
         }
         const margin = 40;
-        const x = margin + Math.random() * (CONFIG.CANVAS_WIDTH - margin * 2);
-        const y = margin + Math.random() * (CONFIG.CANVAS_HEIGHT - margin * 2);
+        const x = margin + Math.random() * (CONFIG.MAP_WIDTH - margin * 2);
+        const y = margin + Math.random() * (CONFIG.MAP_HEIGHT - margin * 2);
         const food = new Food(x, y, type);
         // 给一点随机初速度，让它有动态感
         food.velocity.x = (Math.random() - 0.5) * 1.5;

@@ -65,6 +65,7 @@ class BackgroundEditor {
     this.tangentHandleState = null; // 切线手柄拖拽状态
     this.controlPointEditMode = false; // 控制点编辑模式
     this.selectedControlPointIndex = -1; // 选中的控制点索引
+    this.addPointMode = false; // 增加控制点模式
     this.drawMode = null; // null, 'polyline', 'path'
     this.drawPoints = []; // 正在绘制的点
     this.isDrawingPath = false;
@@ -173,6 +174,16 @@ class BackgroundEditor {
       }
       this.rebuild();
       return;
+    }
+
+    // 增加控制点模式
+    if (this.addPointMode && this.selectedElement && this.selectedElement.startsWith('shape_')) {
+      const shapeId = this.selectedElement.replace('shape_', '');
+      const shape = this.config.shapes?.find(s => s.id === shapeId);
+      if (shape && shape.type === 'path' && shape.points) {
+        this.insertControlPointAtPosition(shape, relX, relY);
+        return;
+      }
     }
 
     // 检查是否点击了选中元素的 Transform 手柄
@@ -388,6 +399,11 @@ class BackgroundEditor {
       const shapeId = this.selectedElement.replace('shape_', '');
       const shape = this.config.shapes?.find(s => s.id === shapeId);
       if (shape && !shape.locked) {
+        // 增加控制点模式
+        if (this.addPointMode && shape.type === 'path') {
+          this.canvas.style.cursor = 'crosshair';
+          return;
+        }
         // 控制点编辑模式
         if (this.controlPointEditMode && (shape.type === 'polyline' || shape.type === 'path') && shape.points) {
           // 检查切线手柄
@@ -1014,12 +1030,18 @@ class BackgroundEditor {
       switch(e.key) {
         case 'Delete':
         case 'Backspace':
-          if (this.selectedElement) {
+          // 优先删除选中的控制点
+          if (this.controlPointEditMode && this.selectedControlPointIndex >= 0) {
+            this.deleteSelectedControlPoint();
+          } else if (this.selectedElement) {
             this.deleteElement(this.selectedElement);
           }
           break;
         case 'Escape':
-          if (this.drawMode) {
+          if (this.addPointMode) {
+            this.addPointMode = false;
+            this.canvas.style.cursor = 'crosshair';
+          } else if (this.drawMode) {
             this.setDrawMode(null);
           } else {
             this.selectElement(null);
@@ -1162,9 +1184,119 @@ class BackgroundEditor {
     this.controlPointEditMode = !this.controlPointEditMode;
     if (!this.controlPointEditMode) {
       this.selectedControlPointIndex = -1; // 退出时重置选中
+      this.addPointMode = false;
     }
     this.canvas.style.cursor = this.controlPointEditMode ? 'crosshair' : 'default';
     this.markDirty();
+  }
+
+  // 进入增加控制点模式
+  enterAddPointMode() {
+    if (!this.selectedElement || !this.selectedElement.startsWith('shape_')) return;
+    const shapeId = this.selectedElement.replace('shape_', '');
+    const shape = this.config.shapes?.find(s => s.id === shapeId);
+    if (!shape || shape.type !== 'path') return;
+
+    this.controlPointEditMode = true;
+    this.addPointMode = true;
+    this.selectedControlPointIndex = -1;
+    this.canvas.style.cursor = 'crosshair';
+    this.markDirty();
+  }
+
+  // 在路径上最近位置插入控制点
+  insertControlPointAtPosition(shape, clickX, clickY) {
+    if (!shape.points || shape.points.length < 2) return;
+
+    const pts = shape.points;
+    let bestSegIdx = 0;
+    let bestT = 0;
+    let bestDist = Infinity;
+
+    // 找到离点击位置最近的曲线段
+    for (let seg = 0; seg < pts.length - 1; seg++) {
+      // 采样曲线段找最近点
+      for (let t = 0; t <= 1; t += 0.05) {
+        const mt = 1 - t;
+        // 简化：用线性插值近似（实际曲线是 Bezier）
+        const x = pts[seg][0] * mt + pts[seg + 1][0] * t;
+        const y = pts[seg][1] * mt + pts[seg + 1][1] * t;
+        const dist = Math.hypot(clickX - x, clickY - y);
+        if (dist < bestDist) {
+          bestDist = dist;
+          bestSegIdx = seg;
+          bestT = t;
+        }
+      }
+    }
+
+    // 在最近位置插入新点
+    const newPoint = [
+      pts[bestSegIdx][0] * (1 - bestT) + pts[bestSegIdx + 1][0] * bestT,
+      pts[bestSegIdx][1] * (1 - bestT) + pts[bestSegIdx + 1][1] * bestT
+    ];
+
+    this.saveToHistory();
+    shape.points.splice(bestSegIdx + 1, 0, newPoint);
+
+    // 更新 tangentHandles 索引
+    if (shape.tangentHandles) {
+      const newHandles = {};
+      for (const [key, val] of Object.entries(shape.tangentHandles)) {
+        const idx = parseInt(key);
+        if (idx > bestSegIdx) {
+          newHandles[idx + 1] = val;
+        } else {
+          newHandles[idx] = val;
+        }
+      }
+      shape.tangentHandles = newHandles;
+    }
+
+    // 更新 tangentWeights 索引
+    if (shape.tangentWeights) {
+      shape.tangentWeights.splice(bestSegIdx + 1, 0, 0.5);
+    }
+
+    this.selectedControlPointIndex = bestSegIdx + 1;
+    this.addPointMode = false;
+    this.rebuild();
+  }
+
+  // 删除选中的控制点
+  deleteSelectedControlPoint() {
+    if (!this.selectedElement || !this.selectedElement.startsWith('shape_')) return;
+    const shapeId = this.selectedElement.replace('shape_', '');
+    const shape = this.config.shapes?.find(s => s.id === shapeId);
+    if (!shape || !shape.points || this.selectedControlPointIndex < 0) return;
+
+    // 至少保留 2 个点
+    if (shape.points.length <= 2) return;
+
+    const idx = this.selectedControlPointIndex;
+    this.saveToHistory();
+    shape.points.splice(idx, 1);
+
+    // 更新 tangentHandles 索引
+    if (shape.tangentHandles) {
+      const newHandles = {};
+      for (const [key, val] of Object.entries(shape.tangentHandles)) {
+        const i = parseInt(key);
+        if (i < idx) newHandles[i] = val;
+        else if (i > idx) newHandles[i - 1] = val;
+        // i === idx: 删除，不保留
+      }
+      shape.tangentHandles = newHandles;
+    }
+
+    // 更新 tangentWeights 索引
+    if (shape.tangentWeights) {
+      shape.tangentWeights.splice(idx, 1);
+    }
+
+    // 调整选中索引
+    this.selectedControlPointIndex = Math.min(idx, shape.points.length - 1);
+    this.rebuild();
   }
 
   // 多选元素（框选）

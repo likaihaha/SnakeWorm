@@ -690,7 +690,7 @@ export class Worm {
                 shrinking.pos.x += shrinking.velocity.x * dt;
                 shrinking.pos.y += shrinking.velocity.y * dt;
 
-                if (shrinking.pos.y >= CONFIG.CANVAS_HEIGHT - CONFIG.WALL_MARGIN && !shrinking.emitted) {
+                if (shrinking.pos.y >= CONFIG.MAP_HEIGHT - CONFIG.BORDER_MARGIN && !shrinking.emitted) {
                     shrinking.emitted = true;
 
                     const roll = Math.random();
@@ -721,8 +721,8 @@ export class Worm {
                     }
                 }
 
-                if (shrinking.pos.y > CONFIG.CANVAS_HEIGHT + 50 ||
-                    shrinking.pos.x < -50 || shrinking.pos.x > CONFIG.CANVAS_WIDTH + 50) {
+                if (shrinking.pos.y > CONFIG.MAP_HEIGHT + 50 ||
+                    shrinking.pos.x < -50 || shrinking.pos.x > CONFIG.MAP_WIDTH + 50) {
                     this.shrinkingSegments.splice(i, 1);
                 }
             }
@@ -983,21 +983,21 @@ export class Worm {
 
     // 幼体边界避让：目标靠近边缘时推向中心
     _juvenileAvoidWalls(target) {
-        const safeMargin = CONFIG.WALL_MARGIN * 4;  // 安全边距，比死亡线更早触发
-        const cx = CONFIG.CANVAS_WIDTH / 2;
-        const cy = CONFIG.CANVAS_HEIGHT / 2;
+        const safeMargin = CONFIG.BORDER_MARGIN * 2;  // 安全边距
+        const cx = CONFIG.MAP_WIDTH / 2;
+        const cy = CONFIG.MAP_HEIGHT / 2;
         let tx = target.x;
         let ty = target.y;
 
         // 如果目标超出安全区域，推向中心
         if (tx < safeMargin) tx = cx;
-        else if (tx > CONFIG.CANVAS_WIDTH - safeMargin) tx = cx;
+        else if (tx > CONFIG.MAP_WIDTH - safeMargin) tx = cx;
         if (ty < safeMargin) ty = cy;
-        else if (ty > CONFIG.CANVAS_HEIGHT - safeMargin) ty = cy;
+        else if (ty > CONFIG.MAP_HEIGHT - safeMargin) ty = cy;
 
         // 如果当前位置已经在边缘，强制推向中心
-        if (this.head.x < safeMargin || this.head.x > CONFIG.CANVAS_WIDTH - safeMargin ||
-            this.head.y < safeMargin || this.head.y > CONFIG.CANVAS_HEIGHT - safeMargin) {
+        if (this.head.x < safeMargin || this.head.x > CONFIG.MAP_WIDTH - safeMargin ||
+            this.head.y < safeMargin || this.head.y > CONFIG.MAP_HEIGHT - safeMargin) {
             const pushDir = new Vector(cx - this.head.x, cy - this.head.y).normalize();
             return this.head.add(pushDir.mult(150));
         }
@@ -1005,22 +1005,22 @@ export class Worm {
         return new Vector(tx, ty);
     }
 
-    // 死亡线检测（外框，最外面）
+    // 死亡线检测（地图边缘）
     checkWallCollision() {
         if (this.segments.length === 0) return false;
         const head = this.segments[0];
-        const margin = CONFIG.WALL_MARGIN * 2 + CONFIG.SEGMENT_RADIUS * 2;  // 死亡线：最外框
-        return head.x < margin || head.x > CONFIG.CANVAS_WIDTH - margin ||
-               head.y < margin || head.y > CONFIG.CANVAS_HEIGHT - margin;
+        const margin = CONFIG.BORDER_MARGIN;
+        return head.x < margin || head.x > CONFIG.MAP_WIDTH - margin ||
+               head.y < margin || head.y > CONFIG.MAP_HEIGHT - margin;
     }
 
-    // 预警线检测（内框，最里面）
+    // 预警线检测（接近地图边缘时预警）
     checkWarningLine() {
         if (this.segments.length === 0) return false;
         const head = this.segments[0];
-        const margin = CONFIG.WALL_MARGIN;  // 预警线：最内框
-        return head.x < margin || head.x > CONFIG.CANVAS_WIDTH - margin ||
-               head.y < margin || head.y > CONFIG.CANVAS_HEIGHT - margin;
+        const margin = CONFIG.BORDER_MARGIN + 80;  // 距离边界80像素时开始预警
+        return head.x < margin || head.x > CONFIG.MAP_WIDTH - margin ||
+               head.y < margin || head.y > CONFIG.MAP_HEIGHT - margin;
     }
 
     checkFoodCollision(foods) {

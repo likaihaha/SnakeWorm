@@ -32,7 +32,7 @@ export class DeadBody {
             seg.y += vel.y * dt;
 
             // 碰底检测：该段尸体转化为宝珠向上发射
-            if (seg.y >= canvasHeight - CONFIG.WALL_MARGIN) {
+            if (seg.y >= canvasHeight - CONFIG.BORDER_MARGIN) {
                 // 尸体爆宝珠概率：70%绿、15%蓝、10%黄、5%橙
                 const roll = Math.random();
                 let type;
@@ -58,7 +58,7 @@ export class DeadBody {
 
         // 如果所有段都转化完毕或超出底部，标记为完成
         if (this.segments.length === 0 || this.segments.every(seg =>
-            seg.y > canvasHeight + 50 || seg.x < -50 || seg.x > CONFIG.CANVAS_WIDTH + 50
+            seg.y > canvasHeight + 50 || seg.x < -50 || seg.x > CONFIG.MAP_WIDTH + 50
         )) {
             this.isFinished = true;
         }

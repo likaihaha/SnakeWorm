@@ -149,17 +149,17 @@ export class Enemy {
         // 更新位置
         this.pos = this.pos.add(this.velocity.mult(dt * 60));
 
-        // 边界反弹
-        const margin = CONFIG.WALL_MARGIN * 2 + CONFIG.SEGMENT_RADIUS * 2;
-        if (this.pos.x < margin || this.pos.x > CONFIG.CANVAS_WIDTH - margin) {
+        // 边界反弹（地图边缘）
+        const margin = CONFIG.BORDER_MARGIN;
+        if (this.pos.x < margin || this.pos.x > CONFIG.MAP_WIDTH - margin) {
             this.velocity.x *= -1;
             this.wanderDir.x *= -1;
-            this.pos.x = Math.max(margin, Math.min(CONFIG.CANVAS_WIDTH - margin, this.pos.x));
+            this.pos.x = Math.max(margin, Math.min(CONFIG.MAP_WIDTH - margin, this.pos.x));
         }
-        if (this.pos.y < margin || this.pos.y > CONFIG.CANVAS_HEIGHT - margin) {
+        if (this.pos.y < margin || this.pos.y > CONFIG.MAP_HEIGHT - margin) {
             this.velocity.y *= -1;
             this.wanderDir.y *= -1;
-            this.pos.y = Math.max(margin, Math.min(CONFIG.CANVAS_HEIGHT - margin, this.pos.y));
+            this.pos.y = Math.max(margin, Math.min(CONFIG.MAP_HEIGHT - margin, this.pos.y));
         }
 
         // 更新身体节段位置

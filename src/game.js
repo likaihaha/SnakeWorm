@@ -16,6 +16,7 @@ import { DeadBody } from './dead-body.js';
 import { Leaderboard } from './leaderboard.js';
 import { DynamicBG } from './dynamic-bg.js';
 import { DebugLogger } from './debug-log.js';
+import { Camera } from './camera.js';
 
 export class Game {
     constructor() {
@@ -32,7 +33,7 @@ export class Game {
         this.crosshairHintTimer = 0;  // 瞄准镜提示计时器
         this.slowedWorms = new Map();  // 减速的虫虫 {worm: slowTimer}
         this.musicSystem = new MusicSystem();  // 音效系统
-        this.mousePos = new Vector(CONFIG.CANVAS_WIDTH / 2, CONFIG.CANVAS_HEIGHT / 2);
+        this.mousePos = new Vector(CONFIG.MAP_WIDTH / 2, CONFIG.MAP_HEIGHT / 2);  // 世界坐标
         this.isMouseDown = false;  // 鼠标按下状态（连续射击）
         this.fireCooldown = 0;  // 射击冷却计时器
         this.score = 0;
@@ -58,16 +59,21 @@ export class Game {
         this.waitingForPlayer = false;  // 等待玩家鼠标移入白圈
         this.mouseInCanvas = false;  // 鼠标是否在Canvas内
         this.familyNoticeShown = false;  // 亲子提示是否已显示
-        // 空间网格分区
-        this.spatialGrid = new SpatialGrid(CONFIG.CANVAS_WIDTH, CONFIG.CANVAS_HEIGHT, 40);
-        // 网格预渲染
+
+        // 相机系统
+        this.camera = new Camera();
+
+        // 空间网格分区（使用地图尺寸）
+        this.spatialGrid = new SpatialGrid(CONFIG.MAP_WIDTH, CONFIG.MAP_HEIGHT, 40);
+        // 网格瓦片预渲染（只渲染一个 40×40 瓦片，绘制时平铺）
+        this.gridTileSize = 40;
         this.gridCanvas = document.createElement('canvas');
-        this.gridCanvas.width = CONFIG.CANVAS_WIDTH;
-        this.gridCanvas.height = CONFIG.CANVAS_HEIGHT;
+        this.gridCanvas.width = this.gridTileSize;
+        this.gridCanvas.height = this.gridTileSize;
         this.gridCtx = this.gridCanvas.getContext('2d');
         this.preRenderGrid();
 
-        // 动态程序化背景（默认配置，随后加载外部 JSON）
+        // 动态程序化背景（视口大小，覆盖屏幕即可）
         this.bg = new DynamicBG(CONFIG.CANVAS_WIDTH, CONFIG.CANVAS_HEIGHT);
         fetch('src/dynamic-bg-config.json')
             .then(r => r.json())
@@ -229,7 +235,7 @@ export class Game {
         this.joystickDirection = normalizedDir;
         
         // 更新鼠标位置（在摇杆方向上）
-        const head = this.worms[0] ? this.worms[0].head : new Vector(CONFIG.CANVAS_WIDTH / 2, CONFIG.CANVAS_HEIGHT / 2);
+        const head = this.worms[0] ? this.worms[0].head : new Vector(CONFIG.MAP_WIDTH / 2, CONFIG.MAP_HEIGHT / 2);
         const targetX = head.x + normalizedDir.x * 100;
         const targetY = head.y + normalizedDir.y * 100;
         this.mousePos = new Vector(targetX, targetY);
@@ -252,11 +258,15 @@ export class Game {
             const rect = canvas.getBoundingClientRect();
             const scaleX = CONFIG.CANVAS_WIDTH / rect.width;
             const scaleY = CONFIG.CANVAS_HEIGHT / rect.height;
-            const x = (e.clientX - rect.left) * scaleX;
-            const y = (e.clientY - rect.top) * scaleY;
+            const screenX = (e.clientX - rect.left) * scaleX;
+            const screenY = (e.clientY - rect.top) * scaleY;
             
             // 检查鼠标是否真的在 Canvas 区域内
-            if (x >= 0 && x <= CONFIG.CANVAS_WIDTH && y >= 0 && y <= CONFIG.CANVAS_HEIGHT) {
+            if (screenX >= 0 && screenX <= CONFIG.CANVAS_WIDTH && screenY >= 0 && screenY <= CONFIG.CANVAS_HEIGHT) {
+                // 屏幕坐标转世界坐标
+                const world = this.camera.screenToWorld(screenX, screenY);
+                const x = world.x;
+                const y = world.y;
                 this.mousePos = new Vector(x, y);
                 this.mouseInCanvas = true;
                 
@@ -266,8 +276,8 @@ export class Game {
                 
                 // 等待玩家控制阶段：检测鼠标是否移入白圈
                 if (this.waitingForPlayer) {
-                    const centerX = CONFIG.CANVAS_WIDTH / 2;
-                    const centerY = CONFIG.CANVAS_HEIGHT / 2;
+                    const centerX = CONFIG.MAP_WIDTH / 2;
+                    const centerY = CONFIG.MAP_HEIGHT / 2;
                     const cursorRadius = 18;  // 白圈半径
                     const dx = x - centerX;
                     const dy = y - centerY;
@@ -410,12 +420,13 @@ export class Game {
         const rect = canvas.getBoundingClientRect();
         const scaleX = CONFIG.CANVAS_WIDTH / rect.width;
         const scaleY = CONFIG.CANVAS_HEIGHT / rect.height;
-        const x = (touch.clientX - rect.left) * scaleX;
-        const y = (touch.clientY - rect.top) * scaleY;
+        const screenX = (touch.clientX - rect.left) * scaleX;
+        const screenY = (touch.clientY - rect.top) * scaleY;
         
         // 检查触摸是否在 Canvas 区域内
-        if (x >= 0 && x <= CONFIG.CANVAS_WIDTH && y >= 0 && y <= CONFIG.CANVAS_HEIGHT) {
-            this.mousePos = new Vector(x, y);
+        if (screenX >= 0 && screenX <= CONFIG.CANVAS_WIDTH && screenY >= 0 && screenY <= CONFIG.CANVAS_HEIGHT) {
+            const world = this.camera.screenToWorld(screenX, screenY);
+            this.mousePos = new Vector(world.x, world.y);
             this.mouseInCanvas = true;
         } else {
             this.mouseInCanvas = false;
@@ -445,7 +456,7 @@ export class Game {
             this.restart();
             
             // 设置初始状态：白圈在画面中央，等待玩家鼠标移入
-            this.mousePos = new Vector(CONFIG.CANVAS_WIDTH / 2, CONFIG.CANVAS_HEIGHT / 2);
+            this.mousePos = new Vector(CONFIG.MAP_WIDTH / 2, CONFIG.MAP_HEIGHT / 2);
             this.mouseInCanvas = true;
             this.waitingForPlayer = true;  // 等待玩家鼠标移入白圈
             
@@ -556,12 +567,13 @@ export class Game {
      */
     _spawnDemoElements() {
         const colors = ['#4ecca3', '#4ecdc4', '#ffe66d', '#ff8b94', '#a8e6cf', '#c7ceea'];
-        // 生成 3-4 条 AI 虫虫
+        // 生成 3-4 条 AI 虫虫（在视口中央区域）
         const count = 3 + Math.floor(Math.random() * 2);
         for (let i = 0; i < count; i++) {
-            const margin = CONFIG.WALL_MARGIN * 3;
-            const x = margin + Math.random() * (CONFIG.CANVAS_WIDTH - margin * 2);
-            const y = margin + Math.random() * (CONFIG.CANVAS_HEIGHT - margin * 2);
+            // Demo 模式：在地图中央区域生成（约视口范围）
+            const cx = CONFIG.MAP_WIDTH / 2, cy = CONFIG.MAP_HEIGHT / 2;
+            const x = cx - 300 + Math.random() * 600;
+            const y = cy - 200 + Math.random() * 400;
             const color = colors[i % colors.length];
             const worm = new Worm(x, y, 5 + Math.floor(Math.random() * 6), color, false);
             worm.aiWanderDir = Vector.randomDir();
@@ -588,9 +600,9 @@ export class Game {
             // 碰墙反弹
             if (worm.checkWallCollision()) {
                 worm.aiWanderDir = Vector.randomDir();
-                const margin = CONFIG.WALL_MARGIN + CONFIG.SEGMENT_RADIUS;
-                worm.segments[0].x = Math.max(margin, Math.min(CONFIG.CANVAS_WIDTH - margin, worm.segments[0].x));
-                worm.segments[0].y = Math.max(margin, Math.min(CONFIG.CANVAS_HEIGHT - margin, worm.segments[0].y));
+                const margin = CONFIG.BORDER_MARGIN + CONFIG.SEGMENT_RADIUS;
+                worm.segments[0].x = Math.max(margin, Math.min(CONFIG.MAP_WIDTH - margin, worm.segments[0].x));
+                worm.segments[0].y = Math.max(margin, Math.min(CONFIG.MAP_HEIGHT - margin, worm.segments[0].y));
             }
         }
         // 更新宝珠
@@ -641,18 +653,18 @@ export class Game {
 
         // 玩家虫虫从框外左边开始（完全不可见）
         const player = new Worm(
-            CONFIG.CANVAS_WIDTH / 2,  // 目标位置（中间）
-            CONFIG.CANVAS_HEIGHT / 2,
+            CONFIG.MAP_WIDTH / 2,  // 目标位置（地图中间）
+            CONFIG.MAP_HEIGHT / 2,
             CONFIG.WORM_INITIAL_LENGTH,
             '#4ecca3',
             true
         );
         // 设置出场动画参数
-        player.enterStartPos = new Vector(-50, CONFIG.CANVAS_HEIGHT / 2);  // 从框外左边开始
-        player.enterMidPos = new Vector(CONFIG.CANVAS_WIDTH / 2, CONFIG.CANVAS_HEIGHT / 2);  // 画面中央
+        player.enterStartPos = new Vector(-50, CONFIG.MAP_HEIGHT / 2);  // 从框外左边开始
+        player.enterMidPos = new Vector(CONFIG.MAP_WIDTH / 2, CONFIG.MAP_HEIGHT / 2);  // 地图中央
         // 初始化虫虫身体位置到框外（这样一开始就不可见）
         for (let i = 0; i < player.segments.length; i++) {
-            player.segments[i] = new Vector(-50 - i * 14, CONFIG.CANVAS_HEIGHT / 2);
+            player.segments[i] = new Vector(-50 - i * 14, CONFIG.MAP_HEIGHT / 2);
         }
         // 给玩家添加无敌时间，出场动画期间不会被吞噬
         player.invincibleTimer = 3.5;  // 3.5 秒无敌（2 秒动画 + 1.5 秒游向鼠标）
@@ -806,15 +818,15 @@ export class Game {
         // 节奏解锁通知
         if (!this.rhythmNotified.yellow && (this.gameTime >= CONFIG.RHYTHM.YELLOW_UNLOCK_TIME || player.length >= CONFIG.RHYTHM.YELLOW_UNLOCK_LENGTH)) {
             this.rhythmNotified.yellow = true;
-            this.floatingTexts.push(FloatingText.acquire(CONFIG.CANVAS_WIDTH / 2, CONFIG.CANVAS_HEIGHT / 2 - 50, '🟡 黄色宝珠已解锁！', '#ffd700'));
+            this.floatingTexts.push(FloatingText.acquire(CONFIG.MAP_WIDTH / 2, CONFIG.MAP_HEIGHT / 2 - 50, '🟡 黄色宝珠已解锁！', '#ffd700'));
         }
         if (!this.rhythmNotified.orange && this.gameTime >= CONFIG.RHYTHM.ORANGE_UNLOCK_TIME) {
             this.rhythmNotified.orange = true;
-            this.floatingTexts.push(FloatingText.acquire(CONFIG.CANVAS_WIDTH / 2, CONFIG.CANVAS_HEIGHT / 2 - 50, '🟠 橙色宝珠已解锁！', '#ff8c42'));
+            this.floatingTexts.push(FloatingText.acquire(CONFIG.MAP_WIDTH / 2, CONFIG.MAP_HEIGHT / 2 - 50, '🟠 橙色宝珠已解锁！', '#ff8c42'));
         }
         if (!this.rhythmNotified.red && this.gameTime >= CONFIG.RHYTHM.RED_UNLOCK_TIME && player.length >= CONFIG.RHYTHM.RED_UNLOCK_LENGTH) {
             this.rhythmNotified.red = true;
-            this.floatingTexts.push(FloatingText.acquire(CONFIG.CANVAS_WIDTH / 2, CONFIG.CANVAS_HEIGHT / 2 - 50, '🔵 蓝色宝珠已解锁！可以发射减速子弹！', '#4dabf7'));
+            this.floatingTexts.push(FloatingText.acquire(CONFIG.MAP_WIDTH / 2, CONFIG.MAP_HEIGHT / 2 - 50, '🔵 蓝色宝珠已解锁！可以发射减速子弹！', '#4dabf7'));
         }
 
         // 按住鼠标连续射击
@@ -872,9 +884,9 @@ export class Game {
 
                 if (worm.checkWallCollision()) {
                     worm.aiWanderDir = Vector.randomDir();
-                    const margin = CONFIG.WALL_MARGIN + CONFIG.SEGMENT_RADIUS;
-                    worm.segments[0].x = Math.max(margin, Math.min(CONFIG.CANVAS_WIDTH - margin, worm.segments[0].x));
-                    worm.segments[0].y = Math.max(margin, Math.min(CONFIG.CANVAS_HEIGHT - margin, worm.segments[0].y));
+                    const margin = CONFIG.BORDER_MARGIN + CONFIG.SEGMENT_RADIUS;
+                    worm.segments[0].x = Math.max(margin, Math.min(CONFIG.MAP_WIDTH - margin, worm.segments[0].x));
+                    worm.segments[0].y = Math.max(margin, Math.min(CONFIG.MAP_HEIGHT - margin, worm.segments[0].y));
                 }
                 
                 // AI虫虫随机射击（有蓝色段时）
@@ -1118,7 +1130,7 @@ export class Game {
             let w = 0;
             for (let i = 0; i < this.deadBodies.length; i++) {
                 const body = this.deadBodies[i];
-                const emitted = body.update(dt, CONFIG.CANVAS_HEIGHT);
+                const emitted = body.update(dt, CONFIG.MAP_HEIGHT);
 
                 // 每一段碰底的尸体转化为宝珠，从该段位置向上发射
                 for (const emit of emitted) {
@@ -1319,11 +1331,11 @@ export class Game {
 
         // 9. 按类型刷新宝珠 + 清理出画布的宝珠（底部消散特效）
         {
-            const deathMargin = CONFIG.WALL_MARGIN * 2 + CONFIG.SEGMENT_RADIUS * 2;
+            const deathMargin = CONFIG.BORDER_MARGIN;
             let w = 0;
             for (let i = 0; i < this.foods.length; i++) {
                 const food = this.foods[i];
-                if (food.pos.y > CONFIG.CANVAS_HEIGHT - deathMargin && food.velocity.y >= 0) {
+                if (food.pos.y > CONFIG.MAP_HEIGHT - deathMargin && food.velocity.y >= 0) {
                     // 宝珠掉到底部死亡线时，播放消散特效
                     for (let j = 0; j < 8; j++) {
                         this.particles.push(Particle.acquire(food.pos.x, food.pos.y, food.type.color));
@@ -1588,12 +1600,13 @@ export class Game {
             }
         }
         
-        // 转换为屏幕坐标
+        // 世界坐标 → 屏幕坐标（通过相机转换）
+        const screen = this.camera.worldToScreen(indicatorX, indicatorY);
         const rect = canvas.getBoundingClientRect();
         const scaleX = rect.width / CONFIG.CANVAS_WIDTH;
         const scaleY = rect.height / CONFIG.CANVAS_HEIGHT;
-        const screenX = rect.left + indicatorX * scaleX;
-        const screenY = rect.top + indicatorY * scaleY;
+        const screenX = rect.left + screen.x * scaleX;
+        const screenY = rect.top + screen.y * scaleY;
         
         // 更新指示器位置
         indicator.style.left = screenX + 'px';
@@ -1890,14 +1903,18 @@ export class Game {
             this.enemySpawnTimer -= dt;
             if (this.enemySpawnTimer <= 0 && this.enemies.length < maxEnemy) {
                 this.enemySpawnTimer = CONFIG.FAMILY.ENEMY_SPAWN_INTERVAL;
-                const margin = CONFIG.WALL_MARGIN * 4;
+                const margin = CONFIG.BORDER_MARGIN;
                 let x, y;
                 const side = Math.floor(Math.random() * 4);
+                // 在玩家附近边缘生成敌人
+                const px = player ? player.head.x : CONFIG.MAP_WIDTH / 2;
+                const py = player ? player.head.y : CONFIG.MAP_HEIGHT / 2;
+                const range = 600;  // 玩家附近的范围
                 switch (side) {
-                    case 0: x = margin; y = margin + Math.random() * (CONFIG.CANVAS_HEIGHT - margin * 2); break;
-                    case 1: x = CONFIG.CANVAS_WIDTH - margin; y = margin + Math.random() * (CONFIG.CANVAS_HEIGHT - margin * 2); break;
-                    case 2: x = margin + Math.random() * (CONFIG.CANVAS_WIDTH - margin * 2); y = margin; break;
-                    case 3: x = margin + Math.random() * (CONFIG.CANVAS_WIDTH - margin * 2); y = CONFIG.CANVAS_HEIGHT - margin; break;
+                    case 0: x = Math.max(margin, px - range / 2 + Math.random() * range); y = margin; break;
+                    case 1: x = Math.max(margin, px - range / 2 + Math.random() * range); y = CONFIG.MAP_HEIGHT - margin; break;
+                    case 2: x = margin; y = Math.max(margin, py - range / 2 + Math.random() * range); break;
+                    case 3: x = CONFIG.MAP_WIDTH - margin; y = Math.max(margin, py - range / 2 + Math.random() * range); break;
                 }
                 const newEnemy = new Enemy(x, y);
                 this.enemies.push(newEnemy);
@@ -2099,8 +2116,26 @@ export class Game {
     }
 
     draw() {
-        // 绘制程序化动态背景（替代纯色填充）
+        // 更新相机跟随玩家头部（或demo模式下跟随第一个虫虫）
+        const player = this.worms[0];
+        if (player && player.isAlive && player.head) {
+            this.camera.follow(player.head.x, player.head.y);
+        } else if (this.state === GAME_STATE.IDLE && this.worms.length > 0) {
+            // Demo模式：跟随第一个存活虫虫
+            for (const w of this.worms) {
+                if (w.isAlive && w.head) {
+                    this.camera.follow(w.head.x, w.head.y);
+                    break;
+                }
+            }
+        }
+
+        // 绘制程序化动态背景（视口大小，直接画到屏幕）
         this.bg.draw(ctx);
+
+        // === 应用相机偏移 ===
+        ctx.save();
+        ctx.translate(-this.camera.x, -this.camera.y);
 
         this.drawGrid();
 
@@ -2129,8 +2164,15 @@ export class Game {
         // 恢复source-over模式绘制UI
         ctx.globalCompositeOperation = 'source-over';
         for (let i = 0; i < this.floatingTexts.length; i++) this.floatingTexts[i].draw(ctx);
+
+        // 绘制地图边界（在世界坐标中）
+        this.drawMapBorder();
+
+        // 恢复相机偏移
+        ctx.restore();
+
+        // === 屏幕坐标UI层（不受相机影响） ===
         this.drawCustomCursor();
-        this.drawWalls();
         if (this.showFPS) {
             this.drawFPS();
         }
@@ -2138,15 +2180,14 @@ export class Game {
 
     preRenderGrid() {
         const gridCtx = this.gridCtx;
+        const size = this.gridTileSize;
+        gridCtx.clearRect(0, 0, size, size);
         gridCtx.strokeStyle = 'rgba(78, 204, 163, 0.05)';
         gridCtx.lineWidth = 1;
-        const gridSize = 40;
-        for (let x = 0; x < CONFIG.CANVAS_WIDTH; x += gridSize) {
-            gridCtx.beginPath(); gridCtx.moveTo(x, 0); gridCtx.lineTo(x, CONFIG.CANVAS_HEIGHT); gridCtx.stroke();
-        }
-        for (let y = 0; y < CONFIG.CANVAS_HEIGHT; y += gridSize) {
-            gridCtx.beginPath(); gridCtx.moveTo(0, y); gridCtx.lineTo(CONFIG.CANVAS_WIDTH, y); gridCtx.stroke();
-        }
+        gridCtx.beginPath();
+        gridCtx.moveTo(0, 0); gridCtx.lineTo(size, 0);
+        gridCtx.moveTo(0, 0); gridCtx.lineTo(0, size);
+        gridCtx.stroke();
     }
 
     /**
@@ -2164,25 +2205,34 @@ export class Game {
     }
 
     drawGrid() {
-        ctx.drawImage(this.gridCanvas, 0, 0);
+        // 在可见视口范围内平铺网格瓦片
+        const size = this.gridTileSize;
+        const startX = Math.floor(this.camera.x / size) * size;
+        const startY = Math.floor(this.camera.y / size) * size;
+        const endX = this.camera.x + CONFIG.CANVAS_WIDTH + size;
+        const endY = this.camera.y + CONFIG.CANVAS_HEIGHT + size;
+        for (let x = startX; x < endX; x += size) {
+            for (let y = startY; y < endY; y += size) {
+                // 只绘制地图范围内的网格
+                if (x >= 0 && x < CONFIG.MAP_WIDTH && y >= 0 && y < CONFIG.MAP_HEIGHT) {
+                    ctx.drawImage(this.gridCanvas, x, y);
+                }
+            }
+        }
     }
 
-    drawWalls() {
-        // 预警线（内框）- 半透明红色，进入后显示预警
-        ctx.strokeStyle = 'rgba(255, 107, 107, 0.4)';
-        ctx.lineWidth = 2;
-        const warningMargin = CONFIG.WALL_MARGIN;
-        ctx.strokeRect(warningMargin, warningMargin, 
-            CONFIG.CANVAS_WIDTH - warningMargin * 2, 
-            CONFIG.CANVAS_HEIGHT - warningMargin * 2);
-        
-        // 死亡线（外框）- 更明显的红色，碰到就死
-        ctx.strokeStyle = 'rgba(255, 60, 60, 0.6)';
+    /**
+     * 绘制地图边界指示（虚线，非红色边框）
+     */
+    drawMapBorder() {
+        ctx.save();
+        ctx.setLineDash([20, 15]);
+        ctx.strokeStyle = 'rgba(78, 204, 163, 0.15)';
         ctx.lineWidth = 3;
-        const deathMargin = CONFIG.WALL_MARGIN * 2 + CONFIG.SEGMENT_RADIUS * 2;
-        ctx.strokeRect(deathMargin, deathMargin, 
-            CONFIG.CANVAS_WIDTH - deathMargin * 2, 
-            CONFIG.CANVAS_HEIGHT - deathMargin * 2);
+        const m = CONFIG.BORDER_MARGIN;
+        ctx.strokeRect(m, m, CONFIG.MAP_WIDTH - m * 2, CONFIG.MAP_HEIGHT - m * 2);
+        ctx.setLineDash([]);
+        ctx.restore();
     }
 
     drawFPS() {
@@ -2203,16 +2253,22 @@ export class Game {
         if (!this.mouseInCanvas) return;
         if (this.isTouchDevice) return;  // 触摸设备不显示光标
         
-        let cursorX = this.mousePos.x;
-        let cursorY = this.mousePos.y;
+        // 将世界坐标转换为屏幕坐标
+        let worldX = this.mousePos.x;
+        let worldY = this.mousePos.y;
         const player = this.worms[0];
         const hasBlueSegments = player && player.blueSegments > 0;
         
-        // 等待玩家控制阶段：白圈固定在画面中央
+        // 等待玩家控制阶段：白圈固定在地图中央
         if (this.waitingForPlayer) {
-            cursorX = CONFIG.CANVAS_WIDTH / 2;
-            cursorY = CONFIG.CANVAS_HEIGHT / 2;
+            worldX = CONFIG.MAP_WIDTH / 2;
+            worldY = CONFIG.MAP_HEIGHT / 2;
         }
+        
+        // 世界坐标转屏幕坐标
+        const screen = this.camera.worldToScreen(worldX, worldY);
+        const cursorX = screen.x;
+        const cursorY = screen.y;
         
         if (hasBlueSegments) {
             // 瞄准镜图样（蓝色）

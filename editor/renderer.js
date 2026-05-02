@@ -647,49 +647,54 @@ class EditableDynamicBG {
       let widthAtStart = this._getTaperedWidth(startRatio, startWidth, endWidth, taperStart, taperEnd);
       let widthAtEnd = this._getTaperedWidth(endRatio, startWidth, endWidth, taperStart, taperEnd);
       
-      // 绘制梯形段
+      // 绘制梯形段（重叠消除缝隙）
       const p1 = { x: pts[i][0] * w, y: pts[i][1] * h };
       const p2 = { x: pts[i+1][0] * w, y: pts[i+1][1] * h };
-      
-      this._drawTaperedSegment(ctx, p1, p2, widthAtStart, widthAtEnd, s.stroke);
+
+      this._drawTaperedSegment(ctx, p1, p2, widthAtStart, widthAtEnd, s.stroke, 0.5);
       
       currentLength += segLen;
     }
   }
   
   _getTaperedWidth(ratio, startWidth, endWidth, taperStart, taperEnd) {
-    let width;
-    if (ratio <= taperStart) {
-      // 起始渐变区域
-      const t = taperStart > 0 ? ratio / taperStart : 1;
-      width = startWidth + (endWidth - startWidth) * t;
-    } else if (ratio >= 1 - taperEnd) {
-      // 结束渐变区域
-      const t = taperEnd > 0 ? (1 - ratio) / taperEnd : 1;
-      width = endWidth + (startWidth - endWidth) * t;
-    } else {
-      // 中间区域
-      width = startWidth + (endWidth - startWidth) * ratio;
+    const baseWidth = Math.max(startWidth, endWidth);
+    const minWidthStart = baseWidth * (1 - Math.min(1, taperStart || 0));
+    const minWidthEnd = baseWidth * (1 - Math.min(1, taperEnd || 0));
+    const smoothstep = (t) => t * t * (3 - 2 * t);
+
+    if (ratio <= taperStart && taperStart > 0) {
+      const t = smoothstep(ratio / taperStart);
+      return minWidthStart + (baseWidth - minWidthStart) * t;
+    } else if (ratio >= 1 - taperEnd && taperEnd > 0) {
+      const t = smoothstep((ratio - (1 - taperEnd)) / taperEnd);
+      return baseWidth + (minWidthEnd - baseWidth) * t;
     }
-    return Math.max(1, width);
+    return baseWidth;
   }
   
-  _drawTaperedSegment(ctx, p1, p2, width1, width2, color) {
+  _drawTaperedSegment(ctx, p1, p2, width1, width2, color, overlap = 0) {
     const dx = p2.x - p1.x;
     const dy = p2.y - p1.y;
     const len = Math.sqrt(dx * dx + dy * dy);
     if (len === 0) return;
-    
+
     // 法线方向
     const nx = -dy / len;
     const ny = dx / len;
-    
+
+    // 延伸端点以消除缝隙
+    const ex = overlap > 0 ? (dx / len) * overlap : 0;
+    const ey = overlap > 0 ? (dy / len) * overlap : 0;
+    const ax = p1.x - ex, ay = p1.y - ey;
+    const bx = p2.x + ex, by = p2.y + ey;
+
     // 计算四个角点
-    const tl = { x: p1.x + nx * width1 / 2, y: p1.y + ny * width1 / 2 };
-    const tr = { x: p1.x - nx * width1 / 2, y: p1.y - ny * width1 / 2 };
-    const bl = { x: p2.x + nx * width2 / 2, y: p2.y + ny * width2 / 2 };
-    const br = { x: p2.x - nx * width2 / 2, y: p2.y - ny * width2 / 2 };
-    
+    const tl = { x: ax + nx * width1 / 2, y: ay + ny * width1 / 2 };
+    const tr = { x: ax - nx * width1 / 2, y: ay - ny * width1 / 2 };
+    const bl = { x: bx + nx * width2 / 2, y: by + ny * width2 / 2 };
+    const br = { x: bx - nx * width2 / 2, y: by - ny * width2 / 2 };
+
     ctx.beginPath();
     ctx.moveTo(tl.x, tl.y);
     ctx.lineTo(bl.x, bl.y);
@@ -719,36 +724,46 @@ class EditableDynamicBG {
     }
     
     if (totalLength === 0) return;
-    
-    // 绘制每段
+
+    // 绘制每段（重叠绘制避免缝隙）
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
     let currentLength = 0;
     for (let i = 0; i < segments.length; i++) {
       const segLen = segments[i];
       const startRatio = currentLength / totalLength;
       const endRatio = (currentLength + segLen) / totalLength;
-      
+
       // 计算起点和终点的颜色
       const colorAtStart = this._getGradientColor(stops, startRatio);
       const colorAtEnd = this._getGradientColor(stops, endRatio);
-      
+
       // 绘制渐变段
       const p1 = { x: pts[i][0] * w, y: pts[i][1] * h };
       const p2 = { x: pts[i+1][0] * w, y: pts[i+1][1] * h };
-      
+
       // 使用线性渐变模拟路径渐变
       const grad = ctx.createLinearGradient(p1.x, p1.y, p2.x, p2.y);
       grad.addColorStop(0, colorAtStart);
       grad.addColorStop(1, colorAtEnd);
-      
+
+      // 向两端稍微延伸，确保与相邻段重叠
+      const dx = p2.x - p1.x, dy = p2.y - p1.y;
+      const len = Math.sqrt(dx * dx + dy * dy) || 1;
+      const nx = dx / len, ny = dy / len;
+      const overlap = baseWidth * 0.6;
+
       ctx.beginPath();
-      ctx.moveTo(p1.x, p1.y);
-      ctx.lineTo(p2.x, p2.y);
+      ctx.moveTo(p1.x - nx * overlap, p1.y - ny * overlap);
+      ctx.lineTo(p2.x + nx * overlap, p2.y + ny * overlap);
       ctx.strokeStyle = grad;
       ctx.lineWidth = baseWidth;
       ctx.stroke();
-      
+
       currentLength += segLen;
     }
+    ctx.lineCap = 'butt';
+    ctx.lineJoin = 'miter';
   }
   
   _getGradientColor(stops, ratio) {
@@ -987,33 +1002,43 @@ class EditableDynamicBG {
     }
     
     if (totalLength === 0) return;
-    
-    // 绘制每段
+
+    // 绘制每段（重叠绘制避免缝隙）
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
     let currentLength = 0;
     for (let i = 0; i < segments.length; i++) {
       const segLen = segments[i];
       const startRatio = currentLength / totalLength;
       const endRatio = (currentLength + segLen) / totalLength;
-      
+
       const colorAtStart = this._getGradientColor(stops, startRatio);
       const colorAtEnd = this._getGradientColor(stops, endRatio);
-      
+
       const p1 = curvePoints[i];
       const p2 = curvePoints[i + 1];
-      
+
       const grad = ctx.createLinearGradient(p1.x, p1.y, p2.x, p2.y);
       grad.addColorStop(0, colorAtStart);
       grad.addColorStop(1, colorAtEnd);
-      
+
+      // 向两端稍微延伸，确保与相邻段重叠
+      const dx = p2.x - p1.x, dy = p2.y - p1.y;
+      const len = Math.sqrt(dx * dx + dy * dy) || 1;
+      const nx = dx / len, ny = dy / len;
+      const overlap = baseWidth * 0.6;
+
       ctx.beginPath();
-      ctx.moveTo(p1.x, p1.y);
-      ctx.lineTo(p2.x, p2.y);
+      ctx.moveTo(p1.x - nx * overlap, p1.y - ny * overlap);
+      ctx.lineTo(p2.x + nx * overlap, p2.y + ny * overlap);
       ctx.strokeStyle = grad;
       ctx.lineWidth = baseWidth;
       ctx.stroke();
-      
+
       currentLength += segLen;
     }
+    ctx.lineCap = 'butt';
+    ctx.lineJoin = 'miter';
   }
   
   _drawTaperedCurve(ctx, s, w, h) {
@@ -1068,7 +1093,7 @@ class EditableDynamicBG {
       let widthAtStart = this._getTaperedWidth(startRatio, startWidth, endWidth, taperStart, taperEnd);
       let widthAtEnd = this._getTaperedWidth(endRatio, startWidth, endWidth, taperStart, taperEnd);
       
-      this._drawTaperedSegment(ctx, curvePoints[i], curvePoints[i+1], widthAtStart, widthAtEnd, s.stroke);
+      this._drawTaperedSegment(ctx, curvePoints[i], curvePoints[i+1], widthAtStart, widthAtEnd, s.stroke, 0.5);
       
       currentLength += segLen;
     }

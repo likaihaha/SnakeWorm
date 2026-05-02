@@ -5,13 +5,15 @@
  */
 
 export const CONFIG = {
-    VERSION: '1.58',
-    CANVAS_WIDTH: 800, CANVAS_HEIGHT: 600,
+    VERSION: '1.61',
+    CANVAS_WIDTH: 800, CANVAS_HEIGHT: 600,   // 视口大小（屏幕显示区域）
+    MAP_WIDTH: 4000, MAP_HEIGHT: 3000,        // 世界地图大小（5×5倍）
+    BORDER_MARGIN: 30,                        // 地图边界死亡区宽度（用于尸体/宝珠生成等）
+    WALL_MARGIN: 5,                           // 地图边缘死亡区宽度（保留兼容，很小）
     SEGMENT_RADIUS: 8, SEGMENT_SPACING: 14,
     BASE_SPEED: 5, MIN_SPEED: 2, SPEED_DECAY: 0.02,
     WORM_INITIAL_LENGTH: 3, GROWTH_PER_FOOD: 1,
     MAX_SEGMENT_LENGTH: 80,
-    WALL_MARGIN: 10,
     SPLIT_COLOR_DURATION: 3.0,
     SPLIT_GROW_HEAD_TIME: 2.0,
     SPLIT_INVINCIBLE_TIME: 9.0,

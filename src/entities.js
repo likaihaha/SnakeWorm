@@ -79,8 +79,8 @@ export class Bullet {
 
         // 超出边界或时间到则消失
         if (this.life <= 0 ||
-            this.pos.x < 0 || this.pos.x > CONFIG.CANVAS_WIDTH ||
-            this.pos.y < 0 || this.pos.y > CONFIG.CANVAS_HEIGHT) {
+            this.pos.x < 0 || this.pos.x > CONFIG.MAP_WIDTH ||
+            this.pos.y < 0 || this.pos.y > CONFIG.MAP_HEIGHT) {
             return false;
         }
         return true;
@@ -225,15 +225,15 @@ export class Food {
     }
 
     static random(type = null) {
-        // 使用死亡线边距，确保宝珠不会在死亡区内生成
-        const margin = CONFIG.WALL_MARGIN * 2 + CONFIG.SEGMENT_RADIUS * 2;
+        // 使用地图边界边距，确保宝珠不会在边界外生成
+        const margin = CONFIG.BORDER_MARGIN + CONFIG.SEGMENT_RADIUS;
         const foodType = type || Food.weightedRandom();
-        // 在框体内均匀随机出生
-        const x = margin + Math.random() * (CONFIG.CANVAS_WIDTH - margin * 2);
-        const y = margin + Math.random() * (CONFIG.CANVAS_HEIGHT - margin * 2);
+        // 在地图范围内均匀随机出生
+        const x = margin + Math.random() * (CONFIG.MAP_WIDTH - margin * 2);
+        const y = margin + Math.random() * (CONFIG.MAP_HEIGHT - margin * 2);
         const food = new Food(x, y, foodType);
         // 如果在下半部分出生，给一点向上初速度，避免马上落出底部
-        if (y > CONFIG.CANVAS_HEIGHT / 2) {
+        if (y > CONFIG.MAP_HEIGHT / 2) {
             food.velocity.y = -(0.3 + Math.random() * 0.5);  // 向上初速度
         }
         return food;
