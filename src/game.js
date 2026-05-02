@@ -773,6 +773,7 @@ export class Game {
 
     update(deltaTime) {
         const dt = Math.min(deltaTime, 1 / 30);
+        this._lastDt = dt; // 存给draw()相机跟随用
         this.frameCount++;
         const player = this.worms[0];
 
@@ -2118,13 +2119,14 @@ export class Game {
     draw() {
         // 更新相机跟随玩家头部（或demo模式下跟随第一个虫虫）
         const player = this.worms[0];
+        const camDt = this._lastDt || 0.016; // dt来自update()
         if (player && player.isAlive && player.head) {
-            this.camera.follow(player.head.x, player.head.y);
+            this.camera.follow(player.head.x, player.head.y, camDt);
         } else if (this.state === GAME_STATE.IDLE && this.worms.length > 0) {
             // Demo模式：跟随第一个存活虫虫
             for (const w of this.worms) {
                 if (w.isAlive && w.head) {
-                    this.camera.follow(w.head.x, w.head.y);
+                    this.camera.follow(w.head.x, w.head.y, camDt);
                     break;
                 }
             }
