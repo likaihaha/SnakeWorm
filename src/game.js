@@ -1797,23 +1797,27 @@ export class Game {
                     }
                 }
                 
-                // 检测敌人与玩家（成年体）碰撞
+                // 检测敌人与玩家（成年体）碰撞 - 全身碰撞，头部碰撞双向伤害
                 if (player && player.isAlive && !player.isJuvenile && !enemy.isDying) {
-                    if (enemy.checkCollisionWithPlayer(player)) {
+                    const hitSeg = enemy.checkCollisionWithPlayer(player);
+                    if (hitSeg >= 0) {
                         player.adultHitCount++;
                         // 调试日志：玩家被敌人撞击
                         this.debugLogger.logAdultHitByEnemy(player, enemy, player.adultHitCount, this.gameTime);
-                        const phx = enemy.pos.x - player.head.x;
-                        const phy = enemy.pos.y - player.head.y;
-                        const phd = Math.sqrt(phx * phx + phy * phy);
-                        const hitDir = new Vector(phd > 0 ? phx / phd : 0, phd > 0 ? phy / phd : 0);
-                        const killed = enemy.takeDamage(hitDir);
-                        if (killed) {
-                            this.debugLogger.logEnemyDeath(enemy, this.gameTime);
-                            this.floatingTexts.push(FloatingText.acquire(enemy.segments[0].x, enemy.segments[0].y - 20, 'KILL!', '#ff6b6b'));
-                        } else {
-                            this.debugLogger.logEnemyHit(enemy, enemy.health, this.gameTime);
-                            this.floatingTexts.push(FloatingText.acquire(enemy.segments[0].x, enemy.segments[0].y - 20, `${enemy.health}/${enemy.maxHealth}`, '#ffa500'));
+                        // 只有虫虫头部撞到敌人才双向伤害
+                        if (hitSeg === 0) {
+                            const phx = enemy.pos.x - player.head.x;
+                            const phy = enemy.pos.y - player.head.y;
+                            const phd = Math.sqrt(phx * phx + phy * phy);
+                            const hitDir = new Vector(phd > 0 ? phx / phd : 0, phd > 0 ? phy / phd : 0);
+                            const killed = enemy.takeDamage(hitDir);
+                            if (killed) {
+                                this.debugLogger.logEnemyDeath(enemy, this.gameTime);
+                                this.floatingTexts.push(FloatingText.acquire(enemy.segments[0].x, enemy.segments[0].y - 20, 'KILL!', '#ff6b6b'));
+                            } else {
+                                this.debugLogger.logEnemyHit(enemy, enemy.health, this.gameTime);
+                                this.floatingTexts.push(FloatingText.acquire(enemy.segments[0].x, enemy.segments[0].y - 20, `${enemy.health}/${enemy.maxHealth}`, '#ffa500'));
+                            }
                         }
                         if (player.adultHitCount >= CONFIG.FAMILY.ADULT_HITS_TO_LOSE) {
                             player.adultHitCount = 0;
@@ -1830,20 +1834,25 @@ export class Game {
                 // 检测敌人与AI成年体虫虫碰撞（AI保护幼体时撞向敌人）
                 for (const worm of this.worms) {
                     if (!worm.isAlive || worm.isPlayer || worm.isJuvenile || !worm.head) continue;
-                    if (!enemy.isDying && enemy.checkCollisionWithPlayer(worm)) {
+                    if (enemy.isDying) continue;
+                    const aiHitSeg = enemy.checkCollisionWithPlayer(worm);
+                    if (aiHitSeg >= 0) {
                         worm.adultHitCount++;
                         this.debugLogger.logAdultHitByEnemy(worm, enemy, worm.adultHitCount, this.gameTime);
-                        const whx = enemy.pos.x - worm.head.x;
-                        const why = enemy.pos.y - worm.head.y;
-                        const whd = Math.sqrt(whx * whx + why * why);
-                        const hitDir = new Vector(whd > 0 ? whx / whd : 0, whd > 0 ? why / whd : 0);
-                        const killed = enemy.takeDamage(hitDir);
-                        if (killed) {
-                            this.floatingTexts.push(FloatingText.acquire(enemy.segments[0].x, enemy.segments[0].y - 20, 'KILL!', '#ff6b6b'));
-                            this.debugLogger.logEnemyDeath(enemy, this.gameTime);
-                        } else {
-                            this.floatingTexts.push(FloatingText.acquire(enemy.segments[0].x, enemy.segments[0].y - 20, `${enemy.health}/${enemy.maxHealth}`, '#ffa500'));
-                            this.debugLogger.logEnemyHit(enemy, enemy.health, this.gameTime);
+                        // 只有虫虫头部撞到敌人才双向伤害
+                        if (aiHitSeg === 0) {
+                            const whx = enemy.pos.x - worm.head.x;
+                            const why = enemy.pos.y - worm.head.y;
+                            const whd = Math.sqrt(whx * whx + why * why);
+                            const hitDir = new Vector(whd > 0 ? whx / whd : 0, whd > 0 ? why / whd : 0);
+                            const killed = enemy.takeDamage(hitDir);
+                            if (killed) {
+                                this.floatingTexts.push(FloatingText.acquire(enemy.segments[0].x, enemy.segments[0].y - 20, 'KILL!', '#ff6b6b'));
+                                this.debugLogger.logEnemyDeath(enemy, this.gameTime);
+                            } else {
+                                this.floatingTexts.push(FloatingText.acquire(enemy.segments[0].x, enemy.segments[0].y - 20, `${enemy.health}/${enemy.maxHealth}`, '#ffa500'));
+                                this.debugLogger.logEnemyHit(enemy, enemy.health, this.gameTime);
+                            }
                         }
                         if (worm.adultHitCount >= CONFIG.FAMILY.ADULT_HITS_TO_LOSE) {
                             worm.adultHitCount = 0;

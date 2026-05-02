@@ -630,12 +630,26 @@ export class Enemy {
         return -1;
     }
 
-    checkCollisionWithPlayer(player) {
-        if (!this.isAlive || !player.isAlive) return false;
-        const head = this.segments[0];
-        if (!head) return false;
-        const dist = head.dist(player.head);
-        return dist < this.size + CONFIG.SEGMENT_RADIUS;
+    /**
+     * 检测敌人与虫虫（玩家/AI成年体）的碰撞
+     * 敌人全身与虫虫全身都能碰撞
+     * @param {Worm} worm - 要检测的虫虫
+     * @returns {number} 碰撞的虫虫身体段索引，-1表示无碰撞，0表示虫虫头部碰撞
+     */
+    checkCollisionWithPlayer(worm) {
+        if (!this.isAlive || !worm.isAlive) return -1;
+        if (!this.segments.length) return -1;
+        // 检测敌人全身与虫虫全身的碰撞，返回被碰撞的虫虫段索引
+        for (let i = 0; i < worm.segments.length; i++) {
+            for (let j = 0; j < this.segments.length; j++) {
+                const dist = this.segments[j].dist(worm.segments[i]);
+                const enemyRadius = this.size * (1 - j * CONFIG.FAMILY.ENEMY_TAIL_TAPER);
+                if (dist < enemyRadius + CONFIG.SEGMENT_RADIUS) {
+                    return i;  // 返回被碰撞的虫虫段索引（0=头部）
+                }
+            }
+        }
+        return -1;
     }
 
     hit() {
