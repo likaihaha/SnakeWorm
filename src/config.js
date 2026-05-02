@@ -5,7 +5,7 @@
  */
 
 export const CONFIG = {
-    VERSION: '1.61',
+    VERSION: '1.70',
     CANVAS_WIDTH: 800, CANVAS_HEIGHT: 600,   // 视口大小（屏幕显示区域）
     MAP_WIDTH: 4000, MAP_HEIGHT: 3000,        // 世界地图大小（5×5倍）
     BORDER_MARGIN: 30,                        // 地图边界死亡区宽度（用于尸体/宝珠生成等）
@@ -91,6 +91,16 @@ export const CONFIG = {
         JUVENILE_EAT_RADIUS: 30,
         JUVENILE_FEED_COOLDOWN: 3.0,  // 幼体吃一节后冷却3秒（游出去一圈再吃下一节）
         JUVENILE_SPEED_RATIO: 0.7,
+    },
+    // === Phase 2 幼体性格系统 ===
+    PERSONALITY: {
+        TYPES: {
+            brave:   { label: '勇敢', color: '#ff6b6b', emoji: '⚔️', guardRadius: 300, shieldCooldown: 15 },
+            gentle:  { label: '温柔', color: '#a8e6cf', emoji: '💚', healRadius: 80, healRate: 0.5 },
+            curious: { label: '好奇', color: '#4ecdc4', emoji: '🔍', scoutRadius: 500, flashDuration: 1.5 },
+            naughty: { label: '淘气', color: '#ffe66d', emoji: '⚡', speedBonus: 1.3, stealRadius: 120 },
+        },
+        MIMICRY_THRESHOLD: 10,  // 母体行为采样次数阈值
     },
     PARTICLE: {
         SPEED_MIN: 2,

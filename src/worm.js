@@ -2,7 +2,7 @@ import { Vector } from './vector.js';
 import { CONFIG } from './config.js';
 import { hexToRgba, drawGlow } from './utils.js';
 import { SpatialGrid } from './spatial-grid.js';
-import { Food, Particle } from './entities.js';
+import { Food, Particle, FloatingText } from './entities.js';
 
 export class Worm {
     constructor(x, y, length, color = '#4ecca3', isPlayer = true) {
@@ -129,6 +129,23 @@ export class Worm {
         this.deathPhase = 'none';     // 死亡阶段：none → flashing → turning → sinking → gone
         this.deathTimer = 0;          // 死亡动画计时器
 
+        // === Phase 2 幼体性格系统 ===
+        this.personality = null;      // 'brave' | 'gentle' | 'curious' | 'naughty' | null
+        this.guardCooldown = 0;       // 勇敢：护卫挡刀冷却
+        this.isGuarding = false;      // 勇敢：是否正在挡刀
+        // === Phase 2 护理恢复系统 ===
+        this.injuredLevel = 0;        // 受伤等级 0=健康 1=轻伤 2=重伤
+        this.injuredGrayAlpha = 0;    // 灰色覆盖透明度 0~1
+        this.recoveryTimer = 0;       // 恢复计时器（母体靠近时累加）
+        this.isRecovering = false;    // 是否正在恢复中
+        this.guardTargetEnemy = null; // 勇敢：挡刀目标敌人
+        this.healPulseTimer = 0;      // 温柔：治疗脉冲计时器
+        this.isHealing = false;       // 温柔：是否正在治疗
+        this.scoutTarget = null;      // 好奇：侦察目标位置
+        this.isScouting = false;      // 好奇：是否正在侦察
+        this.scoutFlashTimer = 0;     // 好奇：发现宝珠闪烁计时器
+        this.mimicryData = { rushes: 0, dodges: 0, totalSamples: 0 }; // 模仿机制数据
+
         // 冰晶覆盖效果
         this.iceOverlays = [];  // [{segmentIndex, timer, maxTimer}]
 
@@ -178,6 +195,15 @@ export class Worm {
         // 幼体速度打折
         if (this.isJuvenile) {
             newSpeed *= CONFIG.FAMILY.JUVENILE_SPEED_RATIO;
+            // Phase 2: 淘气性格加速
+            if (this.personality === 'naughty') {
+                newSpeed *= CONFIG.PERSONALITY.TYPES.naughty.speedBonus;
+            }
+            // Phase 2: 受伤减速（受伤等级越高越慢）
+            if (this.injuredLevel > 0) {
+                const injuredSlowdown = 1.0 - this.injuredLevel * 0.2; // 轻伤0.8倍，重伤0.6倍
+                newSpeed *= Math.max(0.4, injuredSlowdown);
+            }
         }
 
         // 如果有减速叠加，应用减速效果
@@ -845,6 +871,145 @@ export class Worm {
     juvenileThink(foods, allWorms, dt, enemies, brokenTails) {
         this._allWorms = allWorms;  // 保存引用供findFoodTarget使用
         this.juvenileFearTimer -= dt;
+
+        // === Phase 2 性格行为：每次调用采样母体行为（用于模仿机制） ===
+        if (this.parentWorm && this.parentWorm.isAlive && this.mimicryData.totalSamples < 100) {
+            this.mimicryData.totalSamples++;
+            if (this.parentWorm.isMoving) {
+                const speed = this.parentWorm.speed || 0;
+                if (speed > 4) this.mimicryData.rushes++;
+                else if (speed < 3) this.mimicryData.dodges++;
+            }
+        }
+
+        // === Phase 2 性格行为：更新冷却和状态计时器 ===
+        if (this.guardCooldown > 0) this.guardCooldown -= dt;
+        if (this.healPulseTimer > 0) this.healPulseTimer -= dt;
+        if (this.scoutFlashTimer > 0) this.scoutFlashTimer -= dt;
+
+        // === Phase 2 护理恢复系统：更新受伤等级 ===
+        const newInjuredLevel = this.juvenileHitCount >= 2 ? 2 : (this.juvenileHitCount >= 1 ? 1 : 0);
+        this.injuredLevel = newInjuredLevel;
+        // 平滑过渡灰色透明度
+        const targetGrayAlpha = this.injuredLevel === 2 ? 0.6 : (this.injuredLevel === 1 ? 0.3 : 0);
+        this.injuredGrayAlpha += (targetGrayAlpha - this.injuredGrayAlpha) * Math.min(1, dt * 3);
+
+        // === Phase 2 护理恢复：母体靠近喂食恢复 ===
+        if (this.injuredLevel > 0 && this.parentWorm && this.parentWorm.isAlive) {
+            const distToParent = this.head.dist(this.parentWorm.head);
+            if (distToParent < 60) {
+                this.isRecovering = true;
+                this.recoveryTimer += dt;
+                // 每 2 秒恢复 1 级受伤
+                if (this.recoveryTimer >= 2.0) {
+                    this.recoveryTimer = 0;
+                    if (this.juvenileHitCount > 0) {
+                        this.juvenileHitCount--;
+                        // 恢复特效
+                        if (typeof game !== 'undefined' && game.particles) {
+                            for (let k = 0; k < 5; k++) {
+                                game.particles.push(Particle.acquire(this.head.x, this.head.y, '#a8e6cf'));
+                            }
+                        }
+                        if (typeof game !== 'undefined' && game.floatingTexts) {
+                            game.floatingTexts.push(FloatingText.acquire(this.head.x, this.head.y - 20, 'HEAL!', '#a8e6cf'));
+                        }
+                        if (typeof game !== 'undefined' && game.musicSystem) {
+                            game.musicSystem.playHealChime(this.head.x);
+                        }
+                    }
+                }
+            } else {
+                this.isRecovering = false;
+                this.recoveryTimer = 0;
+            }
+        } else {
+            this.isRecovering = false;
+            this.recoveryTimer = 0;
+        }
+
+        // === Phase 2 性格行为：勇敢挡刀 ===
+        if (this.personality === 'brave' && enemies && this.parentWorm && this.parentWorm.isAlive) {
+            if (this.guardCooldown <= 0 && !this.isGuarding) {
+                // 检查母体是否被敌人威胁
+                for (const enemy of enemies) {
+                    if (!enemy.isAlive || enemy.isDying) continue;
+                    const distToEnemy = this.head.dist(enemy.pos);
+                    const distParentToEnemy = this.parentWorm.head.dist(enemy.pos);
+                    // 敌人在母体附近300px内，且幼体比母体更近敌人的概率更大
+                    if (distParentToEnemy < 300 && distToEnemy < 350) {
+                        this.isGuarding = true;
+                        this.guardTargetEnemy = enemy;
+                        this._pendingGuardSound = true;
+                        break;
+                    }
+                }
+            }
+            // 挡刀行为：冲到敌人和母体之间
+            if (this.isGuarding && this.guardTargetEnemy && this.guardTargetEnemy.isAlive) {
+                const parentHead = this.parentWorm.head;
+                const enemyPos = this.guardTargetEnemy.pos;
+                // 计算敌人和母体之间的中点偏敌方位置（挡在前面）
+                const guardX = (parentHead.x + enemyPos.x) / 2 + (enemyPos.x - parentHead.x) * 0.15;
+                const guardY = (parentHead.y + enemyPos.y) / 2 + (enemyPos.y - parentHead.y) * 0.15;
+                const distToGuard = this.head.dist(new Vector(guardX, guardY));
+                if (distToGuard < 20) {
+                    // 到达挡位，等待敌人冲过来
+                    this.isGuarding = false;
+                    this.guardCooldown = 15; // 冷却15秒
+                }
+                return this._juvenileAvoidWalls(new Vector(guardX, guardY));
+            }
+        }
+
+        // === Phase 2 性格行为：温柔治疗 ===
+        if (this.personality === 'gentle' && this.parentWorm && this.parentWorm.isAlive) {
+            const distToParent = this.head.dist(this.parentWorm.head);
+            // 如果母体有受伤幼体，靠近治疗
+            if (distToParent < 80) {
+                this.isHealing = true;
+                this.healPulseTimer = 2.0; // 治疗脉冲持续2秒
+            } else if (distToParent > 150) {
+                this.isHealing = false;
+            }
+        }
+
+        // === Phase 2 性格行为：好奇侦察 ===
+        if (this.personality === 'curious' && foods && foods.length > 0) {
+            // 主动探索远处宝珠
+            let farthestFood = null;
+            let farthestDist = 0;
+            for (const food of foods) {
+                if (!food || !food.pos) continue;
+                const d = this.head.dist(food.pos);
+                if (d > 200 && d > farthestDist && d < 600) {
+                    farthestDist = d;
+                    farthestFood = food;
+                }
+            }
+            if (farthestFood && !this.isScouting) {
+                this.isScouting = true;
+                this.scoutTarget = farthestFood.pos;
+            }
+            // 侦察中：向远处宝珠移动
+            if (this.isScouting && this.scoutTarget) {
+                const distToTarget = this.head.dist(this.scoutTarget);
+                if (distToTarget < 40) {
+                    // 到达侦察目标，闪烁提示
+                    this.scoutFlashTimer = 1.5;
+                    this.isScouting = false;
+                    this._pendingScoutFlash = true;
+                } else {
+                    return this._juvenileAvoidWalls(this.scoutTarget);
+                }
+            }
+        }
+
+        // === Phase 2 性格行为：淘气加速 ===
+        if (this.personality === 'naughty') {
+            // 淘气幼体移动更快（在updateSpeed中处理）
+            // 主动靠近母体偷吃宝珠残渣
+        }
 
         // 冷却计时器递减
         if (this.feedCooldown > 0) {

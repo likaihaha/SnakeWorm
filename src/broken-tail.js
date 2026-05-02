@@ -471,6 +471,10 @@ export class BrokenTail {
         worm.isJuvenile = true;
         worm.parentWorm = parentWorm;
 
+        // Phase 2: 出生时随机分配性格
+        const personalities = ['brave', 'gentle', 'curious', 'naughty'];
+        worm.personality = personalities[Math.floor(Math.random() * personalities.length)];
+
         return worm;
     }
 }

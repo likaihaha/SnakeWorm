@@ -395,6 +395,25 @@ export class MusicSystem {
         }
     }
 
+    /** 恢复音效：C5→E5→G5 上行琶音（与出生音效类似但更轻柔） */
+    playHealChime(screenX) {
+        if (!this.audioContext) this.init();
+        if (!this.audioContext) return;
+        if (this.audioContext.state === 'suspended') this.audioContext.resume();
+
+        const notes = [
+            { freq: 523.25, delay: 0, duration: 150, velocity: 0.2 },   // C5
+            { freq: 659.25, delay: 120, duration: 150, velocity: 0.2 },  // E5
+            { freq: 783.99, delay: 240, duration: 200, velocity: 0.25 }, // G5
+        ];
+
+        notes.forEach(n => {
+            setTimeout(() => {
+                this.playNote(n.freq, n.duration, n.velocity, true, screenX);
+            }, n.delay);
+        });
+    }
+
     /** 幼体撒娇音效：G4→E4 下行，低沉 */
     playSulkSound(screenX) {
         if (!this.audioContext) this.init();

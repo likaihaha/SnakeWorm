@@ -162,6 +162,24 @@ export const WormDrawMixin = {
                     ctx.fill();
                 }
 
+                // Phase 2: 护理恢复 - 受伤灰色覆盖效果
+                if (this.isJuvenile && this.injuredGrayAlpha > 0.01) {
+                    ctx.beginPath();
+                    ctx.arc(seg.x, seg.y, radius + 1, 0, Math.PI * 2);
+                    ctx.fillStyle = `rgba(128, 128, 128, ${this.injuredGrayAlpha * 0.5})`;
+                    ctx.fill();
+                }
+
+                // Phase 2: 护理恢复 - 恢复中绿色脉冲
+                if (this.isJuvenile && this.isRecovering && this.injuredLevel > 0) {
+                    const pulse = 0.4 + 0.3 * Math.sin(Date.now() * 0.005);
+                    ctx.beginPath();
+                    ctx.arc(seg.x, seg.y, radius + 3, 0, Math.PI * 2);
+                    ctx.strokeStyle = `rgba(168, 230, 207, ${pulse})`;
+                    ctx.lineWidth = 1.5;
+                    ctx.stroke();
+                }
+
                 // 被咬段视觉效果：红色脉冲标记
                 if (this.bittenSegments && this.bittenSegments.has(i)) {
                     const pulse = 0.5 + 0.3 * Math.sin(Date.now() * 0.01);
@@ -596,11 +614,87 @@ export const WormDrawMixin = {
 
         const drawRadius = radius + 2;
 
+        // Phase 2: 性格光环（头部外围彩色光环）
+        if (this.personality) {
+            const pConfig = CONFIG.PERSONALITY.TYPES[this.personality];
+            if (pConfig) {
+                ctx.save();
+                ctx.globalCompositeOperation = 'screen';
+                const haloRadius = drawRadius + 3;
+                ctx.beginPath();
+                ctx.arc(headPos.x, headPos.y, haloRadius, 0, Math.PI * 2);
+                ctx.strokeStyle = hexToRgba(pConfig.color, 0.5);
+                ctx.lineWidth = 1.5;
+                ctx.stroke();
+                ctx.restore();
+            }
+        }
+
+        // Phase 2: 勇敢挡刀动画（身体发光 + 冲刺特效）
+        if (this.isGuarding) {
+            ctx.save();
+            ctx.globalCompositeOperation = 'screen';
+            drawGlow(ctx, headPos.x, headPos.y, drawRadius + 6, '#ff6b6b', 15);
+            ctx.restore();
+        }
+
+        // Phase 2: 温柔治疗脉冲（向周围扩散的绿色光环）
+        if (this.isHealing && this.healPulseTimer > 0) {
+            ctx.save();
+            ctx.globalCompositeOperation = 'screen';
+            const pulseProgress = 1 - (this.healPulseTimer / 2.0);
+            const pulseRadius = 20 + pulseProgress * 60;
+            const pulseAlpha = (1 - pulseProgress) * 0.4;
+            ctx.beginPath();
+            ctx.arc(headPos.x, headPos.y, pulseRadius, 0, Math.PI * 2);
+            ctx.strokeStyle = `rgba(168, 230, 207, ${pulseAlpha})`;
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            ctx.restore();
+        }
+
+        // Phase 2: 好奇侦察闪烁（发现宝珠时头部闪光）
+        if (this.scoutFlashTimer > 0) {
+            ctx.save();
+            ctx.globalCompositeOperation = 'screen';
+            const flashAlpha = Math.sin(this.scoutFlashTimer * 15) * 0.4 + 0.4;
+            drawGlow(ctx, headPos.x, headPos.y, drawRadius + 8, '#4ecdc4', flashAlpha * 15);
+            ctx.restore();
+        }
+
         // 绘制圆形头部
         ctx.beginPath();
         ctx.arc(headPos.x, headPos.y, drawRadius, 0, Math.PI *2);
         ctx.fillStyle = hexToRgba(this.color, 0.8);
         ctx.fill();
+
+        // Phase 2: 护理恢复 - 受伤灰色覆盖（头部）
+        if (this.injuredGrayAlpha > 0.01) {
+            ctx.beginPath();
+            ctx.arc(headPos.x, headPos.y, drawRadius + 1, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(128, 128, 128, ${this.injuredGrayAlpha * 0.4})`;
+            ctx.fill();
+        }
+
+        // Phase 2: 护理恢复 - 恢复中绿色光环（头部）
+        if (this.isRecovering && this.injuredLevel > 0) {
+            const recPulse = 0.5 + 0.3 * Math.sin(Date.now() * 0.005);
+            ctx.save();
+            ctx.globalCompositeOperation = 'screen';
+            drawGlow(ctx, headPos.x, headPos.y, drawRadius + 5, '#a8e6cf', recPulse * 12);
+            ctx.restore();
+        }
+
+        // Phase 2: 受伤等级提示符号（重伤时头部显示感叹号）
+        if (this.injuredLevel >= 2) {
+            const exAlpha = 0.6 + 0.3 * Math.sin(Date.now() * 0.004);
+            ctx.save();
+            ctx.font = 'bold 8px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillStyle = `rgba(255, 100, 100, ${exAlpha})`;
+            ctx.fillText('!', headPos.x, headPos.y - drawRadius - 4);
+            ctx.restore();
+        }
 
         // 计算朝向角度
         let mouthAngle = Math.atan2(this.velocity.y, this.velocity.x);
