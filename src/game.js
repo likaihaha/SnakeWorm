@@ -17,6 +17,7 @@ import { Leaderboard } from './leaderboard.js';
 import { DynamicBG } from './dynamic-bg.js';
 import { DebugLogger } from './debug-log.js';
 import { Camera } from './camera.js';
+import { FamilyGate } from './family-gate.js';
 
 export class Game {
     constructor() {
@@ -53,6 +54,7 @@ export class Game {
         
         // 亲子关系系统
         this.enemies = [];  // 敌人列表
+        this.familyGates = [];  // 家族门列表
         this.enemySpawnTimer = 0;  // 敌人生成计时器
         this.playerDeathLength = 0;  // 玩家死亡时的长度（用于显示）
         this.maxLengthReached = 0;  // 玩家达到过的最大长度（用于排行榜）
@@ -689,6 +691,12 @@ export class Game {
             this.foodRespawnTimers[type.score] = 0;
         });
 
+        // Phase 3: 初始化家族门（放置在地图中部偏上位置）
+        this.familyGates = [
+            new FamilyGate(2000, 1500, 2, '家族门·初试'),
+            new FamilyGate(3200, 600, 3, '家族门·进阶'),
+        ];
+
         document.getElementById('gameOver').style.display = 'none';
         this.updateUI();
     }
@@ -706,7 +714,9 @@ export class Game {
         this.ui.speed.textContent = player.speed.toFixed(1);
         this.ui.bullet.textContent = player.bulletCount || 0;
         this.ui.splitCount.textContent = this.splitCount;
-        this.ui.wormCount.textContent = this.worms.filter(w => w.isAlive).length;
+        const aliveWorms = this.worms.filter(w => w.isAlive);
+        const adultCount = aliveWorms.filter(w => w.isAdult).length;
+        this.ui.wormCount.textContent = adultCount > 0 ? `${aliveWorms.length}(${adultCount}👑)` : aliveWorms.length;
         
         // 移动端弹仓显示
         if (this.ui.ammoCount && this.isTouchDevice) {
@@ -865,9 +875,10 @@ export class Game {
         for (const worm of this.worms) {
             if (!worm.isAlive || worm.segments.length === 0) continue;
             
-            // 传递敌人和断尾引用给AI
+            // 传递敌人、断尾和家族门引用给AI
             worm._enemies = this.enemies;
             worm._brokenTails = this.brokenTails;
+            worm._familyGates = this.familyGates;
 
             if (worm.isPlayer) {
                 // 出场动画期间，继续执行updateEntering，跳过普通update
@@ -1177,6 +1188,11 @@ export class Game {
 
         // 8.5 更新敌人系统
         this.updateEnemies(dt, player);
+        
+        // 8.6 Phase 3: 更新家族门
+        for (const gate of this.familyGates) {
+            gate.update(dt, this.worms);
+        }
         
         // 9. 更新尸体下沉动画（紧凑过滤替代splice）
         {
@@ -2306,6 +2322,17 @@ export class Game {
 
         // 绘制波纹特效
         this.drawRipples();
+
+        // Phase 3: 绘制家族门
+        ctx.globalCompositeOperation = 'source-over';
+        for (const gate of this.familyGates) {
+            gate.draw(ctx, this.gameTime);
+        }
+        // 门提示文字
+        const playerWorm = this.worms[0];
+        for (const gate of this.familyGates) {
+            gate.drawHint(ctx, playerWorm);
+        }
 
         // 绘制地图边界（在世界坐标中）
         this.drawMapBorder();

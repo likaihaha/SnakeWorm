@@ -5,7 +5,7 @@
  */
 
 export const CONFIG = {
-    VERSION: '1.70',
+    VERSION: '1.71',
     CANVAS_WIDTH: 800, CANVAS_HEIGHT: 600,   // 视口大小（屏幕显示区域）
     MAP_WIDTH: 4000, MAP_HEIGHT: 3000,        // 世界地图大小（5×5倍）
     BORDER_MARGIN: 30,                        // 地图边界死亡区宽度（用于尸体/宝珠生成等）
@@ -91,6 +91,13 @@ export const CONFIG = {
         JUVENILE_EAT_RADIUS: 30,
         JUVENILE_FEED_COOLDOWN: 3.0,  // 幼体吃一节后冷却3秒（游出去一圈再吃下一节）
         JUVENILE_SPEED_RATIO: 0.7,
+        // === Phase 3 羁绊深度 ===
+        ADULT_EVOLVE_LENGTH: 11,      // 幼体进化为成年后代的长度
+        GUARD_PATROL_RADIUS: 120,     // 驻守巡逻半径
+        GUARD_DETECT_RADIUS: 200,     // 驻守者发现敌人的半径
+        GUARD_ORBIT_SPEED: 0.8,       // 驻守巡逻旋转速度
+        TERRITORY_GUARDIAN_COUNT: 5,  // 家族领地所需驻守者数量
+        FAMILY_GATE_RADIUS: 40,       // 家族门检测半径
     },
     // === Phase 2 幼体性格系统 ===
     PERSONALITY: {

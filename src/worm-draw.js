@@ -12,6 +12,17 @@ export const WormDrawMixin = {
             return;
         }
 
+        // === Phase 3: 成年后代进化光环 ===
+        if (this.isAdult && this.evolveAnimation > 0) {
+            const pColor = this.personality ? CONFIG.PERSONALITY.TYPES[this.personality]?.color : '#ffe66d';
+            const pulse = this.evolveAnimation;
+            ctx.save();
+            ctx.globalCompositeOperation = 'screen';
+            const glowSize = 15 + pulse * 30;
+            drawGlow(ctx, this.head.x, this.head.y, glowSize, pColor || '#ffe66d', pulse * 20);
+            ctx.restore();
+        }
+
         // 获取各区域段索引集合 (用于视觉标识，使用缓存)
         const rs = this._regionSets;
         const tailIndices = rs.tail;
@@ -82,9 +93,28 @@ export const WormDrawMixin = {
             }
 
             if (isHead) {
-                // 幼体用2个眼睛，成年体用吃豆人嘴巴
+                // 幼体用2个眼睛，成年体用吃豆人嘴巴，成年后代用特殊幼体头
                 if (this.isJuvenile) {
                     this.drawJuvenileHead(ctx, seg, radius);
+                } else if (this.isAdult) {
+                    // 成年后代：幼体头 + 金色小皇冠
+                    this.drawJuvenileHead(ctx, seg, radius);
+                    // 金色小皇冠
+                    const crownSize = radius * 0.6;
+                    ctx.save();
+                    ctx.fillStyle = '#ffe66d';
+                    ctx.globalAlpha = 0.8;
+                    ctx.beginPath();
+                    const cx = seg.x, cy = seg.y - radius - 3;
+                    ctx.moveTo(cx - crownSize, cy + crownSize * 0.5);
+                    ctx.lineTo(cx - crownSize * 0.6, cy);
+                    ctx.lineTo(cx, cy + crownSize * 0.4);
+                    ctx.lineTo(cx + crownSize * 0.6, cy);
+                    ctx.lineTo(cx + crownSize, cy + crownSize * 0.5);
+                    ctx.closePath();
+                    ctx.fill();
+                    ctx.globalAlpha = 1.0;
+                    ctx.restore();
                 } else {
                     this.drawPacmanHead(ctx, seg, radius);
                 }

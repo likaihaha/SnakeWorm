@@ -146,6 +146,13 @@ export class Worm {
         this.scoutFlashTimer = 0;     // 好奇：发现宝珠闪烁计时器
         this.mimicryData = { rushes: 0, dodges: 0, totalSamples: 0 }; // 模仿机制数据
 
+        // === Phase 3 羁绊深度：成年后代与驻守系统 ===
+        this.isAdult = false;           // 是否已进化为成年后代
+        this.isGuardingPosition = false; // 是否在驻守模式
+        this.guardPosition = null;       // 驻守位置 {x, y}
+        this.guardOrbitPhase = 0;        // 驻守巡逻相位
+        this.evolveAnimation = 0;        // 进化动画进度 (0~1)
+
         // 冰晶覆盖效果
         this.iceOverlays = [];  // [{segmentIndex, timer, maxTimer}]
 
@@ -387,6 +394,53 @@ export class Worm {
             return;
         }
 
+        // === Phase 3 成年进化检测 ===
+        if (this.isJuvenile && !this.isAdult && this.segments.length >= CONFIG.FAMILY.ADULT_EVOLVE_LENGTH) {
+            this.isAdult = true;
+            this.isJuvenile = false;
+            this.evolveAnimation = 1.0; // 触发进化动画
+            // 进化特效
+            if (typeof game !== 'undefined' && game.particles) {
+                for (let k = 0; k < 12; k++) {
+                    game.particles.push(Particle.acquire(this.head.x, this.head.y, '#ffe66d'));
+                }
+            }
+            if (typeof game !== 'undefined' && game.floatingTexts) {
+                game.floatingTexts.push(FloatingText.acquire(this.head.x, this.head.y - 30, 'EVOLVE!', '#ffe66d'));
+            }
+            if (typeof game !== 'undefined' && game.musicSystem) {
+                game.musicSystem.playBirthChime(this.head.x);
+            }
+            if (typeof game !== 'undefined' && game.debugLogger) {
+                game.debugLogger.logEvent('evolve', `幼体进化为成年后代 (${this.personality || '无性格'})`, game.gameTime);
+            }
+        }
+
+        // === Phase 3 进化动画衰减 ===
+        if (this.evolveAnimation > 0) {
+            this.evolveAnimation = Math.max(0, this.evolveAnimation - dt * 0.5);
+        }
+
+        // === Phase 3 驻守模式：成年后代巡逻 ===
+        if (this.isAdult && this.isGuardingPosition && this.guardPosition && !this.isPlayer) {
+            this.guardOrbitPhase += dt * CONFIG.FAMILY.GUARD_ORBIT_SPEED;
+            const orbitR = 30 + Math.sin(this.guardOrbitPhase * 0.7) * 15;
+            const gx = this.guardPosition.x + Math.cos(this.guardOrbitPhase) * orbitR;
+            const gy = this.guardPosition.y + Math.sin(this.guardOrbitPhase) * orbitR;
+            // 驻守者主动攻击附近敌人
+            if (this._enemies) {
+                for (const enemy of this._enemies) {
+                    if (!enemy.isAlive || enemy.isDying) continue;
+                    const d = this.head.dist(enemy.pos);
+                    if (d < CONFIG.FAMILY.GUARD_DETECT_RADIUS) {
+                        // 冲向敌人
+                        return this._juvenileAvoidWalls(enemy.pos);
+                    }
+                }
+            }
+            return this._juvenileAvoidWalls(new Vector(gx, gy));
+        }
+
         // 更新计时器
         this.updateTimers(dt);
 
@@ -449,9 +503,31 @@ export class Worm {
             }
 
             const speedDt = this.speed * dt * 60;
-            head.x += this.velocity.x * speedDt;
-            head.y += this.velocity.y * speedDt;
-            this.isMoving = true;
+            const newX = head.x + this.velocity.x * speedDt;
+            const newY = head.y + this.velocity.y * speedDt;
+
+            // Phase 3: 家族门阻挡检测
+            if (this._familyGates) {
+                let blocked = false;
+                for (const gate of this._familyGates) {
+                    if (gate.isBlocking(this)) {
+                        blocked = true;
+                        break;
+                    }
+                }
+                if (blocked) {
+                    // 被门挡住，回退到原位
+                    this.isMoving = false;
+                } else {
+                    head.x = newX;
+                    head.y = newY;
+                    this.isMoving = true;
+                }
+            } else {
+                head.x = newX;
+                head.y = newY;
+                this.isMoving = true;
+            }
         }
 
         // 更新饥饿系统
