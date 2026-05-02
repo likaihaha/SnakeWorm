@@ -228,9 +228,15 @@ export class Food {
         // 使用地图边界边距，确保宝珠不会在边界外生成
         const margin = CONFIG.BORDER_MARGIN + CONFIG.SEGMENT_RADIUS;
         const foodType = type || Food.weightedRandom();
-        // 在地图范围内均匀随机出生
-        const x = margin + Math.random() * (CONFIG.MAP_WIDTH - margin * 2);
-        const y = margin + Math.random() * (CONFIG.MAP_HEIGHT - margin * 2);
+        // 宝珠集中在出生点(400,2800)附近的左下方区域，半径约1200
+        const centerX = 400, centerY = 2800, spreadRadius = 1200;
+        const angle = Math.random() * Math.PI * 2;
+        const dist = Math.sqrt(Math.random()) * spreadRadius; // sqrt保证均匀分布
+        let x = centerX + Math.cos(angle) * dist;
+        let y = centerY + Math.sin(angle) * dist;
+        // 钳制到地图范围内
+        x = Math.max(margin, Math.min(CONFIG.MAP_WIDTH - margin, x));
+        y = Math.max(margin, Math.min(CONFIG.MAP_HEIGHT - margin, y));
         const food = new Food(x, y, foodType);
         // 如果在下半部分出生，给一点向上初速度，避免马上落出底部
         if (y > CONFIG.MAP_HEIGHT / 2) {
