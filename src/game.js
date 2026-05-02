@@ -1008,6 +1008,8 @@ export class Game {
         if (this.splitCooldown <= 0 && player && !player.isEntering) {
             for (const worm of this.worms) {
                 if (!worm.isAlive || worm.isDead) continue;
+                // 幼体不能自噬断尾
+                if (worm.isJuvenile) continue;
                 // 跳过无敌状态的虫虫（刚诞生的后代）
                 if (worm.invincibleTimer > 0) continue;
                 
