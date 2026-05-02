@@ -12,6 +12,8 @@ export class DebugLogger {
         this.enemyCounter = 0;     // 敌人全局编号
         this.startTime = 0;        // 调试开始的游戏时间
         this.overlay = null;       // 状态指示器 DOM
+        this.panel = null;         // 实时日志面板 DOM
+        this.panelMaxLines = 40;   // 面板最多显示条数
         this._initHotkey();
     }
 
@@ -43,6 +45,7 @@ export class DebugLogger {
 
         this._log('SYSTEM', '调试模式启动', { version: typeof CONFIG !== 'undefined' ? '' : '' });
         this._showOverlay();
+        this._showPanel();
 
         // 启动时记录当前存活虫虫状态
         if (game && game.worms) {
@@ -73,6 +76,7 @@ export class DebugLogger {
         this.active = false;
         this._log('SYSTEM', '调试模式停止', { 总日志条数: this.logs.length });
         this._hideOverlay();
+        this._hidePanel();
         this.exportToFile();
         console.log('[DebugLogger] 调试模式停止，日志已导出');
     }
@@ -367,6 +371,9 @@ export class DebugLogger {
         // 控制台也输出一份（方便实时查看）
         const prefix = `[DEBUG ${type}]`;
         console.log(`${prefix} t=${entry.time}s ${message}`, details);
+
+        // 实时面板输出
+        this._appendPanelLine(entry);
     }
 
     _pos(vec) {
@@ -420,6 +427,217 @@ export class DebugLogger {
             this.overlay.remove();
             this.overlay = null;
         }
+    }
+
+    // ========== 实时日志面板 ==========
+
+    /** 事件类型 → 颜色 */
+    _typeColor(type) {
+        const colorMap = {
+            'SYSTEM':          '#aaa',
+            'SNAPSHOT':        '#888',
+            'EAT':             '#4ecdc4',
+            'SELF_BITE':       '#ff6b6b',
+            'TAIL_BITE':       '#ff9f43',
+            'NECK_BITE_DEATH': '#ee5a24',
+            'JUVENILE_BORN':   '#ffe66d',
+            'JUVENILE_EAT':    '#a8e6cf',
+            'JUVENILE_MATURE': '#6c5ce7',
+            'JUVENILE_DEATH':  '#d63031',
+            'ENEMY_SPAWN':     '#fd79a8',
+            'ENEMY_HIT':       '#e17055',
+            'ENEMY_DEATH':     '#636e72',
+            'ENEMY_LATCH':     '#e84393',
+            'ENEMY_BITE':      '#fdcb6e',
+            'ADULT_HIT':       '#74b9ff',
+            'ADULT_LOSE_SEG':  '#0984e3',
+            'COLLISION_DEATH': '#b71540',
+            'WALL_DEATH':      '#eb2f06',
+            'HUNGER_DEATH':    '#f9ca24',
+            'AI_DEATH':        '#d63031',
+            'GAME_OVER':       '#ff3838',
+        };
+        return colorMap[type] || '#ccc';
+    }
+
+    /** 事件类型 → 图标 */
+    _typeIcon(type) {
+        const iconMap = {
+            'SYSTEM':          '⚙️',
+            'SNAPSHOT':        '📸',
+            'EAT':             '🍎',
+            'SELF_BITE':       '🐍',
+            'TAIL_BITE':       '🦷',
+            'NECK_BITE_DEATH': '💀',
+            'JUVENILE_BORN':   '🥚',
+            'JUVENILE_EAT':    '🍽️',
+            'JUVENILE_MATURE': '🎉',
+            'JUVENILE_DEATH':  '☠️',
+            'ENEMY_SPAWN':     '👾',
+            'ENEMY_HIT':       '💥',
+            'ENEMY_DEATH':     '🪦',
+            'ENEMY_LATCH':     '🔗',
+            'ENEMY_BITE':      '🦷',
+            'ADULT_HIT':       '💢',
+            'ADULT_LOSE_SEG':  '✂️',
+            'COLLISION_DEATH': '💀',
+            'WALL_DEATH':      '🧱',
+            'HUNGER_DEATH':    '🍖',
+            'AI_DEATH':        '☠️',
+            'GAME_OVER':       '🛑',
+        };
+        return iconMap[type] || '📝';
+    }
+
+    _showPanel() {
+        if (this.panel) return;
+
+        // 容器
+        this.panel = document.createElement('div');
+        this.panel.id = 'debugLogPanel';
+        this.panel.style.cssText = `
+            position: fixed; left: 8px; top: 40px; bottom: 40px; width: 420px;
+            z-index: 15000; background: rgba(10, 12, 18, 0.92);
+            border: 1px solid rgba(255,255,255,0.12); border-radius: 8px;
+            font-family: 'Consolas', 'Courier New', monospace;
+            display: flex; flex-direction: column; overflow: hidden;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.6);
+            backdrop-filter: blur(8px);
+            pointer-events: auto;
+        `;
+
+        // 标题栏
+        const header = document.createElement('div');
+        header.style.cssText = `
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 6px 12px; background: rgba(255,60,60,0.15);
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+            cursor: move; user-select: none; flex-shrink: 0;
+        `;
+
+        const title = document.createElement('span');
+        title.style.cssText = 'color: #ff6b6b; font-size: 12px; font-weight: bold;';
+        title.textContent = '🔴 DEBUG LOG (Ctrl+L 停止)';
+        header.appendChild(title);
+
+        // 统计
+        this.panelCount = document.createElement('span');
+        this.panelCount.style.cssText = 'color: #888; font-size: 11px;';
+        this.panelCount.textContent = '0 条';
+        header.appendChild(this.panelCount);
+
+        this.panel.appendChild(header);
+
+        // 日志列表容器（可滚动）
+        this.panelBody = document.createElement('div');
+        this.panelBody.style.cssText = `
+            flex: 1; overflow-y: auto; padding: 4px 0;
+            scroll-behavior: smooth;
+        `;
+        // 自定义滚动条
+        const scrollStyle = document.createElement('style');
+        scrollStyle.textContent = `
+            #debugLogPanel div::-webkit-scrollbar { width: 5px; }
+            #debugLogPanel div::-webkit-scrollbar-track { background: transparent; }
+            #debugLogPanel div::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 3px; }
+        `;
+        this.panel.appendChild(scrollStyle);
+        this.panel.appendChild(this.panelBody);
+
+        document.body.appendChild(this.panel);
+
+        // 可拖拽
+        this._makeDraggable(this.panel, header);
+    }
+
+    _hidePanel() {
+        if (this.panel) {
+            this.panel.remove();
+            this.panel = null;
+            this.panelBody = null;
+            this.panelCount = null;
+        }
+    }
+
+    /** 一行日志实时追加到面板 */
+    _appendPanelLine(entry) {
+        if (!this.panelBody) return;
+
+        const row = document.createElement('div');
+        row.style.cssText = `
+            padding: 3px 10px; line-height: 1.4; font-size: 11px;
+            border-bottom: 1px solid rgba(255,255,255,0.03);
+            transition: background 0.2s;
+        `;
+
+        const color = this._typeColor(entry.type);
+        const icon = this._typeIcon(entry.type);
+        const timeStr = entry.time + 's';
+
+        // 主行：图标 + 时间 + 消息
+        const mainSpan = document.createElement('div');
+        mainSpan.innerHTML = `<span style="color:${color}">${icon}</span> <span style="color:#666">${timeStr}</span> <span style="color:${color}">${entry.message}</span>`;
+        row.appendChild(mainSpan);
+
+        // 详情行（如果有）
+        const details = entry.details;
+        if (details && Object.keys(details).length > 0) {
+            const detailDiv = document.createElement('div');
+            const pairs = Object.entries(details)
+                .map(([k, v]) => `<span style="color:#666">${k}</span>=<span style="color:#8ab4f8">${v}</span>`)
+                .join('  ');
+            detailDiv.innerHTML = `<span style="color:#555">└─</span> ${pairs}`;
+            detailDiv.style.cssText = 'margin-top: 1px; font-size: 10px; color: #888; padding-left: 14px;';
+            row.appendChild(detailDiv);
+        }
+
+        // hover 高亮
+        row.addEventListener('mouseenter', () => { row.style.background = 'rgba(255,255,255,0.04)'; });
+        row.addEventListener('mouseleave', () => { row.style.background = 'transparent'; });
+
+        this.panelBody.appendChild(row);
+
+        // 超过上限移除最早的
+        while (this.panelBody.children.length > this.panelMaxLines) {
+            this.panelBody.removeChild(this.panelBody.firstChild);
+        }
+
+        // 自动滚动到底部
+        this.panelBody.scrollTop = this.panelBody.scrollHeight;
+
+        // 更新计数
+        if (this.panelCount) {
+            this.panelCount.textContent = `${this.logs.length} 条`;
+        }
+    }
+
+    /** 使面板可拖拽 */
+    _makeDraggable(panel, handle) {
+        let startX, startY, startLeft, startTop;
+        let isDragging = false;
+
+        handle.addEventListener('mousedown', (e) => {
+            isDragging = true;
+            startX = e.clientX;
+            startY = e.clientY;
+            const rect = panel.getBoundingClientRect();
+            startLeft = rect.left;
+            startTop = rect.top;
+            e.preventDefault();
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+            const dx = e.clientX - startX;
+            const dy = e.clientY - startY;
+            panel.style.left = (startLeft + dx) + 'px';
+            panel.style.top = (startTop + dy) + 'px';
+            panel.style.right = 'auto';
+        });
+
+        document.addEventListener('mouseup', () => {
+            isDragging = false;
+        });
     }
 
     /**
