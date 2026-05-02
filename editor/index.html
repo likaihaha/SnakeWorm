@@ -1860,8 +1860,8 @@
             });
             btnRow.appendChild(cpToggleBtn);
 
-            // 增加控制点按钮（仅 path 类型）
-            if (element.type === 'path') {
+            // 增加控制点按钮（path 和 polyline 类型）
+            if (element.type === 'path' || element.type === 'polyline') {
               const addCpBtn = document.createElement('button');
               addCpBtn.textContent = '增加控制点';
               addCpBtn.style.cssText = `

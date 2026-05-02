@@ -180,7 +180,7 @@ class BackgroundEditor {
     if (this.addPointMode && this.selectedElement && this.selectedElement.startsWith('shape_')) {
       const shapeId = this.selectedElement.replace('shape_', '');
       const shape = this.config.shapes?.find(s => s.id === shapeId);
-      if (shape && shape.type === 'path' && shape.points) {
+      if (shape && (shape.type === 'path' || shape.type === 'polyline') && shape.points) {
         this.insertControlPointAtPosition(shape, relX, relY);
         return;
       }
@@ -400,7 +400,7 @@ class BackgroundEditor {
       const shape = this.config.shapes?.find(s => s.id === shapeId);
       if (shape && !shape.locked) {
         // 增加控制点模式
-        if (this.addPointMode && shape.type === 'path') {
+        if (this.addPointMode && (shape.type === 'path' || shape.type === 'polyline')) {
           this.canvas.style.cursor = 'crosshair';
           return;
         }
@@ -1195,7 +1195,7 @@ class BackgroundEditor {
     if (!this.selectedElement || !this.selectedElement.startsWith('shape_')) return;
     const shapeId = this.selectedElement.replace('shape_', '');
     const shape = this.config.shapes?.find(s => s.id === shapeId);
-    if (!shape || shape.type !== 'path') return;
+    if (!shape || (shape.type !== 'path' && shape.type !== 'polyline')) return;
 
     this.controlPointEditMode = true;
     this.addPointMode = true;
