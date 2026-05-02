@@ -1719,6 +1719,115 @@
             groupIcon.style.transform = this._groupStates[groupKey] ? '' : 'rotate(-90deg)';
             break;
 
+          case 'widthNodes':
+            input = document.createElement('div');
+            input.style.cssText = 'display:flex; flex-direction:column; gap:4px;';
+
+            // 初始化默认节点
+            if (!element.widthNodes) {
+              element.widthNodes = [
+                { width: 1.0, position: 0.0 },
+                { width: 1.0, position: 0.2 },
+                { width: 1.0, position: 0.8 },
+                { width: 1.0, position: 1.0 }
+              ];
+            }
+
+            const wnList = document.createElement('div');
+            wnList.style.cssText = 'display:flex; flex-direction:column; gap:3px; max-height:150px; overflow-y:auto;';
+
+            const renderWidthNodes = () => {
+              wnList.innerHTML = '';
+              element.widthNodes.forEach((node, idx) => {
+                const row = document.createElement('div');
+                row.style.cssText = 'display:flex; gap:4px; align-items:center; font-size:10px;';
+
+                const label = document.createElement('span');
+                label.style.cssText = 'color:#8b949e; min-width:14px;';
+                label.textContent = `${idx + 1}`;
+
+                // 宽度百分比
+                const wLabel = document.createElement('span');
+                wLabel.style.cssText = 'color:#58a6ff; font-size:9px;';
+                wLabel.textContent = '宽';
+
+                const wSlider = document.createElement('input');
+                wSlider.type = 'range';
+                wSlider.min = 0; wSlider.max = 100; wSlider.step = 1;
+                wSlider.value = Math.round(node.width * 100);
+                wSlider.style.cssText = 'width:50px; height:12px; accent-color:#58a6ff;';
+
+                const wVal = document.createElement('span');
+                wVal.style.cssText = 'color:#c9d1d9; font-size:9px; min-width:28px;';
+                wVal.textContent = `${Math.round(node.width * 100)}%`;
+
+                wSlider.addEventListener('input', () => {
+                  node.width = parseInt(wSlider.value) / 100;
+                  wVal.textContent = `${parseInt(wSlider.value)}%`;
+                  this.editor.markDirty();
+                });
+
+                // 位置百分比
+                const pLabel = document.createElement('span');
+                pLabel.style.cssText = 'color:#ffd700; font-size:9px;';
+                pLabel.textContent = '位';
+
+                const pSlider = document.createElement('input');
+                pSlider.type = 'range';
+                pSlider.min = 0; pSlider.max = 100; pSlider.step = 1;
+                pSlider.value = Math.round(node.position * 100);
+                pSlider.style.cssText = 'width:50px; height:12px; accent-color:#ffd700;';
+
+                const pVal = document.createElement('span');
+                pVal.style.cssText = 'color:#c9d1d9; font-size:9px; min-width:28px;';
+                pVal.textContent = `${Math.round(node.position * 100)}%`;
+
+                pSlider.addEventListener('input', () => {
+                  node.position = parseInt(pSlider.value) / 100;
+                  pVal.textContent = `${parseInt(pSlider.value)}%`;
+                  this.editor.markDirty();
+                });
+
+                // 删除按钮
+                const delBtn = document.createElement('span');
+                delBtn.textContent = '✕';
+                delBtn.style.cssText = 'color:#f85149; cursor:pointer; font-size:10px; min-width:12px;';
+                delBtn.addEventListener('click', () => {
+                  if (element.widthNodes.length > 2) {
+                    element.widthNodes.splice(idx, 1);
+                    renderWidthNodes();
+                    this.editor.markDirty();
+                  }
+                });
+
+                row.appendChild(label);
+                row.appendChild(wLabel);
+                row.appendChild(wSlider);
+                row.appendChild(wVal);
+                row.appendChild(pLabel);
+                row.appendChild(pSlider);
+                row.appendChild(pVal);
+                row.appendChild(delBtn);
+                wnList.appendChild(row);
+              });
+            };
+
+            renderWidthNodes();
+            input.appendChild(wnList);
+
+            // 添加节点按钮
+            const addWnBtn = document.createElement('button');
+            addWnBtn.textContent = '+ 添加节点';
+            addWnBtn.style.cssText = 'width:100%; padding:4px; font-size:10px; background:#21262d; color:#c9d1d9; border:1px solid #30363d; border-radius:3px; cursor:pointer;';
+            addWnBtn.addEventListener('click', () => {
+              element.widthNodes.push({ width: 1.0, position: 0.5 });
+              element.widthNodes.sort((a, b) => a.position - b.position);
+              renderWidthNodes();
+              this.editor.markDirty();
+            });
+            input.appendChild(addWnBtn);
+            break;
+
           case 'controlPoints':
             input = document.createElement('div');
             input.style.cssText = 'display:flex; flex-direction:column; gap:4px;';
@@ -2212,10 +2321,7 @@
           { key: '_controlPoints', label: '控制点', type: 'controlPoints' },
           { key: 'stroke', label: '颜色', type: 'color' },
           { key: 'strokeWidth', label: '宽度', type: 'range', min: 0, max: 20, step: 0.5 },
-          { key: 'startWidth', label: '起点粗细', type: 'range', min: 0, max: 3, step: 0.1 },
-          { key: 'endWidth', label: '终点粗细', type: 'range', min: 0, max: 3, step: 0.1 },
-          { key: 'taperStart', label: '起点渐变%', type: 'range', min: 0, max: 1, step: 0.01 },
-          { key: 'taperEnd', label: '终点渐变%', type: 'range', min: 0, max: 1, step: 0.01 },
+          { key: 'widthNodes', label: '粗细节点', type: 'widthNodes' },
           { key: 'pathGradient', label: '路径渐变', type: 'pathGradient' },
           { key: 'closed', label: '闭合', type: 'checkbox' },
           { key: 'fill', label: '填充', type: 'color' },
@@ -2245,10 +2351,7 @@
           { key: '_controlPoints', label: '控制点', type: 'controlPoints' },
           { key: 'stroke', label: '颜色', type: 'color' },
           { key: 'strokeWidth', label: '宽度', type: 'range', min: 0, max: 20, step: 0.5 },
-          { key: 'startWidth', label: '起点粗细', type: 'range', min: 0, max: 3, step: 0.1 },
-          { key: 'endWidth', label: '终点粗细', type: 'range', min: 0, max: 3, step: 0.1 },
-          { key: 'taperStart', label: '起点渐变%', type: 'range', min: 0, max: 1, step: 0.01 },
-          { key: 'taperEnd', label: '终点渐变%', type: 'range', min: 0, max: 1, step: 0.01 },
+          { key: 'widthNodes', label: '粗细节点', type: 'widthNodes' },
           { key: 'pathGradient', label: '路径渐变', type: 'pathGradient' },
           { key: 'closed', label: '闭合', type: 'checkbox' },
           { key: 'fill', label: '填充', type: 'color' },

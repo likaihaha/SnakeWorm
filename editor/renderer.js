@@ -590,13 +590,13 @@ class EditableDynamicBG {
 
   _drawPolyline(ctx, s, w, h, isHighlight) {
     if (!s.points || s.points.length < 2) return;
-    
-    const hasTaper = (s.taperStart > 0 || s.taperEnd > 0) && !s.closed;
+
+    const hasWidthNodes = s.widthNodes && s.widthNodes.length >= 2;
     const hasPathGradient = s.pathGradient && s.pathGradient.stops && s.pathGradient.stops.length >= 2;
-    
-    if (hasTaper && !isHighlight) {
-      // 绘制粗细渐变的折线
-      this._drawTaperedPolyline(ctx, s, w, h);
+
+    if (hasWidthNodes && !isHighlight) {
+      // 绘制可变宽度折线
+      this._drawVariableWidthPolyline(ctx, s, w, h);
     } else if (hasPathGradient && !isHighlight) {
       // 绘制路径渐变的折线
       this._drawPathGradientPolyline(ctx, s, w, h);
@@ -613,7 +613,50 @@ class EditableDynamicBG {
       else if (isHighlight) ctx.stroke();
     }
   }
-  
+
+  /**
+   * 绘制可变宽度折线（使用 widthNodes）
+   */
+  _drawVariableWidthPolyline(ctx, s, w, h) {
+    if (s.strokeWidth === 0) return;
+    const pts = s.points;
+    const baseWidth = s.strokeWidth || 2;
+    const widthNodes = s.widthNodes;
+
+    // 计算总长度
+    let totalLength = 0;
+    const segLens = [];
+    for (let i = 1; i < pts.length; i++) {
+      const dx = (pts[i][0] - pts[i - 1][0]) * w;
+      const dy = (pts[i][1] - pts[i - 1][1]) * h;
+      segLens.push(Math.sqrt(dx * dx + dy * dy));
+      totalLength += segLens[segLens.length - 1];
+    }
+    if (totalLength === 0) return;
+
+    // 绘制每段
+    ctx.fillStyle = s.stroke || '#fff';
+    let currentLength = 0;
+    for (let i = 0; i < segLens.length; i++) {
+      const segLen = segLens[i];
+      const startRatio = currentLength / totalLength;
+      const endRatio = (currentLength + segLen) / totalLength;
+
+      const widthAtStart = this._getWidthAtRatio(widthNodes, startRatio, baseWidth);
+      const widthAtEnd = this._getWidthAtRatio(widthNodes, endRatio, baseWidth);
+
+      if (widthAtStart < 0.01 && widthAtEnd < 0.01) {
+        currentLength += segLen;
+        continue;
+      }
+
+      const p1 = { x: pts[i][0] * w, y: pts[i][1] * h };
+      const p2 = { x: pts[i + 1][0] * w, y: pts[i + 1][1] * h };
+      this._drawTaperedSegment(ctx, p1, p2, widthAtStart, widthAtEnd, s.stroke, 0.5);
+      currentLength += segLen;
+    }
+  }
+
   _drawTaperedPolyline(ctx, s, w, h) {
     if (s.strokeWidth === 0) return;
     const pts = s.points;
@@ -921,15 +964,48 @@ class EditableDynamicBG {
     return handles;
   }
 
+  /**
+   * 根据宽度节点插值计算曲线某位置的宽度
+   * @param {Array} widthNodes - [{width, position}, ...]
+   * @param {number} ratio - 曲线上的位置 (0-1)
+   * @param {number} baseWidth - 基础宽度
+   * @returns {number} 插值后的宽度
+   */
+  _getWidthAtRatio(widthNodes, ratio, baseWidth) {
+    if (!widthNodes || widthNodes.length === 0) return baseWidth;
+    if (widthNodes.length === 1) return baseWidth * widthNodes[0].width;
+
+    // 确保按位置排序
+    const nodes = [...widthNodes].sort((a, b) => a.position - b.position);
+
+    // 位置超出范围
+    if (ratio <= nodes[0].position) return baseWidth * nodes[0].width;
+    if (ratio >= nodes[nodes.length - 1].position) return baseWidth * nodes[nodes.length - 1].width;
+
+    // 找到包围的两个节点
+    for (let i = 0; i < nodes.length - 1; i++) {
+      if (ratio >= nodes[i].position && ratio <= nodes[i + 1].position) {
+        const t = (nodes[i + 1].position - nodes[i].position);
+        if (t < 0.0001) return baseWidth * nodes[i].width;
+        const blend = (ratio - nodes[i].position) / t;
+        // smoothstep 插值
+        const s = blend * blend * (3 - 2 * blend);
+        const w = nodes[i].width + (nodes[i + 1].width - nodes[i].width) * s;
+        return baseWidth * w;
+      }
+    }
+    return baseWidth;
+  }
+
   _drawCurve(ctx, s, w, h, isHighlight) {
     if (!s.points || s.points.length < 2) return;
 
-    const hasTaper = (s.taperStart > 0 || s.taperEnd > 0) && !s.closed;
+    const hasWidthNodes = s.widthNodes && s.widthNodes.length >= 2;
     const hasPathGradient = s.pathGradient && s.pathGradient.stops && s.pathGradient.stops.length >= 2;
 
-    if (hasTaper && !isHighlight) {
-      // 绘制粗细渐变的曲线
-      this._drawTaperedCurve(ctx, s, w, h);
+    if (hasWidthNodes && !isHighlight) {
+      // 绘制可变宽度曲线
+      this._drawVariableWidthCurve(ctx, s, w, h);
     } else if (hasPathGradient && !isHighlight) {
       // 绘制路径渐变的曲线
       this._drawPathGradientCurve(ctx, s, w, h);
@@ -1040,7 +1116,68 @@ class EditableDynamicBG {
     ctx.lineCap = 'butt';
     ctx.lineJoin = 'miter';
   }
-  
+
+  /**
+   * 绘制可变宽度曲线（使用 widthNodes）
+   */
+  _drawVariableWidthCurve(ctx, s, w, h) {
+    if (s.strokeWidth === 0) return;
+    const rawPts = s.points;
+    const tw = s.tangentWeights;
+    const th = s.tangentHandles;
+    const baseWidth = s.strokeWidth || 2;
+    const widthNodes = s.widthNodes;
+
+    // 细分曲线
+    const numSegments = 30;
+    const curvePoints = [];
+
+    for (let i = 0; i < rawPts.length - 1; i++) {
+      const p0 = { x: rawPts[i][0] * w, y: rawPts[i][1] * h };
+      const p1 = { x: rawPts[i + 1][0] * w, y: rawPts[i + 1][1] * h };
+      const { cp1, cp2 } = this._getBezierControlPoints(rawPts, tw, i, w, h, th);
+      for (let t = 0; t < numSegments; t++) {
+        const ratio = t / numSegments;
+        curvePoints.push(this._getPointOnBezier(p0, cp1, cp2, p1, ratio));
+      }
+    }
+    const lastPt = rawPts[rawPts.length - 1];
+    curvePoints.push({ x: lastPt[0] * w, y: lastPt[1] * h });
+
+    // 计算总长度
+    let totalLength = 0;
+    const segLens = [];
+    for (let i = 1; i < curvePoints.length; i++) {
+      const dx = curvePoints[i].x - curvePoints[i - 1].x;
+      const dy = curvePoints[i].y - curvePoints[i - 1].y;
+      const len = Math.sqrt(dx * dx + dy * dy);
+      segLens.push(len);
+      totalLength += len;
+    }
+    if (totalLength === 0) return;
+
+    // 绘制每段（用梯形近似可变宽度）
+    ctx.fillStyle = s.stroke || '#fff';
+    let currentLength = 0;
+    for (let i = 0; i < segLens.length; i++) {
+      const segLen = segLens[i];
+      const startRatio = currentLength / totalLength;
+      const endRatio = (currentLength + segLen) / totalLength;
+
+      const widthAtStart = this._getWidthAtRatio(widthNodes, startRatio, baseWidth);
+      const widthAtEnd = this._getWidthAtRatio(widthNodes, endRatio, baseWidth);
+
+      // 跳过宽度为 0 的段
+      if (widthAtStart < 0.01 && widthAtEnd < 0.01) {
+        currentLength += segLen;
+        continue;
+      }
+
+      this._drawTaperedSegment(ctx, curvePoints[i], curvePoints[i + 1], widthAtStart, widthAtEnd, s.stroke, 0.5);
+      currentLength += segLen;
+    }
+  }
+
   _drawTaperedCurve(ctx, s, w, h) {
     if (s.strokeWidth === 0) return;
     const rawPts = s.points;
