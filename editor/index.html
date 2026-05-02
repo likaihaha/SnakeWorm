@@ -533,6 +533,7 @@
   
   <div class="toolbar-group">
     <button class="btn" id="help-btn" title="快捷键帮助 (F1)">❓ 帮助</button>
+    <button class="btn" id="changelog-btn" title="更新日志">📜 日志</button>
   </div>
 </div>
 
@@ -732,6 +733,7 @@
       document.getElementById('grid-btn').addEventListener('click', () => this.canvasManager.toggleGrid());
       document.getElementById('guides-btn').addEventListener('click', () => this.canvasManager.toggleGuides());
       document.getElementById('help-btn').addEventListener('click', () => this.showHelp());
+      document.getElementById('changelog-btn').addEventListener('click', () => this.showChangelog());
       
       // 画布尺寸预设
       document.getElementById('canvas-size-preset').addEventListener('change', (e) => {
@@ -2731,6 +2733,104 @@
       
       // 关闭按钮事件
       document.getElementById('help-close-btn').addEventListener('click', () => overlay.remove());
+    }
+
+    showChangelog() {
+      const LOGS = [
+        { version: 'v2.3', date: '2026-05-02', items: [
+          '新增宽度节点系统：可自由控制曲线任意位置的粗细',
+          '新增增加控制点功能，支持在路径上任意位置插入',
+          '新增 Delete 键删除选中控制点',
+          '切线手柄改为自由方向拖拽，仅显示选中点的手柄',
+          'Schneider 曲线拟合算法：手绘曲线自动转稀疏贝塞尔曲线',
+          '修复路径渐变缝隙问题',
+        ]},
+        { version: 'v2.2', date: '2026-05-01', items: [
+          '新增曲线切线权重控制',
+          '支持 Catmull-Rom 切线方向计算',
+          '控制点编辑模式优化',
+        ]},
+        { version: 'v2.1', date: '2026-04-30', items: [
+          '新增路径渐变功能',
+          '新增粗细渐变功能',
+          '支持折线和曲线的可变宽度渲染',
+        ]},
+        { version: 'v2.0', date: '2026-04-28', items: [
+          '新增折线和曲线绘制工具',
+          '支持控制点拖拽编辑',
+          '支持变换手柄缩放和旋转',
+        ]},
+      ];
+
+      const old = document.getElementById('editorChangelog');
+      if (old) old.remove();
+
+      const overlay = document.createElement('div');
+      overlay.id = 'editorChangelog';
+      overlay.style.cssText = `
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0,0,0,0.7); z-index: 10000;
+        display: flex; align-items: center; justify-content: center;
+      `;
+      overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+
+      const panel = document.createElement('div');
+      panel.style.cssText = `
+        background: #161b22; border: 1px solid #30363d; border-radius: 12px;
+        padding: 0; width: 520px; max-width: 90vw; max-height: 80vh; color: #e6edf3;
+        display: flex; flex-direction: column; overflow: hidden;
+      `;
+
+      const header = document.createElement('div');
+      header.style.cssText = `
+        padding: 16px 20px; border-bottom: 1px solid #30363d;
+        display: flex; align-items: center; justify-content: space-between;
+        background: #1c2128;
+      `;
+      header.innerHTML = `
+        <div style="font-size: 16px; font-weight: 600; color: #58a6ff;">📜 更新日志</div>
+        <button id="cl-close-btn" style="background: none; border: none; color: #8b949e; font-size: 18px; cursor: pointer;">✕</button>
+      `;
+
+      const list = document.createElement('div');
+      list.style.cssText = 'overflow-y: auto; flex: 1; padding: 16px 20px;';
+
+      for (const log of LOGS) {
+        const block = document.createElement('div');
+        block.style.cssText = 'margin-bottom: 18px; padding-bottom: 14px; border-bottom: 1px solid rgba(255,255,255,0.06);';
+
+        const row = document.createElement('div');
+        row.style.cssText = 'display: flex; align-items: baseline; gap: 10px; margin-bottom: 6px;';
+
+        const ver = document.createElement('span');
+        ver.style.cssText = 'font-weight: bold; color: #ffd700; font-size: 14px;';
+        ver.textContent = log.version;
+
+        const date = document.createElement('span');
+        date.style.cssText = 'color: #484f58; font-size: 11px;';
+        date.textContent = log.date;
+
+        row.appendChild(ver);
+        row.appendChild(date);
+        block.appendChild(row);
+
+        const ul = document.createElement('ul');
+        ul.style.cssText = 'margin: 0; padding-left: 18px; color: #c9d1d9; font-size: 12px; line-height: 1.8;';
+        for (const item of log.items) {
+          const li = document.createElement('li');
+          li.textContent = item;
+          ul.appendChild(li);
+        }
+        block.appendChild(ul);
+        list.appendChild(block);
+      }
+
+      panel.appendChild(header);
+      panel.appendChild(list);
+      overlay.appendChild(panel);
+      document.body.appendChild(overlay);
+
+      document.getElementById('cl-close-btn').addEventListener('click', () => overlay.remove());
     }
 
     showLLMSettings() {

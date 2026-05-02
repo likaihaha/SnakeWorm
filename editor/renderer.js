@@ -591,7 +591,7 @@ class EditableDynamicBG {
   _drawPolyline(ctx, s, w, h, isHighlight) {
     if (!s.points || s.points.length < 2) return;
 
-    const hasWidthNodes = s.widthNodes && s.widthNodes.length >= 2;
+    const hasWidthNodes = s.widthNodes && s.widthNodes.length >= 2 && s.widthNodes.some(n => n.width < 0.999);
     const hasPathGradient = s.pathGradient && s.pathGradient.stops && s.pathGradient.stops.length >= 2;
 
     if (hasWidthNodes && !isHighlight) {
@@ -635,7 +635,8 @@ class EditableDynamicBG {
     if (totalLength === 0) return;
 
     // 绘制每段
-    ctx.fillStyle = s.stroke || '#fff';
+    const hasPathGrad = s.pathGradient && s.pathGradient.stops && s.pathGradient.stops.length >= 2;
+    const pathStops = hasPathGrad ? s.pathGradient.stops : null;
     let currentLength = 0;
     for (let i = 0; i < segLens.length; i++) {
       const segLen = segLens[i];
@@ -650,9 +651,10 @@ class EditableDynamicBG {
         continue;
       }
 
+      const color = pathStops ? this._getGradientColor(pathStops, (startRatio + endRatio) / 2) : (s.stroke || '#fff');
       const p1 = { x: pts[i][0] * w, y: pts[i][1] * h };
       const p2 = { x: pts[i + 1][0] * w, y: pts[i + 1][1] * h };
-      this._drawTaperedSegment(ctx, p1, p2, widthAtStart, widthAtEnd, s.stroke, 0.5);
+      this._drawTaperedSegment(ctx, p1, p2, widthAtStart, widthAtEnd, color, 0.5);
       currentLength += segLen;
     }
   }
@@ -1000,7 +1002,7 @@ class EditableDynamicBG {
   _drawCurve(ctx, s, w, h, isHighlight) {
     if (!s.points || s.points.length < 2) return;
 
-    const hasWidthNodes = s.widthNodes && s.widthNodes.length >= 2;
+    const hasWidthNodes = s.widthNodes && s.widthNodes.length >= 2 && s.widthNodes.some(n => n.width < 0.999);
     const hasPathGradient = s.pathGradient && s.pathGradient.stops && s.pathGradient.stops.length >= 2;
 
     if (hasWidthNodes && !isHighlight) {
@@ -1157,7 +1159,8 @@ class EditableDynamicBG {
     if (totalLength === 0) return;
 
     // 绘制每段（用梯形近似可变宽度）
-    ctx.fillStyle = s.stroke || '#fff';
+    const hasPathGrad = s.pathGradient && s.pathGradient.stops && s.pathGradient.stops.length >= 2;
+    const pathStops = hasPathGrad ? s.pathGradient.stops : null;
     let currentLength = 0;
     for (let i = 0; i < segLens.length; i++) {
       const segLen = segLens[i];
@@ -1173,7 +1176,8 @@ class EditableDynamicBG {
         continue;
       }
 
-      this._drawTaperedSegment(ctx, curvePoints[i], curvePoints[i + 1], widthAtStart, widthAtEnd, s.stroke, 0.5);
+      const color = pathStops ? this._getGradientColor(pathStops, (startRatio + endRatio) / 2) : (s.stroke || '#fff');
+      this._drawTaperedSegment(ctx, curvePoints[i], curvePoints[i + 1], widthAtStart, widthAtEnd, color, 0.5);
       currentLength += segLen;
     }
   }
