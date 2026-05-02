@@ -634,27 +634,42 @@ class EditableDynamicBG {
     }
     if (totalLength === 0) return;
 
-    // 绘制每段
     const hasPathGrad = s.pathGradient && s.pathGradient.stops && s.pathGradient.stops.length >= 2;
     const pathStops = hasPathGrad ? s.pathGradient.stops : null;
+    const numSub = 20; // 每段细分数，消除拐角裂痕+渐变平滑
     let currentLength = 0;
+
     for (let i = 0; i < segLens.length; i++) {
       const segLen = segLens[i];
-      const startRatio = currentLength / totalLength;
-      const endRatio = (currentLength + segLen) / totalLength;
+      const segStartRatio = currentLength / totalLength;
+      const segEndRatio = (currentLength + segLen) / totalLength;
+      const widthAtSegStart = this._getWidthAtRatio(widthNodes, segStartRatio, baseWidth);
+      const widthAtSegEnd = this._getWidthAtRatio(widthNodes, segEndRatio, baseWidth);
 
-      const widthAtStart = this._getWidthAtRatio(widthNodes, startRatio, baseWidth);
-      const widthAtEnd = this._getWidthAtRatio(widthNodes, endRatio, baseWidth);
-
-      if (widthAtStart < 0.01 && widthAtEnd < 0.01) {
+      if (widthAtSegStart < 0.01 && widthAtSegEnd < 0.01) {
         currentLength += segLen;
         continue;
       }
 
-      const color = pathStops ? this._getGradientColor(pathStops, (startRatio + endRatio) / 2) : (s.stroke || '#fff');
-      const p1 = { x: pts[i][0] * w, y: pts[i][1] * h };
-      const p2 = { x: pts[i + 1][0] * w, y: pts[i + 1][1] * h };
-      this._drawTaperedSegment(ctx, p1, p2, widthAtStart, widthAtEnd, color, 0.5);
+      const p1x = pts[i][0] * w, p1y = pts[i][1] * h;
+      const p2x = pts[i + 1][0] * w, p2y = pts[i + 1][1] * h;
+
+      for (let j = 0; j < numSub; j++) {
+        const t0 = j / numSub;
+        const t1 = (j + 1) / numSub;
+        const r0 = segStartRatio + (segEndRatio - segStartRatio) * t0;
+        const r1 = segStartRatio + (segEndRatio - segStartRatio) * t1;
+        const w0 = this._getWidthAtRatio(widthNodes, r0, baseWidth);
+        const w1 = this._getWidthAtRatio(widthNodes, r1, baseWidth);
+
+        if (w0 < 0.01 && w1 < 0.01) continue;
+
+        const color = pathStops ? this._getGradientColor(pathStops, (r0 + r1) / 2) : (s.stroke || '#fff');
+        const subP1 = { x: p1x + (p2x - p1x) * t0, y: p1y + (p2y - p1y) * t0 };
+        const subP2 = { x: p1x + (p2x - p1x) * t1, y: p1y + (p2y - p1y) * t1 };
+        const isEdge = i === 0 && j === 0 || i === segLens.length - 1 && j === numSub - 1;
+        this._drawTaperedSegment(ctx, subP1, subP2, w0, w1, color, isEdge ? 0 : 0.5);
+      }
       currentLength += segLen;
     }
   }
