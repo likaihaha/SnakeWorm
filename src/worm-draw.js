@@ -808,10 +808,15 @@ export const WormDrawMixin = {
         // 嘴巴动画逻辑：
         // - 移动时：保持张开，有小幅度合嘴动作（表现张嘴冲向宝珠）
         // - 闭嘴计时器 > 0 时：完全闭合（吃到宝珠时）
+        // - 挖掘墙壁时：夸张的大幅度一张一合（嘴巴啃泥的感觉）
         let mouthOpenRatio;
         if (this.mouthCloseTimer > 0) {
             // 吃到宝珠时：完全闭合
             mouthOpenRatio = 0;
+        } else if (this.isDigging) {
+            // 挖掘时：大幅度快速张合
+            const t = performance.now() * 0.001 * CONFIG.DIGGABLE_WALL.MOUTH_ANIM_SPEED;
+            mouthOpenRatio = 0.3 + (Math.sin(t * Math.PI * 2) + 1) / 2 * 0.7;  // 0.3 ~ 1.0
         } else if (this.isMoving) {
             // 移动时：保持张开，有小幅度合嘴动作
             const smallAnim = (Math.sin(performance.now() / 200) + 1) / 2;  // 0~1

@@ -24,6 +24,7 @@ import { createBoss, BOSS_STATE } from './boss.js';
 import { Obstacle, OBSTACLE_TYPE, generateObstacles } from './obstacle.js';
 import { getThemeConfig } from './theme-configs.js';
 import { MiniMap } from './minimap.js';
+import { DiggableWall, generateDiggableWalls } from './diggable-wall.js';
 
 export class Game {
     constructor() {
@@ -79,6 +80,9 @@ export class Game {
         
         // === Phase B: Barrier 门系统 ===
         this.barriers = generateBarriers(this.zoneManager);
+
+        // === Phase 3c: 可挖掘墙壁系统 ===
+        this.diggableWalls = generateDiggableWalls(this.zoneManager);
         this.playerDeathLength = 0;  // 玩家死亡时的长度（用于显示）
         this.maxLengthReached = 0;  // 玩家达到过的最大长度（用于排行榜）
         this.waitingForPlayer = false;  // 等待玩家鼠标移入白圈
@@ -774,6 +778,7 @@ export class Game {
 
         // Phase E: 重新生成 Barrier（反映已解锁区域），清理实体缓存
         this.barriers = generateBarriers(this.zoneManager);
+        this.diggableWalls = generateDiggableWalls(this.zoneManager);
         this.zoneManager.zoneEntityCache.clear();
 
         document.getElementById('gameOver').style.display = 'none';
@@ -964,6 +969,7 @@ export class Game {
             worm._familyGates = this.familyGates;
             worm._barriers = this.barriers;
             worm._obstacles = this.obstacles;
+            worm._diggableWalls = this.diggableWalls;
 
             if (worm.isPlayer) {
                 // 出场动画期间，继续执行updateEntering，跳过普通update
@@ -1381,7 +1387,36 @@ export class Game {
             barrier.update(dt, playerState, this.zoneManager);
             if (player) barrier.checkPlayerNear(player);
         }
-        
+
+        // 8.9 Phase 3c: 更新可挖掘墙壁
+        for (const wall of this.diggableWalls) {
+            wall.update(dt);
+        }
+        // 虫虫挖掘墙壁检测
+        for (const worm of this.worms) {
+            if (!worm.isAlive || worm.segments.length === 0) continue;
+            worm.isDigging = false;  // 重置挖掘状态
+            for (const wall of this.diggableWalls) {
+                if (!wall.active) continue;
+                const result = wall.dig(worm);
+                if (result.digging) {
+                    worm.isDigging = true;
+                    worm.mouthCloseTimer = 0;  // 清除吃宝珠的闭嘴，让挖掘嘴巴动画生效
+                }
+                if (result.blocked) {
+                    worm.isDigging = true;
+                }
+                // 收集泥块粒子
+                if (result.debrisParticles.length > 0) {
+                    wall.addDebris(result.debrisParticles);
+                }
+                // 释放的宝珠加入食物列表
+                for (const food of result.releasedFoods) {
+                    this.foods.push(food);
+                }
+            }
+        }
+
         // 9. 更新尸体下沉动画（紧凑过滤替代splice）
         {
             let w = 0;
@@ -3074,6 +3109,10 @@ export class Game {
         for (let i = 0; i < this.bosses.length; i++) this.bosses[i].draw(ctx);
         // Phase 3b: 绘制障碍物
         for (let i = 0; i < this.obstacles.length; i++) this.obstacles[i].draw(ctx);
+        // Phase 3c: 绘制可挖掘墙壁（在障碍物之后、虫虫之前，让虫虫出现在墙上面）
+        for (const wall of this.diggableWalls) {
+            wall.draw(ctx, this.gameTime);
+        }
         for (let i = 0; i < this.deadBodies.length; i++) this.deadBodies[i].draw(ctx);
 
         // 绘制screen模式的对象（发光）

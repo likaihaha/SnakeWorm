@@ -5,7 +5,7 @@
  */
 
 export const CONFIG = {
-    VERSION: '1.82',
+    VERSION: '1.85',
     CANVAS_WIDTH: 800, CANVAS_HEIGHT: 600,   // 视口大小（屏幕显示区域）
     MAP_WIDTH: 4000, MAP_HEIGHT: 3000,        // 世界地图大小（5×5倍）
     BORDER_MARGIN: 30,                        // 地图边界死亡区宽度（用于尸体/宝珠生成等）
@@ -293,6 +293,25 @@ export const CONFIG = {
             EYE_COLOR: '#ffd700',
             QUEEN_COLOR: '#ff1493',
         },
+    },
+
+    // === Phase 3c 可挖掘墙壁系统 ===
+    DIGGABLE_WALL: {
+        CELL_SIZE: 28,             // 每个泥块单元的像素大小
+        THICKNESS: 168,            // 墙体厚度 = 12节 × SEGMENT_SPACING(14)
+        DIG_SPEED: 0.4,            // 每秒挖掘进度（1.0 = 完全挖穿一个单元）
+        DIG_RADIUS: 1,             // 挖掘半径（以单元格为单位，1=只挖接触格）
+        ORB_CHANCE: 0.15,          // 每个单元格嵌入宝珠的概率
+        COLOR: '#8B6914',          // 泥墙基础色
+        COLOR_DARK: '#5C4A0E',     // 泥墙深色（裂缝/阴影）
+        COLOR_LIGHT: '#B8943C',    // 泥墙浅色（高光）
+        CRACK_COLOR: '#3A2A08',    // 裂缝颜色
+        DEBRIS_LIFE: 0.8,          // 泥块掉落粒子寿命（秒）
+        DEBRIS_SPEED: 3,           // 泥块飞溅速度
+        DEBRIS_COUNT: 5,           // 每次挖掘产生的泥块粒子数
+        DEBRIS_SIZE_MIN: 3,        // 泥块最小尺寸
+        DEBRIS_SIZE_SPREAD: 5,     // 泥块尺寸随机范围
+        MOUTH_ANIM_SPEED: 8,       // 嘴巴一张一合的频率（Hz）
     },
 
     PARTICLE: {

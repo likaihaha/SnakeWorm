@@ -54,6 +54,7 @@ export class Worm {
         // 嘴巴动画状态
         this.mouthCloseTimer = 0;  // 闭嘴计时器（吃宝珠时触发）
         this.isMoving = false;  // 是否在移动
+        this.isDigging = false;  // 是否在挖掘墙壁
 
         // 空闲波动动画（静止时的生命感）
         this.idleWavePhase = Math.random() * Math.PI * 2;  // 波动相位
@@ -508,8 +509,8 @@ export class Worm {
             const newX = head.x + this.velocity.x * speedDt;
             const newY = head.y + this.velocity.y * speedDt;
 
-            // Phase 3: 家族门 + Phase B: Barrier 门 + Phase 3b: 障碍物 阻挡检测
-            if (this._familyGates || this._barriers || this._obstacles) {
+            // Phase 3: 家族门 + Phase B: Barrier 门 + Phase 3b: 障碍物 + Phase 3c: 可挖掘墙 阻挡检测
+            if (this._familyGates || this._barriers || this._obstacles || this._diggableWalls) {
                 let blocked = false;
                 if (this._familyGates) {
                     for (const gate of this._familyGates) {
@@ -533,6 +534,17 @@ export class Worm {
                                 blocked = true;
                                 break;
                             }
+                        }
+                    }
+                }
+                // Phase 3c: 可挖掘墙壁阻挡（挖穿后不再阻挡）
+                if (!blocked && this._diggableWalls) {
+                    for (const wall of this._diggableWalls) {
+                        if (!wall.active) continue;
+                        if (wall.isBlocked(newX, newY)) {
+                            blocked = true;
+                            this.isDigging = true;
+                            break;
                         }
                     }
                 }
