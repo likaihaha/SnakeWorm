@@ -512,6 +512,11 @@ class BackgroundEditor {
       const deg = angle * 180 / Math.PI;
       const cos = Math.cos(angle), sin = Math.sin(angle);
 
+      if (this._lastRotLog !== Math.round(deg)) {
+        this._lastRotLog = Math.round(deg);
+        console.log('[旋转]', 'fromCenter:', fromCenter, 'deg:', Math.round(deg), 'gcx:', Math.round(gcx), 'gcy:', Math.round(gcy));
+      }
+
       for (const [id, sp] of map) {
         const shape = this.config.shapes.find(s => s.id === id);
         if (!shape) continue;
