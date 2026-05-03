@@ -544,18 +544,13 @@ class BackgroundEditor {
     const shapes = cfg.shapes || [];
     const groups = cfg.groups || [];
 
-    // DEBUG: 画大标记确认_redrawAll被调用
-    ctx.save();
-    ctx.fillStyle = 'rgba(255,0,0,0.3)';
-    ctx.fillRect(0, 0, 50, 50);
-    ctx.restore();
-
     for (const id of order) {
       if (id === 'background') {
         bg._renderStaticLayer(ctx, id);
         continue;
       }
       if (id.startsWith('group_')) {
+        // 组用drawGroupDirect绘制（含变换），不用_renderStaticLayer
         const group = groups.find(g => g.id === id);
         if (group) bg.drawGroupDirect(ctx, group);
       } else if (id.startsWith('shape_')) {
@@ -563,19 +558,6 @@ class BackgroundEditor {
         const s = shapes.find(sh => sh.id === sid);
         if (s && s.visible !== false) bg._drawSingleShape(ctx, s, false);
       }
-    }
-
-    // DEBUG: 画组中心红点
-    const selGroup = groups.find(g => g.id === this.selectedElement);
-    if (selGroup) {
-      const gx = (selGroup.x || 0.5) * this.canvas.width;
-      const gy = (selGroup.y || 0.5) * this.canvas.height;
-      ctx.save();
-      ctx.fillStyle = '#f00';
-      ctx.beginPath();
-      ctx.arc(gx, gy, 8, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.restore();
     }
   }
 
@@ -1985,6 +1967,11 @@ class BackgroundEditor {
         // 有组被选中时，跳过静态画布，全部直接绘制
         if (this.selectedElement && this.selectedElement.startsWith('group_')) {
           this._redrawAll(this.ctx);
+          // DEBUG
+          this.ctx.save();
+          this.ctx.fillStyle = '#f00';
+          this.ctx.fillRect(10, 40, 30, 30);
+          this.ctx.restore();
         } else {
           this.bg.draw(this.ctx);
         }
