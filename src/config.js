@@ -297,21 +297,24 @@ export const CONFIG = {
 
     // === Phase 3c 可挖掘墙壁系统 ===
     DIGGABLE_WALL: {
-        CELL_SIZE: 28,             // 每个泥块单元的像素大小
-        THICKNESS: 168,            // 墙体厚度 = 12节 × SEGMENT_SPACING(14)
-        DIG_SPEED: 0.4,            // 每秒挖掘进度（1.0 = 完全挖穿一个单元）
+        CELL_SIZE: 14,             // 每个泥块单元的像素大小（缩小一半）
+        THICKNESS: 168,            // 墙体厚度
+        DIG_SPEED: 60,             // 每秒挖掘进度（极快，1口≈1帧即挖掉）
         DIG_RADIUS: 1,             // 挖掘半径（以单元格为单位，1=只挖接触格）
         ORB_CHANCE: 0.15,          // 每个单元格嵌入宝珠的概率
-        COLOR: '#8B6914',          // 泥墙基础色
-        COLOR_DARK: '#5C4A0E',     // 泥墙深色（裂缝/阴影）
-        COLOR_LIGHT: '#B8943C',    // 泥墙浅色（高光）
-        CRACK_COLOR: '#3A2A08',    // 裂缝颜色
-        DEBRIS_LIFE: 0.8,          // 泥块掉落粒子寿命（秒）
-        DEBRIS_SPEED: 3,           // 泥块飞溅速度
-        DEBRIS_COUNT: 5,           // 每次挖掘产生的泥块粒子数
-        DEBRIS_SIZE_MIN: 3,        // 泥块最小尺寸
-        DEBRIS_SIZE_SPREAD: 5,     // 泥块尺寸随机范围
+        COLOR: '#1a3a1a',          // 泥墙基础色（forest主题reef色）
+        COLOR_DARK: '#0f2a0f',     // 泥墙深色（裂缝/阴影）
+        COLOR_LIGHT: '#2d5a2d',    // 泥墙浅色（高光）
+        CRACK_COLOR: '#0a1a0a',    // 裂缝颜色
+        DEBRIS_LIFE: 0.5,          // 泥块掉落粒子寿命（秒）
+        DEBRIS_SPEED: 2,           // 泥块飞溅速度
+        DEBRIS_COUNT: 3,           // 每次挖掘产生的泥块粒子数
+        DEBRIS_SIZE_MIN: 1,        // 泥块最小尺寸（缩小）
+        DEBRIS_SIZE_SPREAD: 2,     // 泥块尺寸随机范围（缩小）
         MOUTH_ANIM_SPEED: 8,       // 嘴巴一张一合的频率（Hz）
+        REEF_NOISE_SCALE: 0.12,    // 珊瑚礁噪声缩放
+        REEF_NOISE_AMP: 3,         // 珊瑚礁轮廓扰动幅度（单元格数）
+        BOTTOM_EXPAND: 1.4,        // 底部宽度倍数（下面宽上面窄）
     },
 
     PARTICLE: {

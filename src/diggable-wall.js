@@ -1,8 +1,9 @@
 /**
- * DiggableWall - 可挖掘墙壁系统
+ * DiggableWall - 可挖掘墙壁系统（珊瑚礁造型版）
  * Phase 3c: 区域间的可破坏泥墙
  *
  * 在相邻区域之间放置由网格单元组成的泥墙
+ * 泥墙呈下面宽、上面窄的珊瑚礁形状
  * 玩家虫虫的头部碰墙时，嘴巴一张一合，逐单元挖穿
  * 墙体内随机嵌入宝珠作为奖励
  * 挖掘时产生泥块掉落粒子特效
@@ -13,6 +14,17 @@ import { hexToRgba } from './utils.js';
 import { Food } from './entities.js';
 
 const DW = CONFIG.DIGGABLE_WALL;
+
+/**
+ * 确定性伪随机函数（基于坐标hash）
+ * 用于同一位置的单元每次生成相同外观
+ */
+function hashRandom(x, y, seed) {
+    let n = (x * 374761393 + y * 668265263 + seed * 1274126177) & 0xFFFFFFFF;
+    n = ((n ^ (n >> 13)) * 1103515245) & 0xFFFFFFFF;
+    n = (n ^ (n >> 16)) & 0xFFFFFFFF;
+    return (n & 0x7FFFFFFF) / 0x7FFFFFFF;
+}
 
 /**
  * 单个泥块单元
@@ -28,9 +40,17 @@ class WallCell {
         this.orbType = null;      // 嵌入的宝珠类型（null=无）
         this.orbEaten = false;    // 宝珠是否已被获取
         this.crackPhase = Math.random() * Math.PI * 2;  // 裂纹动画相位
-        // 视觉随机化
-        this.brightness = 0.85 + Math.random() * 0.3;  // 亮度变化
-        this.variant = Math.random();  // 外观变体 0~1
+        // 视觉随机化（确定性：用位置作种子）
+        const hr = hashRandom(col, row, 7);
+        this.brightness = 0.85 + hr * 0.3;  // 亮度变化
+        this.variant = hashRandom(row, col, 13);  // 外观变体 0~1
+        // 四角扰动（珊瑚礁有机感）
+        this.jitter = [
+            (hashRandom(col, row, 1) - 0.5) * 4,
+            (hashRandom(col, row, 2) - 0.5) * 4,
+            (hashRandom(col, row, 3) - 0.5) * 4,
+            (hashRandom(col, row, 4) - 0.5) * 4,
+        ];
     }
 }
 
@@ -147,6 +167,11 @@ export class DiggableWall {
             return;
         }
 
+        // 珊瑚礁造型种子
+        const reefSeed = fromZone.id * 31 + (toZone.id || 0) * 17 + 42;
+        const noiseAmp = DW.REEF_NOISE_AMP || 3;
+        const bottomExpand = DW.BOTTOM_EXPAND || 1.4;
+
         // 用像素大小的cell来填充墙区域
         this.cols = Math.ceil(this.wallW / cellSize);
         this.rows = Math.ceil(this.wallH / cellSize);
@@ -158,8 +183,40 @@ export class DiggableWall {
                 const wy = this.wallY + r * cellSize;
                 const cell = new WallCell(c, r, wx, wy);
 
+                // ---- 珊瑚礁随机轮廓判断 ----
+                let inReef = true;
+
+                if (this.orientation === 'vertical') {
+                    // 垂直墙：r=0是顶部，r=rows-1是底部
+                    const t = 1 - r / (this.rows - 1 || 1); // 1=顶部 0=底部
+                    const widthScale = 1 + (bottomExpand - 1) * t; // 顶部窄、底部宽
+                    const center = (this.cols - 1) / 2;
+                    const halfMax = this.cols / 2;
+                    const halfCurrent = halfMax / widthScale;
+                    const dist = Math.abs(c - center);
+                    // 噪声扰动边界
+                    const n = (hashRandom(c, r, reefSeed) - 0.5) * noiseAmp;
+                    if (dist > halfCurrent + n) {
+                        inReef = false;
+                    }
+                } else {
+                    // 水平墙：c=0是左端，c=cols-1是右端
+                    const t = 1 - c / (this.cols - 1 || 1); // 1=左端 0=右端
+                    const heightScale = 1 + (bottomExpand - 1) * t; // 左右端窄、中间宽
+                    const center = (this.rows - 1) / 2;
+                    const halfMax = this.rows / 2;
+                    const halfCurrent = halfMax / heightScale;
+                    const dist = Math.abs(r - center);
+                    const n = (hashRandom(r, c, reefSeed) - 0.5) * noiseAmp;
+                    if (dist > halfCurrent + n) {
+                        inReef = false;
+                    }
+                }
+
+                cell._inReef = inReef;
+
                 // 随机嵌入宝珠
-                if (Math.random() < DW.ORB_CHANCE) {
+                if (inReef && hashRandom(c, r, reefSeed + 99) < DW.ORB_CHANCE) {
                     cell.orbType = Food.weightedRandom();
                 }
 
@@ -175,7 +232,8 @@ export class DiggableWall {
         if (!this.active) return false;
         const { col, row } = this._worldToCell(worldX, worldY);
         if (col < 0 || col >= this.cols || row < 0 || row >= this.rows) return false;
-        return !this.cells[col][row].dug;
+        const cell = this.cells[col][row];
+        return cell._inReef && !cell.dug;
     }
 
     /**
@@ -211,7 +269,7 @@ export class DiggableWall {
             for (let r = minRow; r <= maxRow; r++) {
                 if (!this.cells[c] || !this.cells[c][r]) continue;
                 const cell = this.cells[c][r];
-                if (cell.dug) continue;
+                if (cell.dug || !cell._inReef) continue;
 
                 // 计算头部中心到单元格中心的距离（以单元格为单位）
                 const cellCenterX = cell.worldX + cellSize / 2;
@@ -275,12 +333,13 @@ export class DiggableWall {
     }
 
     /**
-     * 检查整个墙壁是否被挖穿（所有单元都dug=true）
+     * 检查整个墙壁是否被挖穿（只检查reef内的单元）
      */
     _checkComplete() {
         for (let c = 0; c < this.cols; c++) {
             for (let r = 0; r < this.rows; r++) {
-                if (!this.cells[c][r].dug) return;
+                const cell = this.cells[c][r];
+                if (cell._inReef && !cell.dug) return;
             }
         }
         this.active = false;  // 全部挖穿，墙壁消失
@@ -310,7 +369,7 @@ export class DiggableWall {
     }
 
     /**
-     * 绘制墙壁
+     * 绘制墙壁（珊瑚礁造型）
      */
     draw(ctx, gameTime) {
         if (!this.active) return;
@@ -320,7 +379,7 @@ export class DiggableWall {
         for (let c = 0; c < this.cols; c++) {
             for (let r = 0; r < this.rows; r++) {
                 const cell = this.cells[c][r];
-                if (cell.dug) continue;
+                if (cell.dug || !cell._inReef) continue;
 
                 const x = cell.worldX;
                 const y = cell.worldY;
@@ -339,7 +398,16 @@ export class DiggableWall {
                 const damage = 1 - cell.hp;  // 0=完好 1=即将破碎
 
                 ctx.fillStyle = `rgb(${cr},${cg},${cb})`;
-                ctx.fillRect(x, y, s, s);
+
+                // 使用jitter绘制不规则四边形（珊瑚礁有机感）
+                const j = cell.jitter;
+                ctx.beginPath();
+                ctx.moveTo(x + j[0], y + j[1]);
+                ctx.lineTo(x + s + j[1], y + j[2]);
+                ctx.lineTo(x + s + j[2], y + s + j[3]);
+                ctx.lineTo(x + j[3], y + s + j[0]);
+                ctx.closePath();
+                ctx.fill();
 
                 // 泥土纹理：随机小点
                 if (cell.variant > 0.3) {
@@ -349,7 +417,7 @@ export class DiggableWall {
                         const dx = x + ((cell.variant * 137 + d * 53) % s);
                         const dy = y + ((cell.variant * 89 + d * 71) % s);
                         ctx.beginPath();
-                        ctx.arc(dx, dy, 1 + cell.variant, 0, Math.PI * 2);
+                        ctx.arc(dx, dy, 1 + cell.variant * 0.5, 0, Math.PI * 2);
                         ctx.fill();
                     }
                 }
@@ -357,14 +425,14 @@ export class DiggableWall {
                 // 高光边缘
                 if (damage < 0.3) {
                     ctx.fillStyle = hexToRgba(DW.COLOR_LIGHT, 0.2);
-                    ctx.fillRect(x, y, s, 1.5);  // 顶部高光
-                    ctx.fillRect(x, y, 1.5, s);  // 左侧高光
+                    ctx.fillRect(x, y, s, 1);  // 顶部高光
+                    ctx.fillRect(x, y, 1, s);  // 左侧高光
                 }
 
                 // 裂纹效果（damage > 0时开始出现）
                 if (damage > 0.1) {
                     ctx.strokeStyle = hexToRgba(DW.CRACK_COLOR, damage * 0.8);
-                    ctx.lineWidth = 1 + damage;
+                    ctx.lineWidth = 0.8 + damage * 0.5;
                     const cx = x + s / 2;
                     const cy = y + s / 2;
 
@@ -402,20 +470,30 @@ export class DiggableWall {
             }
         }
 
-        // 绘制墙体边缘（装饰性砖缝线）
-        ctx.strokeStyle = hexToRgba(DW.COLOR_DARK, 0.3);
-        ctx.lineWidth = 0.5;
+        // 绘制墙体边缘（装饰性砖缝线）— 只画reef内单元
+        ctx.strokeStyle = hexToRgba(DW.COLOR_DARK, 0.2);
+        ctx.lineWidth = 0.3;
         for (let c = 0; c <= this.cols; c++) {
-            ctx.beginPath();
-            ctx.moveTo(this.wallX + c * cellSize, this.wallY);
-            ctx.lineTo(this.wallX + c * cellSize, this.wallY + this.wallH);
-            ctx.stroke();
+            for (let r = 0; r < this.rows; r++) {
+                if (!this.cells[c] || !this.cells[c][r] || !this.cells[c][r]._inReef) continue;
+                const x = this.wallX + c * cellSize;
+                const y = this.wallY + r * cellSize;
+                ctx.beginPath();
+                ctx.moveTo(x, y);
+                ctx.lineTo(x, y + cellSize);
+                ctx.stroke();
+            }
         }
         for (let r = 0; r <= this.rows; r++) {
-            ctx.beginPath();
-            ctx.moveTo(this.wallX, this.wallY + r * cellSize);
-            ctx.lineTo(this.wallX + this.wallW, this.wallY + r * cellSize);
-            ctx.stroke();
+            for (let c = 0; c < this.cols; c++) {
+                if (!this.cells[c] || !this.cells[c][r] || !this.cells[c][r]._inReef) continue;
+                const x = this.wallX + c * cellSize;
+                const y = this.wallY + r * cellSize;
+                ctx.beginPath();
+                ctx.moveTo(x, y);
+                ctx.lineTo(x + cellSize, y);
+                ctx.stroke();
+            }
         }
 
         // 绘制泥块粒子
