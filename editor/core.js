@@ -546,7 +546,6 @@ class BackgroundEditor {
 
     for (const id of order) {
       if (id === 'background') {
-        // 绘制背景
         bg._renderStaticLayer(ctx, id);
         continue;
       }
@@ -558,6 +557,22 @@ class BackgroundEditor {
         const s = shapes.find(sh => sh.id === sid);
         if (s && s.visible !== false) bg._drawSingleShape(ctx, s, false);
       }
+    }
+
+    // DEBUG: 画组中心红点
+    const selGroup = groups.find(g => g.id === this.selectedElement);
+    if (selGroup) {
+      const gx = (selGroup.x || 0.5) * this.canvas.width;
+      const gy = (selGroup.y || 0.5) * this.canvas.height;
+      ctx.save();
+      ctx.fillStyle = '#f00';
+      ctx.beginPath();
+      ctx.arc(gx, gy, 10, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#fff';
+      ctx.font = '12px monospace';
+      ctx.fillText(`G(${Math.round(gx)},${Math.round(gy)})`, gx + 14, gy + 4);
+      ctx.restore();
     }
   }
 
