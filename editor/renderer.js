@@ -1611,62 +1611,50 @@ class EditableDynamicBG {
     }
   }
 
-  // 组变换专用：直接修改形状位置绘制（不依赖ctx变换）
+  // 虚拟点组渲染：创建临时副本绘制，不动原始形状
   drawGroupDirect(ctx, group) {
-    const gx = (group.x || 0.5) * this.w;
-    const gy = (group.y || 0.5) * this.h;
+    const gw = this.w, gh = this.h;
+    const gcx = (group.x || 0.5) * gw;
+    const gcy = (group.y || 0.5) * gh;
     const gr = (group.rotation || 0) * Math.PI / 180;
     const gs = group.scale || 1;
     const cos = Math.cos(gr), sin = Math.sin(gr);
 
     for (const childId of group.children) {
       const sid = childId.replace('shape_', '');
-      const s = (this.cfg.shapes || []).find(sh => sh.id === sid);
-      if (!s || s.visible === false) continue;
+      const orig = (this.cfg.shapes || []).find(sh => sh.id === sid);
+      if (!orig || orig.visible === false) continue;
 
-      // 保存原始位置
-      const origX = s.x, origY = s.y, origPoints = s.points;
-      const origRotation = s.rotation;
+      // 浅拷贝原始形状
+      const s = { ...orig };
 
-      // 计算变换后的位置
+      // 变换 x/y（以组中心为原点旋转+缩放）
       if (s.x !== undefined && s.y !== undefined) {
-        // 以组中心为原点，缩放+旋转
-        const dx = (s.x * this.w - gx) * gs;
-        const dy = (s.y * this.h - gy) * gs;
-        s.x = (gx + dx * cos - dy * sin) / this.w;
-        s.y = (gy + dx * sin + dy * cos) / this.h;
+        const ox = s.x * gw, oy = s.y * gh;
+        const dx = ox - gcx, dy = oy - gcy;
+        const rdx = dx * gs, rdy = dy * gs;
+        s.x = (gcx + rdx * cos - rdy * sin) / gw;
+        s.y = (gcy + rdx * sin + rdy * cos) / gh;
       }
-      if (s.points) {
-        s.points = s.points.map(p => {
-          const dx = (p[0] * this.w - gx) * gs;
-          const dy = (p[1] * this.h - gy) * gs;
+
+      // 变换 points
+      if (orig.points) {
+        s.points = orig.points.map(p => {
+          const dx = p[0] * gw - gcx, dy = p[1] * gh - gcy;
+          const rdx = dx * gs, rdy = dy * gs;
           return [
-            (gx + dx * cos - dy * sin) / this.w,
-            (gy + dx * sin + dy * cos) / this.h
+            (gcx + rdx * cos - rdy * sin) / gw,
+            (gcy + rdx * sin + rdy * cos) / gh
           ];
         });
       }
+
+      // 变换 rotation
       if (s.rotation !== undefined && gr) {
         s.rotation = s.rotation + gr * 180 / Math.PI;
       }
 
       this._drawSingleShape(ctx, s, false);
-
-      // DEBUG: 变换后位置画黄色边框
-      ctx.save();
-      ctx.strokeStyle = '#ff0';
-      ctx.lineWidth = 2;
-      ctx.setLineDash([4, 4]);
-      const tb = this.getShapeBounds(s);
-      ctx.strokeRect(tb.x, tb.y, tb.width, tb.height);
-      ctx.setLineDash([]);
-      ctx.restore();
-
-      // 恢复原始位置
-      s.x = origX;
-      s.y = origY;
-      s.points = origPoints;
-      s.rotation = origRotation;
     }
   }
 

@@ -550,16 +550,8 @@ class BackgroundEditor {
         continue;
       }
       if (id.startsWith('group_')) {
-        // 组用drawGroupDirect绘制（含变换），不用_renderStaticLayer
         const group = groups.find(g => g.id === id);
-        if (group) {
-          bg.drawGroupDirect(ctx, group);
-          // DEBUG: 组绘制后画绿色标记
-          ctx.save();
-          ctx.fillStyle = '#0f0';
-          ctx.fillRect(10, 80, 30, 30);
-          ctx.restore();
-        }
+        if (group) bg.drawGroupDirect(ctx, group);
       } else if (id.startsWith('shape_')) {
         const sid = id.replace('shape_', '');
         const s = shapes.find(sh => sh.id === sid);
@@ -1974,21 +1966,9 @@ class BackgroundEditor {
         // 有组被选中时，跳过静态画布，全部直接绘制
         if (this.selectedElement && this.selectedElement.startsWith('group_')) {
           this._redrawAll(this.ctx);
-          // DEBUG
-          this.ctx.save();
-          this.ctx.fillStyle = '#f00';
-          this.ctx.fillRect(10, 40, 30, 30);
-          this.ctx.restore();
         } else {
           this.bg.draw(this.ctx);
         }
-
-        // DEBUG: 显示selectedElement
-        this.ctx.save();
-        this.ctx.fillStyle = '#ff0';
-        this.ctx.font = '14px monospace';
-        this.ctx.fillText(`sel:${this.selectedElement}`, 10, 20);
-        this.ctx.restore();
 
         // 绘制网格和参考线
         if (this.canvasManager) {
