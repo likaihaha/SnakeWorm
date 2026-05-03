@@ -716,6 +716,17 @@
       
       // 启用自动保存
       this.historyManager.enableAutoSave(30000);
+
+      // 自动加载上次保存的配置
+      try {
+        const savedConfig = localStorage.getItem('bg-editor-config');
+        if (savedConfig) {
+          this.editor.config = JSON.parse(savedConfig);
+          this.editor.rebuild();
+        }
+      } catch (e) {
+        console.warn('加载本地配置失败:', e);
+      }
       
       console.log('编辑器初始化完成');
     }
@@ -2747,6 +2758,7 @@
           '折线拐角修复：细分渲染消除裂痕+尖角/圆角填充模式(sharpCorners)',
           '折线增加控制点：polyline支持点击路径插入新控制点',
           '坐标修复：框选和点击坐标考虑平移缩放',
+          '自动加载本地配置：启动时恢复上次保存的编辑状态',
         ]},
         { version: 'v2.3', date: '2026-05-02', items: [
           '新增宽度节点系统：可自由控制曲线任意位置的粗细',
