@@ -380,9 +380,19 @@ class EditableDynamicBG {
         } else if (id.startsWith('group_')) {
           const group = (c.groups || []).find(g => g.id === id);
           if (group) {
+            ctx.save();
+            const gx = (group.x || 0.5) * this.w;
+            const gy = (group.y || 0.5) * this.h;
+            const gr = (group.rotation || 0) * Math.PI / 180;
+            const gs = group.scale || 1;
+            ctx.translate(gx, gy);
+            if (gr) ctx.rotate(gr);
+            if (gs !== 1) ctx.scale(gs, gs);
+            ctx.translate(-gx, -gy);
             for (const childId of group.children) {
               this._renderStaticLayer(ctx, childId);
             }
+            ctx.restore();
           }
         }
         break;
@@ -1752,7 +1762,7 @@ class EditableDynamicBG {
 
   // ===== 多选变换控制器 =====
 
-  getGroupBounds(shapes) {
+  getGroupBounds(shapes, group) {
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
     for (const s of shapes) {
       const b = this.getShapeBounds(s);
@@ -1763,11 +1773,32 @@ class EditableDynamicBG {
       maxY = Math.max(maxY, b.y + b.height);
     }
     if (minX === Infinity) return { x: 0, y: 0, width: 0, height: 0 };
+
+    // 如果有组变换，对4个角应用旋转+缩放后重新计算AABB
+    if (group && (group.rotation || group.scale !== 1)) {
+      const gx = (group.x || 0.5) * this.w;
+      const gy = (group.y || 0.5) * this.h;
+      const gr = (group.rotation || 0) * Math.PI / 180;
+      const gs = group.scale || 1;
+      const cos = Math.cos(gr), sin = Math.sin(gr);
+      const corners = [
+        { x: minX, y: minY }, { x: maxX, y: minY },
+        { x: maxX, y: maxY }, { x: minX, y: maxY }
+      ];
+      minX = Infinity; minY = Infinity; maxX = -Infinity; maxY = -Infinity;
+      for (const c of corners) {
+        const rx = (c.x - gx) * gs, ry = (c.y - gy) * gs;
+        const wx = gx + rx * cos - ry * sin;
+        const wy = gy + rx * sin + ry * cos;
+        minX = Math.min(minX, wx); minY = Math.min(minY, wy);
+        maxX = Math.max(maxX, wx); maxY = Math.max(maxY, wy);
+      }
+    }
     return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
   }
 
-  drawGroupTransform(ctx, shapes) {
-    const bounds = this.getGroupBounds(shapes);
+  drawGroupTransform(ctx, shapes, group) {
+    const bounds = this.getGroupBounds(shapes, group);
     if (bounds.width <= 0 && bounds.height <= 0) return;
 
     ctx.save();
@@ -1815,8 +1846,8 @@ class EditableDynamicBG {
     ctx.restore();
   }
 
-  getGroupTransformHandle(mx, my, shapes) {
-    const bounds = this.getGroupBounds(shapes);
+  getGroupTransformHandle(mx, my, shapes, group) {
+    const bounds = this.getGroupBounds(shapes, group);
     if (bounds.width <= 0 && bounds.height <= 0) return null;
     const handleSize = 12;
 
@@ -2013,9 +2044,19 @@ class EditableDynamicBG {
         if (id.startsWith('group_')) {
           const group = (c.groups || []).find(g => g.id === id);
           if (group) {
+            ctx.save();
+            const gx = (group.x || 0.5) * this.w;
+            const gy = (group.y || 0.5) * this.h;
+            const gr = (group.rotation || 0) * Math.PI / 180;
+            const gs = group.scale || 1;
+            ctx.translate(gx, gy);
+            if (gr) ctx.rotate(gr);
+            if (gs !== 1) ctx.scale(gs, gs);
+            ctx.translate(-gx, -gy);
             for (const childId of group.children) {
               this._renderDynamicLayer(ctx, childId);
             }
+            ctx.restore();
           }
         }
         break;
