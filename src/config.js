@@ -5,7 +5,7 @@
  */
 
 export const CONFIG = {
-    VERSION: '1.73',
+    VERSION: '1.74',
     CANVAS_WIDTH: 800, CANVAS_HEIGHT: 600,   // 视口大小（屏幕显示区域）
     MAP_WIDTH: 4000, MAP_HEIGHT: 3000,        // 世界地图大小（5×5倍）
     BORDER_MARGIN: 30,                        // 地图边界死亡区宽度（用于尸体/宝珠生成等）
@@ -108,6 +108,16 @@ export const CONFIG = {
             naughty: { label: '淘气', color: '#ffe66d', emoji: '⚡', speedBonus: 1.3, stealRadius: 120 },
         },
         MIMICRY_THRESHOLD: 10,  // 母体行为采样次数阈值
+    },
+    // === Phase C 区域化实体生成 ===
+    ZONE: {
+        FOOD_BASE_COUNT: 4,        // 每区域基础宝珠数（乘以foodMultiplier）
+        ENEMY_BASE_COUNT: 1,       // 每区域基础敌人数（乘以enemyMultiplier）
+        ENEMY_SPAWN_INTERVAL: 15,  // 敌人刷新间隔（秒，基础值）
+        FOOD_SPAWN_INTERVAL: 3,    // 宝珠刷新间隔（秒，基础值）
+        ZONE_PADDING: 40,          // 实体在区域内离边界的最小距离
+        LOCK_ENEMY_TO_ZONE: true,  // 敌人锁定在生成区域内
+        BULLET_DISAPPEAR_AT_ZONE: true, // 子弹到达区域边界自动消失
     },
     PARTICLE: {
         SPEED_MIN: 2,

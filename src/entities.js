@@ -245,6 +245,29 @@ export class Food {
         return food;
     }
 
+    /**
+     * 在指定区域内生成宝珠（Phase C 区域化生成）
+     * @param {object} zone - 区域配置 {x, y, width, height}
+     * @param {object} type - 宝珠类型（可选）
+     * @returns {Food}
+     */
+    static inZone(zone, type = null) {
+        const padding = CONFIG.ZONE.ZONE_PADDING;
+        const margin = CONFIG.BORDER_MARGIN + CONFIG.SEGMENT_RADIUS;
+        const foodType = type || Food.weightedRandom();
+        let x = zone.x + padding + Math.random() * (zone.width - padding * 2);
+        let y = zone.y + padding + Math.random() * (zone.height - padding * 2);
+        // 钳制到地图范围内
+        x = Math.max(margin, Math.min(CONFIG.MAP_WIDTH - margin, x));
+        y = Math.max(margin, Math.min(CONFIG.MAP_HEIGHT - margin, y));
+        const food = new Food(x, y, foodType);
+        // 区域下方的宝珠给一点向上初速度
+        if (y > zone.y + zone.height * 0.7) {
+            food.velocity.y = -(0.2 + Math.random() * 0.4);
+        }
+        return food;
+    }
+
     update(dt) {
         // 初生冷却倒计时
         if (this.inactiveTimer > 0) {

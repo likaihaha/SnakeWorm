@@ -699,7 +699,8 @@ export class Game {
 
         // 初始化宝珠：开局只生成1个绿色宝珠，其他由节奏系统逐步生成
         const greenType = CONFIG.FOOD_TYPES.find(t => t.score === 10);
-        this.foods.push(Food.random(greenType));
+        const spawnZone = this.zoneManager ? this.zoneManager.zones[0] : null;
+        this.foods.push(spawnZone ? Food.inZone(spawnZone, greenType) : Food.random(greenType));
         this.initialGreenSpawned = 1;  // 记录已生成的初始绿宝珠数量
         this.foodRespawnTimers = {};
         CONFIG.FOOD_TYPES.forEach(type => {
@@ -1315,10 +1316,20 @@ export class Game {
         // 7.6 更新子弹和碰撞检测（紧凑过滤替代splice）
         {
             let w = 0;
+            const bulletZone = this.zoneManager ? this.zoneManager.zones[this.zoneManager.currentZoneId - 1] : null;
             for (let i = 0; i < this.bullets.length; i++) {
                 const bullet = this.bullets[i];
                 if (!bullet.update(dt)) {
                     continue; // 过期子弹，丢弃
+                }
+
+                // Phase C: 子弹到达区域边界自动消失
+                if (CONFIG.ZONE.BULLET_DISAPPEAR_AT_ZONE && bulletZone) {
+                    const bz = bulletZone;
+                    if (bullet.pos.x < bz.x || bullet.pos.x > bz.x + bz.width ||
+                        bullet.pos.y < bz.y || bullet.pos.y > bz.y + bz.height) {
+                        continue; // 子弹飞出当前区域，丢弃
+                    }
                 }
 
                 let hit = false;
@@ -1457,8 +1468,10 @@ export class Game {
             this.foods.length = w;
         }
         
-        // 节奏控制宝珠生成
+        // 节奏控制宝珠生成（Phase C: 区域化生成）
         const playerLength = player ? player.segments.length : 0;
+        // 获取玩家当前区域（用于区域化生成）
+        const playerZone = this.zoneManager ? this.zoneManager.zones[this.zoneManager.currentZoneId - 1] : null;
         for (let ti = 0; ti < CONFIG.FOOD_TYPES.length; ti++) {
             const type = CONFIG.FOOD_TYPES[ti];
             // 计数当前类型的宝珠数量（避免filter创建临时数组）
@@ -1505,7 +1518,12 @@ export class Game {
             }
 
             if (canSpawn) {
-                this.foods.push(Food.random(type));
+                // Phase C: 优先在当前区域生成宝珠
+                if (playerZone) {
+                    this.foods.push(Food.inZone(playerZone, type));
+                } else {
+                    this.foods.push(Food.random(type));
+                }
             }
         }
 
@@ -1977,7 +1995,7 @@ export class Game {
     // 敌人系统更新
     updateEnemies(dt, player) {
         // 生成敌人
-        this.spawnEnemies(dt);
+        this.spawnEnemies(dt, player);
         
         // 更新敌人（紧凑过滤替代splice）
         const juveniles = this.worms.filter(w => w.isAlive && w.isJuvenile && (!w.deathPhase || w.deathPhase === 'none'));
@@ -2083,31 +2101,47 @@ export class Game {
         this.checkJuvenileEatShrinkingSegments();
     }
 
-    // 生成敌人
-    spawnEnemies(dt) {
+    // 生成敌人（Phase C: 区域化生成）
+    spawnEnemies(dt, player) {
         const hasJuvenile = this.worms.some(w => w.isAlive && w.isJuvenile);
+        // 获取玩家当前区域
+        const currentZone = this.zoneManager ? this.zoneManager.zones[this.zoneManager.currentZoneId - 1] : null;
+        // 计算当前区域内的敌人数
+        let enemiesInZone = 0;
+        if (currentZone) {
+            for (const e of this.enemies) {
+                if (!e.isAlive || e.isDying) continue;
+                if (e.homeZone && e.homeZone.x === currentZone.x && e.homeZone.y === currentZone.y) {
+                    enemiesInZone++;
+                }
+            }
+        }
         if (hasJuvenile) {
             // 动态最大敌人数量：幼体≥阈值节数时允许2只，否则1只
             const threshold = CONFIG.FAMILY.ENEMY_JUVENILE_SEG_THRESHOLD;
             const hasLargeJuvenile = this.worms.some(w => w.isAlive && w.isJuvenile && w.segments.length >= threshold);
-            const maxEnemy = hasLargeJuvenile ? 2 : 1;
+            const baseMax = hasLargeJuvenile ? 2 : 1;
+            const zoneMaxEnemy = currentZone ? Math.max(1, Math.round(baseMax * currentZone.enemyMultiplier)) : baseMax;
             this.enemySpawnTimer -= dt;
-            if (this.enemySpawnTimer <= 0 && this.enemies.length < maxEnemy) {
-                this.enemySpawnTimer = CONFIG.FAMILY.ENEMY_SPAWN_INTERVAL;
-                const margin = CONFIG.BORDER_MARGIN;
+            if (this.enemySpawnTimer <= 0 && enemiesInZone < zoneMaxEnemy) {
+                this.enemySpawnTimer = CONFIG.ZONE.ENEMY_SPAWN_INTERVAL / (currentZone ? currentZone.enemyMultiplier : 1);
                 let x, y;
-                const side = Math.floor(Math.random() * 4);
-                // 在玩家附近边缘生成敌人
-                const px = player ? player.head.x : CONFIG.MAP_WIDTH / 2;
-                const py = player ? player.head.y : CONFIG.MAP_HEIGHT / 2;
-                const range = 600;  // 玩家附近的范围
-                switch (side) {
-                    case 0: x = Math.max(margin, px - range / 2 + Math.random() * range); y = margin; break;
-                    case 1: x = Math.max(margin, px - range / 2 + Math.random() * range); y = CONFIG.MAP_HEIGHT - margin; break;
-                    case 2: x = margin; y = Math.max(margin, py - range / 2 + Math.random() * range); break;
-                    case 3: x = CONFIG.MAP_WIDTH - margin; y = Math.max(margin, py - range / 2 + Math.random() * range); break;
+                if (currentZone) {
+                    // Phase C: 在当前区域内生成敌人
+                    const pad = CONFIG.ZONE.ZONE_PADDING;
+                    x = currentZone.x + pad + Math.random() * (currentZone.width - pad * 2);
+                    y = currentZone.y + pad + Math.random() * (currentZone.height - pad * 2);
+                } else {
+                    // 降级：在地图范围内生成
+                    const margin = CONFIG.BORDER_MARGIN;
+                    x = margin + Math.random() * (CONFIG.MAP_WIDTH - margin * 2);
+                    y = margin + Math.random() * (CONFIG.MAP_HEIGHT - margin * 2);
                 }
                 const newEnemy = new Enemy(x, y);
+                // 设置区域锁定
+                if (currentZone && CONFIG.ZONE.LOCK_ENEMY_TO_ZONE) {
+                    newEnemy.homeZone = currentZone;
+                }
                 this.enemies.push(newEnemy);
                 this.debugLogger.logEnemySpawn(newEnemy, this.gameTime);
             }

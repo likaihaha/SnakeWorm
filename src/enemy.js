@@ -55,6 +55,9 @@ export class Enemy {
         // 咬成功后冷却（见好就收，不再追幼体）
         this.biteCooldown = 0;  // 咬成功后冷却计时器
 
+        // Phase C: 区域锁定
+        this.homeZone = null;  // 敌人归属的区域 {x, y, width, height}
+
         // 初始化身体节段
         for (let i = 0; i < this.segmentCount; i++) {
             this.segments.push(new Vector(x - i * CONFIG.FAMILY.ENEMY_SEG_SPACING, y));
@@ -117,12 +120,19 @@ export class Enemy {
         }
 
         // 寻找最近的幼体（咬成功冷却期间不追幼体，见好就收）
+        // Phase C: 区域锁定的敌人只追区域内的幼体
         let nearestJuvenile = null;
         if (this.biteCooldown <= 0) {
             let minDist = CONFIG.FAMILY.ENEMY_CHASE_RADIUS;
 
             for (const worm of juveniles) {
                 if (!worm.isAlive || !worm.isJuvenile || !worm.head) continue;
+                // 区域锁定：只追在自己区域内的幼体
+                if (CONFIG.ZONE.LOCK_ENEMY_TO_ZONE && this.homeZone) {
+                    const z = this.homeZone;
+                    if (worm.head.x < z.x - 50 || worm.head.x > z.x + z.width + 50 ||
+                        worm.head.y < z.y - 50 || worm.head.y > z.y + z.height + 50) continue;
+                }
                 const d = this.pos.dist(worm.head);
                 if (d < minDist) {
                     minDist = d;
@@ -149,17 +159,32 @@ export class Enemy {
         // 更新位置
         this.pos = this.pos.add(this.velocity.mult(dt * 60));
 
-        // 边界反弹（地图边缘）
-        const margin = CONFIG.BORDER_MARGIN;
-        if (this.pos.x < margin || this.pos.x > CONFIG.MAP_WIDTH - margin) {
-            this.velocity.x *= -1;
-            this.wanderDir.x *= -1;
-            this.pos.x = Math.max(margin, Math.min(CONFIG.MAP_WIDTH - margin, this.pos.x));
-        }
-        if (this.pos.y < margin || this.pos.y > CONFIG.MAP_HEIGHT - margin) {
-            this.velocity.y *= -1;
-            this.wanderDir.y *= -1;
-            this.pos.y = Math.max(margin, Math.min(CONFIG.MAP_HEIGHT - margin, this.pos.y));
+        // 边界反弹（锁定到homeZone区域，否则用地图边缘）
+        if (CONFIG.ZONE.LOCK_ENEMY_TO_ZONE && this.homeZone) {
+            const z = this.homeZone;
+            const pad = CONFIG.ZONE.ZONE_PADDING;
+            if (this.pos.x < z.x + pad || this.pos.x > z.x + z.width - pad) {
+                this.velocity.x *= -1;
+                this.wanderDir.x *= -1;
+                this.pos.x = Math.max(z.x + pad, Math.min(z.x + z.width - pad, this.pos.x));
+            }
+            if (this.pos.y < z.y + pad || this.pos.y > z.y + z.height - pad) {
+                this.velocity.y *= -1;
+                this.wanderDir.y *= -1;
+                this.pos.y = Math.max(z.y + pad, Math.min(z.y + z.height - pad, this.pos.y));
+            }
+        } else {
+            const margin = CONFIG.BORDER_MARGIN;
+            if (this.pos.x < margin || this.pos.x > CONFIG.MAP_WIDTH - margin) {
+                this.velocity.x *= -1;
+                this.wanderDir.x *= -1;
+                this.pos.x = Math.max(margin, Math.min(CONFIG.MAP_WIDTH - margin, this.pos.x));
+            }
+            if (this.pos.y < margin || this.pos.y > CONFIG.MAP_HEIGHT - margin) {
+                this.velocity.y *= -1;
+                this.wanderDir.y *= -1;
+                this.pos.y = Math.max(margin, Math.min(CONFIG.MAP_HEIGHT - margin, this.pos.y));
+            }
         }
 
         // 更新身体节段位置

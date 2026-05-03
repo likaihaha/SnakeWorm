@@ -1,0 +1,336 @@
+{
+  "canvas": {
+    "width": 960,
+    "height": 540
+  },
+  "background": {
+    "visible": true,
+    "gradientType": "radial",
+    "centerX": 0.5,
+    "centerY": 0.5,
+    "radius": 0.8,
+    "angle": 90,
+    "color0": "#1a1a2e",
+    "color1": "#16213e",
+    "color2": "#0f3460"
+  },
+  "ambient": {
+    "visible": false
+  },
+  "river": {
+    "visible": false
+  },
+  "leftRock": {
+    "visible": false
+  },
+  "rightRock": {
+    "visible": false
+  },
+  "vents": {
+    "visible": false
+  },
+  "fog": {
+    "visible": false
+  },
+  "vignette": {
+    "visible": false
+  },
+  "jellyfish": {
+    "visible": false
+  },
+  "particles": {
+    "visible": false
+  },
+  "magma": {
+    "visible": false
+  },
+  "glints": {
+    "visible": false
+  },
+  "mountains": {
+    "visible": false
+  },
+  "shapes": [
+    {
+      "id": "1777738689994",
+      "type": "rectangle",
+      "visible": true,
+      "locked": false,
+      "opacity": 1,
+      "x": 0.3313677232032925,
+      "y": 0.26154541773518697,
+      "width": 0.4,
+      "height": 0.3,
+      "fill": "rgba(88, 166, 255, 0.3)",
+      "stroke": "rgba(88, 166, 255, 0.8)",
+      "strokeWidth": 2,
+      "cornerRadius": 0,
+      "rotation": 0,
+      "blendMode": "source-over",
+      "textureScaleX": 1,
+      "textureScaleY": 1,
+      "effects": [],
+      "_selectedPointIndex": -1
+    },
+    {
+      "id": "1777738695445",
+      "type": "path",
+      "visible": true,
+      "locked": false,
+      "opacity": 1,
+      "points": [
+        [
+          0.1767358178963037,
+          0.08901239879400785
+        ],
+        [
+          0.09987081414749997,
+          0.09364998196471666
+        ],
+        [
+          0.06292130733005298,
+          0.19419414666717102
+        ],
+        [
+          0.153038101846798,
+          0.2300061813640197
+        ],
+        [
+          0.20794857930672883,
+          0.31058029919088065
+        ],
+        [
+          0.23461504282889287,
+          0.41693196569269314
+        ],
+        [
+          0.17429021684281398,
+          0.45817970995667867
+        ],
+        [
+          0.10468464839733836,
+          0.36330989814951187
+        ]
+      ],
+      "tangentHandles": {
+        "2": {
+          "dx": 0.0073152808866907,
+          "dy": 0.049757555089959216
+        },
+        "3": {
+          "dx": 0.0322490105717054,
+          "dy": 0.02324253398851761
+        },
+        "4": {
+          "dx": 0.01307392320474543,
+          "dy": 0.03253954758392458
+        }
+      },
+      "fill": "none",
+      "stroke": "rgba(255, 255, 255, 0.8)",
+      "strokeWidth": 20,
+      "closed": false,
+      "rotation": 0,
+      "blendMode": "source-over",
+      "tangentWeights": [
+        0.5,
+        0.5,
+        0.5,
+        0.5,
+        0.5,
+        0.5,
+        0.5,
+        0.5
+      ],
+      "widthNodes": [
+        {
+          "width": 0,
+          "position": 0
+        },
+        {
+          "width": 1,
+          "position": 0.21
+        },
+        {
+          "width": 0.18,
+          "position": 0.62
+        },
+        {
+          "width": 1,
+          "position": 0.82
+        },
+        {
+          "width": 0,
+          "position": 1
+        }
+      ],
+      "_selectedPointIndex": -1,
+      "pathGradient": {
+        "stops": [
+          {
+            "pos": 0.06,
+            "color": "#ff6b2c"
+          },
+          {
+            "pos": 0.54,
+            "color": "#e8e34f"
+          },
+          {
+            "pos": 1,
+            "color": "#42d204"
+          }
+        ]
+      },
+      "effects": [
+        {
+          "type": "glow",
+          "color": "#58a6ff",
+          "blur": 10
+        }
+      ]
+    },
+    {
+      "id": "1777739948008",
+      "type": "polyline",
+      "visible": true,
+      "locked": false,
+      "opacity": 1,
+      "points": [
+        [
+          0.08713046389865833,
+          0.5724461821281785
+        ],
+        [
+          0.26793138399475225,
+          0.646264225265465
+        ],
+        [
+          0.2182181930882621,
+          0.7619986379578231
+        ],
+        [
+          0.4605568445475638,
+          0.9258829595256509
+        ]
+      ],
+      "tangentHandles": null,
+      "fill": "none",
+      "stroke": "#ffffff",
+      "strokeWidth": 17.5,
+      "closed": false,
+      "rotation": 0,
+      "blendMode": "source-over",
+      "widthNodes": [
+        {
+          "width": 0,
+          "position": 0
+        },
+        {
+          "width": 1,
+          "position": 0.2
+        },
+        {
+          "width": 1,
+          "position": 0.8
+        },
+        {
+          "width": 0,
+          "position": 1
+        }
+      ],
+      "_selectedPointIndex": -1,
+      "pathGradient": {
+        "stops": [
+          {
+            "pos": 0,
+            "color": "#2ecbff"
+          },
+          {
+            "pos": 0.12,
+            "color": "#4de8d6"
+          }
+        ]
+      },
+      "sharpCorners": true,
+      "effects": [
+        {
+          "type": "glow",
+          "color": "#e3ff57",
+          "blur": 10
+        }
+      ]
+    },
+    {
+      "id": "1777740034314",
+      "type": "polyline",
+      "visible": true,
+      "locked": false,
+      "opacity": 1,
+      "points": [
+        [
+          0.3938456484700854,
+          0.2762309873678783
+        ],
+        [
+          0.43178631877299667,
+          0.0824207502441926
+        ],
+        [
+          0.766326324540426,
+          0.17723640113431297
+        ],
+        [
+          0.8578944907410515,
+          0.5732147460685744
+        ]
+      ],
+      "tangentHandles": null,
+      "fill": "none",
+      "stroke": "#ffffff",
+      "strokeWidth": 15,
+      "closed": false,
+      "rotation": 0,
+      "blendMode": "source-over",
+      "widthNodes": [
+        {
+          "width": 0,
+          "position": 0
+        },
+        {
+          "width": 1,
+          "position": 0.2
+        },
+        {
+          "width": 1,
+          "position": 0.8
+        },
+        {
+          "width": 0.18,
+          "position": 1
+        }
+      ],
+      "_selectedPointIndex": -1,
+      "sharpCorners": true,
+      "pathGradient": {
+        "stops": [
+          {
+            "pos": 0,
+            "color": "#ff6b2c"
+          },
+          {
+            "pos": 1,
+            "color": "#4de8d6"
+          }
+        ]
+      }
+    }
+  ],
+  "layerOrder": [
+    "background",
+    "shape_1777738689994",
+    "shape_1777738695445",
+    "shape_1777739948008",
+    "shape_1777740034314"
+  ],
+  "groups": []
+}

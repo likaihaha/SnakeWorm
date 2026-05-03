@@ -5,6 +5,18 @@
 
 const LOGS = [
     {
+        version: 'v1.74',
+        date: '2026-05-03',
+        items: [
+            'Phase C 完成 — 区域化实体生成',
+            '宝珠区域生成：Food.inZone() 在玩家当前区域内均匀分布宝珠',
+            '敌人区域锁定：敌人生成在当前区域内，homeZone 属性限制移动范围',
+            '区域倍率：enemyMultiplier/foodMultiplier 影响生成数量和间隔',
+            '子弹边界：子弹到达区域边界自动消失，不会跨区击中',
+            '敌人数上限随区域倍率动态调整',
+        ]
+    },
+    {
         version: 'v1.73',
         date: '2026-05-03',
         items: [
