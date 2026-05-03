@@ -236,10 +236,10 @@ class BackgroundEditor {
             return;
           }
         } else {
-          console.warn('[组交互] 组找到但无有效子元素:', this.selectedElement);
+          // console.warn('[组交互] 组找到但无有效子元素:', this.selectedElement);
         }
       } else {
-        console.warn('[组交互] 未找到组:', this.selectedElement, 'groups:', (this.config.groups || []).map(g => g.id));
+        // console.warn('[组交互] 未找到组:', this.selectedElement);
       }
     }
 
@@ -512,25 +512,17 @@ class BackgroundEditor {
       const deg = angle * 180 / Math.PI;
       const cos = Math.cos(angle), sin = Math.sin(angle);
 
-      if (this._lastRotLog !== Math.round(deg)) {
-        this._lastRotLog = Math.round(deg);
-        console.log('[旋转]', 'fromCenter:', fromCenter, 'deg:', Math.round(deg), 'gcx:', Math.round(gcx), 'gcy:', Math.round(gcy));
-      }
-
       for (const [id, sp] of map) {
         const shape = this.config.shapes.find(s => s.id === id);
-        if (!shape) { console.log('[旋转] shape not found:', id); continue; }
+        if (!shape) continue;
 
         if (fromCenter) {
           // 组模式：围绕组中心旋转位置 + 自身旋转
           if (shape.type === 'rectangle' || shape.type === 'circle' || shape.type === 'polygon' || shape.type === 'particles') {
             const spx = sp.x * w, spy = sp.y * h;
             const rx = spx - gcx, ry = spy - gcy;
-            const newX = (gcx + rx * cos - ry * sin) / w;
-            const newY = (gcy + rx * sin + ry * cos) / h;
-            console.log(`[旋转] ${shape.type} sp:(${sp.x.toFixed(3)},${sp.y.toFixed(3)}) -> (${newX.toFixed(3)},${newY.toFixed(3)})`);
-            shape.x = Math.max(0, Math.min(1, newX));
-            shape.y = Math.max(0, Math.min(1, newY));
+            shape.x = Math.max(0, Math.min(1, (gcx + rx * cos - ry * sin) / w));
+            shape.y = Math.max(0, Math.min(1, (gcy + rx * sin + ry * cos) / h));
           } else if (shape.points && sp.points) {
             shape.points = sp.points.map(p => {
               const px = p[0] * w, py = p[1] * h;
@@ -1952,12 +1944,6 @@ class BackgroundEditor {
               this.bg.drawGroupTransform(this.ctx, children);
             }
           }
-          // 调试：画布左上角显示组信息
-          this.ctx.save();
-          this.ctx.fillStyle = '#ff0';
-          this.ctx.font = '14px monospace';
-          this.ctx.fillText(`selected:${this.selectedElement} groups:${allGroups.length} g:${group?.id||'none'} ch:${group?.children?.length||0}`, 10, 20);
-          this.ctx.restore();
         } else if (this.selectedElement && this.selectedElement.startsWith('shape_')) {
           const shapeId = this.selectedElement.replace('shape_', '');
           const shape = this.config.shapes?.find(s => s.id === shapeId);
