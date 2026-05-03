@@ -539,7 +539,8 @@ class BackgroundEditor {
   _redrawAll(ctx) {
     const bg = this.bg;
     if (!bg) return;
-    const cfg = bg.cfg;
+    // 用编辑器的config（不是渲染器的cfg），确保读到最新值
+    const cfg = this.config;
     const order = cfg.layerOrder || [];
     const shapes = cfg.shapes || [];
     const groups = cfg.groups || [];
@@ -551,7 +552,7 @@ class BackgroundEditor {
       }
       if (id.startsWith('group_')) {
         const group = groups.find(g => g.id === id);
-        if (group) bg.drawGroupDirect(ctx, group);
+        if (group) bg.drawGroupDirect(ctx, group, shapes);
       } else if (id.startsWith('shape_')) {
         const sid = id.replace('shape_', '');
         const s = shapes.find(sh => sh.id === sid);

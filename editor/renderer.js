@@ -1612,18 +1612,19 @@ class EditableDynamicBG {
   }
 
   // 虚拟点组渲染：创建临时副本绘制，不动原始形状
-  drawGroupDirect(ctx, group) {
+  drawGroupDirect(ctx, group, shapesOverride) {
     const gw = this.w, gh = this.h;
     const gcx = (group.x || 0.5) * gw;
     const gcy = (group.y || 0.5) * gh;
     const gr = (group.rotation || 0) * Math.PI / 180;
     const gs = group.scale || 1;
     const cos = Math.cos(gr), sin = Math.sin(gr);
+    const shapes = shapesOverride || this.cfg.shapes || [];
     console.log(`[GDD] group.x:${group.x?.toFixed(4)} gcx:${Math.round(gcx)} id:${group.id}`);
 
     for (const childId of group.children) {
       const sid = childId.replace('shape_', '');
-      const orig = (this.cfg.shapes || []).find(sh => sh.id === sid);
+      const orig = shapes.find(sh => sh.id === sid);
       if (!orig || orig.visible === false) continue;
 
       // 计算变换后位置
