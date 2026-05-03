@@ -1932,10 +1932,8 @@ class BackgroundEditor {
           .filter(s => s && s.visible !== false && !s.locked);
 
         if (multiShapes.length > 1) {
-          // 多选：绘制多选变换控制器（绿色大框）
           this.bg.drawGroupTransform(this.ctx, multiShapes);
         } else if (this.selectedElement && this.selectedElement.startsWith('group_')) {
-          // 组选中：绘制组变换控制器（绿色大框，基于组中心变换）
           const allGroups = this.config.groups || [];
           const group = allGroups.find(g => g.id === this.selectedElement);
           if (group) {
@@ -1943,19 +1941,15 @@ class BackgroundEditor {
               .map(id => this.config.shapes?.find(s => s.id === id.replace('shape_', '')))
               .filter(s => s && s.visible !== false && !s.locked);
             if (children.length > 0) {
-              const bounds = this.bg.getGroupBounds(children);
-              console.log('[组渲染] children:', children.length, 'bounds:', bounds, 'selectedElement:', this.selectedElement);
-              if (bounds.width > 0 || bounds.height > 0) {
-                this.bg.drawGroupTransform(this.ctx, children);
-              } else {
-                console.warn('[组渲染] bounds为0，跳过绘制');
-              }
-            } else {
-              console.warn('[组渲染] 组找到但无有效子元素:', this.selectedElement, 'children:', group.children, 'shapes count:', this.config.shapes?.length);
+              this.bg.drawGroupTransform(this.ctx, children);
             }
-          } else {
-            console.warn('[组渲染] 未找到组:', this.selectedElement, 'groups:', allGroups.map(g => g.id));
           }
+          // 调试：画布左上角显示组信息
+          this.ctx.save();
+          this.ctx.fillStyle = '#ff0';
+          this.ctx.font = '14px monospace';
+          this.ctx.fillText(`selected:${this.selectedElement} groups:${allGroups.length} g:${group?.id||'none'} ch:${group?.children?.length||0}`, 10, 20);
+          this.ctx.restore();
         } else if (this.selectedElement && this.selectedElement.startsWith('shape_')) {
           const shapeId = this.selectedElement.replace('shape_', '');
           const shape = this.config.shapes?.find(s => s.id === shapeId);
