@@ -545,7 +545,7 @@ class BackgroundEditor {
       }
     }
 
-    this.rebuild();
+    this.markDirty();
   }
 
   _getCursorForHandle(handle) {
@@ -1918,6 +1918,19 @@ class BackgroundEditor {
         this.bg.update(dt);
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
         this.bg.draw(this.ctx);
+
+        // 组变换进行中时，直接重绘组内元素（绕过静态画布缓存）
+        if (this.transformState && this.transformState.isGroupTransform) {
+          const tsGroup = (this.config.groups || []).find(g => g.id === this.selectedElement);
+          if (tsGroup) {
+            const tsChildren = tsGroup.children
+              .map(id => this.config.shapes?.find(s => s.id === id.replace('shape_', '')))
+              .filter(s => s && s.visible !== false);
+            for (const s of tsChildren) {
+              this.bg._drawSingleShape(this.ctx, s, false);
+            }
+          }
+        }
 
         // 绘制网格和参考线
         if (this.canvasManager) {
