@@ -528,9 +528,7 @@ class BackgroundEditor {
             const rx = spx - gcx, ry = spy - gcy;
             const newX = (gcx + rx * cos - ry * sin) / w;
             const newY = (gcy + rx * sin + ry * cos) / h;
-            if (this._lastRotLog !== Math.round(deg)) {
-              console.log(`[旋转] ${shape.type} sp:(${sp.x.toFixed(3)},${sp.y.toFixed(3)}) -> (${newX.toFixed(3)},${newY.toFixed(3)})`);
-            }
+            console.log(`[旋转] ${shape.type} sp:(${sp.x.toFixed(3)},${sp.y.toFixed(3)}) -> (${newX.toFixed(3)},${newY.toFixed(3)})`);
             shape.x = Math.max(0, Math.min(1, newX));
             shape.y = Math.max(0, Math.min(1, newY));
           } else if (shape.points && sp.points) {
