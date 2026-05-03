@@ -213,6 +213,32 @@ class BackgroundEditor {
       }
     }
 
+    // 组变换控制器检查（选中组时，基于组中心变换）
+    if (this.selectedElement && this.selectedElement.startsWith('group_') && this.bg) {
+      const group = (this.config.groups || []).find(g => g.id === this.selectedElement);
+      if (group) {
+        const children = group.children
+          .map(id => this.config.shapes?.find(s => s.id === id.replace('shape_', '')))
+          .filter(s => s && s.visible !== false && !s.locked);
+        if (children.length > 0) {
+          const groupHandle = this.bg.getGroupTransformHandle(x, y, children);
+          if (groupHandle) {
+            const groupBounds = this.bg.getGroupBounds(children);
+            this.transformState = {
+              mode: groupHandle,
+              isGroupTransform: true,
+              startX: x,
+              startY: y,
+              groupBounds: { ...groupBounds },
+              startPropsMap: new Map(children.map(s => [s.id, { ...s }]))
+            };
+            this.canvas.style.cursor = this._getCursorForHandle(groupHandle);
+            return;
+          }
+        }
+      }
+    }
+
     // 检查是否点击了选中元素的 Transform 手柄
     if (this.selectedElement && this.selectedElement.startsWith('shape_') && this.bg) {
       const shapeId = this.selectedElement.replace('shape_', '');
@@ -293,25 +319,31 @@ class BackgroundEditor {
         }
         return true;
       });
-      
+
+      // 如果点击的元素属于某个组，选中该组
+      let targetType = unlockedHit?.type || null;
+      if (targetType && targetType.startsWith('shape_')) {
+        const shapeId = targetType.replace('shape_', '');
+        const parentGroup = (this.config.groups || []).find(g => g.children.includes(targetType));
+        if (parentGroup) targetType = parentGroup.id;
+      }
+
       // Shift+点击：多选/取消选择
-      if (e.shiftKey && unlockedHit && unlockedHit.type.startsWith('shape_')) {
-        const idx = this.selectedElements.indexOf(unlockedHit.type);
+      if (e.shiftKey && targetType && targetType.startsWith('shape_')) {
+        const idx = this.selectedElements.indexOf(targetType);
         if (idx >= 0) {
-          // 已选中，取消选择
           this.selectedElements.splice(idx, 1);
-          if (this.selectedElement === unlockedHit.type) {
+          if (this.selectedElement === targetType) {
             this.selectedElement = this.selectedElements[0] || null;
           }
         } else {
-          // 未选中，添加到选择
-          this.selectedElements.push(unlockedHit.type);
-          this.selectedElement = unlockedHit.type;
+          this.selectedElements.push(targetType);
+          this.selectedElement = targetType;
         }
         this.updateUI();
         this.updatePropertyPanel();
-      } else if (unlockedHit) {
-        this.selectElement(unlockedHit.type);
+      } else if (targetType) {
+        this.selectElement(targetType);
       } else {
         this.selectElement(null);
       }
@@ -343,7 +375,7 @@ class BackgroundEditor {
     ]);
   }
 
-  // 多选变换处理：整体平移 + 基于各自中心的缩放/旋转
+  // 多选/组变换处理
   _handleGroupTransform(x, y) {
     const ts = this.transformState;
     const dx = x - ts.startX;
@@ -351,9 +383,10 @@ class BackgroundEditor {
     const w = this.canvas.width, h = this.canvas.height;
     const gb = ts.groupBounds;
     const map = ts.startPropsMap;
+    const fromCenter = ts.isGroupTransform === true; // 组模式：基于组中心
 
     if (ts.mode === 'move') {
-      // 整体平移：每个元素偏移相同量
+      // 整体平移
       for (const [id, sp] of map) {
         const shape = this.config.shapes.find(s => s.id === id);
         if (!shape) continue;
@@ -369,73 +402,124 @@ class BackgroundEditor {
         }
       }
     } else if (ts.mode.startsWith('resize-')) {
-      // 基于各自中心的缩放
       const dir = ts.mode.replace('resize-', '');
       const gcx = gb.x + gb.width / 2, gcy = gb.y + gb.height / 2;
 
+      // 缩放因子
+      let sx = 1, sy = 1;
+      if (dir.includes('e')) sx = (gb.width + dx) / gb.width;
+      if (dir.includes('w')) sx = (gb.width - dx) / gb.width;
+      if (dir.includes('s')) sy = (gb.height + dy) / gb.height;
+      if (dir.includes('n')) sy = (gb.height - dy) / gb.height;
+      sx = Math.max(0.1, Math.min(3, sx));
+      sy = Math.max(0.1, Math.min(3, sy));
+
       for (const [id, sp] of map) {
         const shape = this.config.shapes.find(s => s.id === id);
         if (!shape) continue;
-        const bounds = this.bg.getShapeBounds(sp);
-        if (bounds.width <= 0 && bounds.height <= 0) continue;
-        const bcx = bounds.x + bounds.width / 2;
-        const bcy = bounds.y + bounds.height / 2;
 
-        // 该元素中心相对于组中心的偏移比例
-        const relX = gb.width > 0 ? (bcx - gcx) / gb.width : 0;
-        const relY = gb.height > 0 ? (bcy - gcy) / gb.height : 0;
-
-        // 缩放因子
-        let sx = 1, sy = 1;
-        if (dir.includes('e')) sx = (gb.width + dx) / gb.width;
-        if (dir.includes('w')) sx = (gb.width - dx) / gb.width;
-        if (dir.includes('s')) sy = (gb.height + dy) / gb.height;
-        if (dir.includes('n')) sy = (gb.height - dy) / gb.height;
-        sx = Math.max(0.1, Math.min(3, sx));
-        sy = Math.max(0.1, Math.min(3, sy));
-
-        if (shape.type === 'rectangle' || shape.type === 'circle' || shape.type === 'polygon' || shape.type === 'particles') {
-          // 位置：组中心 + 相对偏移 × 缩放
-          const newX = gcx / w + relX * sx * gb.width / w;
-          const newY = gcy / h + relY * sy * gb.height / h;
-          shape.x = Math.max(0, Math.min(1, newX));
-          shape.y = Math.max(0, Math.min(1, newY));
-          // 尺寸缩放
-          if (shape.type === 'rectangle') {
-            shape.width = Math.max(0.01, sp.width * sx);
-            shape.height = Math.max(0.01, sp.height * sy);
-          } else if (shape.type === 'circle') {
-            if (sp.radiusX !== undefined) shape.radiusX = Math.max(0.01, sp.radiusX * sx);
-            if (sp.radiusY !== undefined) shape.radiusY = Math.max(0.01, sp.radiusY * sy);
-            if (sp.radius !== undefined) shape.radius = Math.max(0.01, sp.radius * Math.max(sx, sy));
-          } else if (shape.type === 'polygon') {
-            shape.radius = Math.max(0.01, sp.radius * Math.max(sx, sy));
-          } else if (shape.type === 'particles') {
-            shape.spread = Math.max(0.01, sp.spread * Math.max(sx, sy));
+        if (fromCenter) {
+          // 组模式：所有元素基于组中心缩放
+          if (shape.type === 'rectangle' || shape.type === 'circle' || shape.type === 'polygon' || shape.type === 'particles') {
+            const spx = sp.x * w, spy = sp.y * h;
+            const newPx = gcx + (spx - gcx) * sx;
+            const newPy = gcy + (spy - gcy) * sy;
+            shape.x = Math.max(0, Math.min(1, newPx / w));
+            shape.y = Math.max(0, Math.min(1, newPy / h));
+            if (shape.type === 'rectangle') {
+              shape.width = Math.max(0.01, sp.width * sx);
+              shape.height = Math.max(0.01, sp.height * sy);
+            } else if (shape.type === 'circle') {
+              if (sp.radiusX !== undefined) shape.radiusX = Math.max(0.01, sp.radiusX * sx);
+              if (sp.radiusY !== undefined) shape.radiusY = Math.max(0.01, sp.radiusY * sy);
+              if (sp.radius !== undefined) shape.radius = Math.max(0.01, sp.radius * Math.max(sx, sy));
+            } else if (shape.type === 'polygon') {
+              shape.radius = Math.max(0.01, sp.radius * Math.max(sx, sy));
+            } else if (shape.type === 'particles') {
+              shape.spread = Math.max(0.01, sp.spread * Math.max(sx, sy));
+            }
+          } else if (shape.points && sp.points) {
+            shape.points = sp.points.map(p => {
+              const px = p[0] * w, py = p[1] * h;
+              return [
+                Math.max(0, Math.min(1, (gcx + (px - gcx) * sx) / w)),
+                Math.max(0, Math.min(1, (gcy + (py - gcy) * sy) / h))
+              ];
+            });
           }
-        } else if (shape.points && sp.points) {
-          // 折线/曲线：基于各自中心缩放
-          const pts = sp.points.map(p => ({ x: p[0], y: p[1] }));
-          const xs = pts.map(p => p.x), ys = pts.map(p => p.y);
-          const cx = (Math.min(...xs) + Math.max(...xs)) / 2;
-          const cy = (Math.min(...ys) + Math.max(...ys)) / 2;
-          shape.points = sp.points.map(p => [
-            Math.max(0, Math.min(1, cx + (p[0] - cx) * sx)),
-            Math.max(0, Math.min(1, cy + (p[1] - cy) * sy))
-          ]);
+        } else {
+          // 多选模式：每个元素基于自身中心缩放
+          const bounds = this.bg.getShapeBounds(sp);
+          if (bounds.width <= 0 && bounds.height <= 0) continue;
+          const bcx = bounds.x + bounds.width / 2;
+          const bcy = bounds.y + bounds.height / 2;
+          const relX = gb.width > 0 ? (bcx - gcx) / gb.width : 0;
+          const relY = gb.height > 0 ? (bcy - gcy) / gb.height : 0;
+
+          if (shape.type === 'rectangle' || shape.type === 'circle' || shape.type === 'polygon' || shape.type === 'particles') {
+            const newX = gcx / w + relX * sx * gb.width / w;
+            const newY = gcy / h + relY * sy * gb.height / h;
+            shape.x = Math.max(0, Math.min(1, newX));
+            shape.y = Math.max(0, Math.min(1, newY));
+            if (shape.type === 'rectangle') {
+              shape.width = Math.max(0.01, sp.width * sx);
+              shape.height = Math.max(0.01, sp.height * sy);
+            } else if (shape.type === 'circle') {
+              if (sp.radiusX !== undefined) shape.radiusX = Math.max(0.01, sp.radiusX * sx);
+              if (sp.radiusY !== undefined) shape.radiusY = Math.max(0.01, sp.radiusY * sy);
+              if (sp.radius !== undefined) shape.radius = Math.max(0.01, sp.radius * Math.max(sx, sy));
+            } else if (shape.type === 'polygon') {
+              shape.radius = Math.max(0.01, sp.radius * Math.max(sx, sy));
+            } else if (shape.type === 'particles') {
+              shape.spread = Math.max(0.01, sp.spread * Math.max(sx, sy));
+            }
+          } else if (shape.points && sp.points) {
+            const pts = sp.points.map(p => ({ x: p[0], y: p[1] }));
+            const xs = pts.map(p => p.x), ys = pts.map(p => p.y);
+            const cx = (Math.min(...xs) + Math.max(...xs)) / 2;
+            const cy = (Math.min(...ys) + Math.max(...ys)) / 2;
+            shape.points = sp.points.map(p => [
+              Math.max(0, Math.min(1, cx + (p[0] - cx) * sx)),
+              Math.max(0, Math.min(1, cy + (p[1] - cy) * sy))
+            ]);
+          }
         }
       }
     } else if (ts.mode === 'rotate') {
-      // 基于各自中心的旋转
       const gcx = gb.x + gb.width / 2, gcy = gb.y + gb.height / 2;
       const angle = Math.atan2(y - gcy, x - gcx) - Math.atan2(ts.startY - gcy, ts.startX - gcx);
       const deg = angle * 180 / Math.PI;
+      const cos = Math.cos(angle), sin = Math.sin(angle);
 
       for (const [id, sp] of map) {
         const shape = this.config.shapes.find(s => s.id === id);
         if (!shape) continue;
-        if (sp.rotation !== undefined) {
-          shape.rotation = (sp.rotation + deg) % 360;
+
+        if (fromCenter) {
+          // 组模式：围绕组中心旋转位置 + 自身旋转
+          if (shape.type === 'rectangle' || shape.type === 'circle' || shape.type === 'polygon' || shape.type === 'particles') {
+            const spx = sp.x * w, spy = sp.y * h;
+            const rx = spx - gcx, ry = spy - gcy;
+            shape.x = Math.max(0, Math.min(1, (gcx + rx * cos - ry * sin) / w));
+            shape.y = Math.max(0, Math.min(1, (gcy + rx * sin + ry * cos) / h));
+          } else if (shape.points && sp.points) {
+            shape.points = sp.points.map(p => {
+              const px = p[0] * w, py = p[1] * h;
+              const rx = px - gcx, ry = py - gcy;
+              return [
+                Math.max(0, Math.min(1, (gcx + rx * cos - ry * sin) / w)),
+                Math.max(0, Math.min(1, (gcy + rx * sin + ry * cos) / h))
+              ];
+            });
+          }
+          if (sp.rotation !== undefined) {
+            shape.rotation = (sp.rotation + deg) % 360;
+          }
+        } else {
+          // 多选模式：每个元素基于自身中心旋转
+          if (sp.rotation !== undefined) {
+            shape.rotation = (sp.rotation + deg) % 360;
+          }
         }
       }
     }
@@ -531,6 +615,21 @@ class BackgroundEditor {
         const gh = this.bg.getGroupTransformHandle(x, y, gShapes);
         this.canvas.style.cursor = gh ? this._getCursorForHandle(gh) : 'default';
         if (gh) return;
+      }
+    }
+
+    // 更新鼠标样式（组变换控制器）
+    if (!this.transformState && this.selectedElement && this.selectedElement.startsWith('group_') && this.bg) {
+      const group = (this.config.groups || []).find(g => g.id === this.selectedElement);
+      if (group) {
+        const children = group.children
+          .map(id => this.config.shapes?.find(s => s.id === id.replace('shape_', '')))
+          .filter(s => s && s.visible !== false && !s.locked);
+        if (children.length > 0) {
+          const gh = this.bg.getGroupTransformHandle(x, y, children);
+          this.canvas.style.cursor = gh ? this._getCursorForHandle(gh) : 'default';
+          if (gh) return;
+        }
       }
     }
 
@@ -1814,6 +1913,17 @@ class BackgroundEditor {
         if (multiShapes.length > 1) {
           // 多选：绘制多选变换控制器（绿色大框）
           this.bg.drawGroupTransform(this.ctx, multiShapes);
+        } else if (this.selectedElement && this.selectedElement.startsWith('group_')) {
+          // 组选中：绘制组变换控制器（绿色大框，基于组中心变换）
+          const group = (this.config.groups || []).find(g => g.id === this.selectedElement);
+          if (group) {
+            const children = group.children
+              .map(id => this.config.shapes?.find(s => s.id === id.replace('shape_', '')))
+              .filter(s => s && s.visible !== false && !s.locked);
+            if (children.length > 0) {
+              this.bg.drawGroupTransform(this.ctx, children);
+            }
+          }
         } else if (this.selectedElement && this.selectedElement.startsWith('shape_')) {
           const shapeId = this.selectedElement.replace('shape_', '');
           const shape = this.config.shapes?.find(s => s.id === shapeId);

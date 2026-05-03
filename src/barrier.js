@@ -254,6 +254,8 @@ export function generateBarriers(zoneManager) {
 
         // 只在有门条件的区域边界创建 Barrier
         if (next.gateType === GATE_TYPE.NONE) continue;
+        // Phase E: 已通关区域的 Barrier 跳过（自动开启）
+        if (next.status === 'completed') continue;
 
         // 计算两个区域之间的边界位置
         let bx, by, bw, bh;

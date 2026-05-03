@@ -142,6 +142,47 @@ export class ZoneManager {
         this.killCount = 0;      // 总击杀数（用于击杀门条件）
         this.visitedZones = new Set([1]);
         this.completedZones = new Set();
+        // Phase E: 区域实体懒加载
+        this.zoneEntityCache = new Map();  // zoneId -> {foods: [], enemies: []} 暂存离区实体
+        this.activeZoneIds = new Set([1]);  // 当前活跃区域（玩家+相邻）
+        this.revisitRewards = new Set();  // 已领取回访奖励的区域
+        this.totalScore = 0;
+        this.maxLengthReached = 0;
+    }
+
+    /**
+     * 获取活跃区域集合（玩家所在+相邻8格）
+     * Phase E: 懒加载核心
+     */
+    getActiveZoneIds(playerX, playerY) {
+        const col = Math.floor(playerX / 800);
+        const row = Math.floor(playerY / 600);
+        const active = new Set();
+        for (let dc = -1; dc <= 1; dc++) {
+            for (let dr = -1; dr <= 1; dr++) {
+                const c = col + dc;
+                const r = row + dr;
+                if (c >= 0 && c <= 4 && r >= 0 && r <= 4) {
+                    // 找到对应区域id
+                    for (const zone of this.zones) {
+                        if (zone.col === c && zone.row === r) {
+                            active.add(zone.id);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        return active;
+    }
+
+    /**
+     * 检查实体是否在活跃区域内
+     */
+    isActive(entity, activeIds) {
+        if (!entity.pos) return true;  // 无位置信息的默认活跃
+        const zone = this.getZoneAt(entity.pos.x, entity.pos.y);
+        return zone ? activeIds.has(zone.id) : true;
     }
 
     /**

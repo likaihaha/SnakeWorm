@@ -713,6 +713,10 @@ export class Game {
             new FamilyGate(3200, 600, 3, '家族门·进阶'),
         ];
 
+        // Phase E: 重新生成 Barrier（反映已解锁区域），清理实体缓存
+        this.barriers = generateBarriers(this.zoneManager);
+        this.zoneManager.zoneEntityCache.clear();
+
         document.getElementById('gameOver').style.display = 'none';
         this.updateUI();
     }
@@ -1211,11 +1215,22 @@ export class Game {
             gate.update(dt, this.worms);
         }
         
-        // 8.7 Phase A+D: 更新区域系统 + 通关检测
+        // 8.7 Phase A+D+E: 更新区域系统 + 通关检测 + 懒加载
         if (player && player.isAlive) {
+            const prevZoneId = this.zoneManager.currentZoneId;
             this.zoneManager.getCurrentZone(player);
+            const newZoneId = this.zoneManager.currentZoneId;
+
+            // Phase E: 区域切换时暂存/恢复实体
+            if (prevZoneId !== newZoneId) {
+                this._handleZoneTransition(prevZoneId, newZoneId, player);
+            }
+
+            // Phase E: 检查回访奖励
+            this._checkRevisitReward(player);
+
             // Phase D: 检查当前区域是否通关
-            const completionResult = this.zoneManager.checkZoneCompletion(this.zoneManager.currentZoneId, {
+            const completionResult = this.zoneManager.checkZoneCompletion(newZoneId, {
                 enemies: this.enemies,
                 gameTime: this.gameTime,
                 score: this.score,
@@ -1224,16 +1239,16 @@ export class Game {
                 adultCount: this.worms.filter(w => w.isAlive && w.isAdult).length,
             });
             if (completionResult.completed) {
-                this.zoneManager.completeZone(this.zoneManager.currentZoneId);
+                this.zoneManager.completeZone(newZoneId);
                 // 通关提示
                 const cx = player.head ? player.head.x : 400;
                 const cy = player.head ? player.head.y : 2800;
-                this.floatingTexts.push(FloatingText.acquire(cx, cy - 40, `✅ 区域 ${this.zoneManager.currentZoneId} 通关！`, '#44ff44'));
+                this.floatingTexts.push(FloatingText.acquire(cx, cy - 40, `✅ 区域 ${newZoneId} 通关！`, '#44ff44'));
                 // 通关粒子
                 for (let k = 0; k < 15; k++) {
                     this.particles.push(Particle.acquire(cx, cy, '#44ff44'));
                 }
-                this.debugLogger.logZoneComplete(this.zoneManager.currentZoneId, completionResult.reason, this.gameTime);
+                this.debugLogger.logZoneComplete(newZoneId, completionResult.reason, this.gameTime);
             }
             // 定期保存进度（每10秒）
             if (Math.floor(this.gameTime) % 10 === 0 && Math.floor(this.gameTime) !== Math.floor(this.gameTime - dt)) {
@@ -2120,6 +2135,88 @@ export class Game {
         // 检测幼体吃尾巴
         this.checkJuvenileEatBrokenTails();
         this.checkJuvenileEatShrinkingSegments();
+    }
+
+    /**
+     * Phase E: 区域切换处理 — 暂存旧区域实体，恢复新区域实体
+     */
+    _handleZoneTransition(fromZoneId, toZoneId, player) {
+        const zm = this.zoneManager;
+        // 暂存离开区域的食物和敌人
+        const fromZone = zm.zones[fromZoneId - 1];
+        if (fromZone) {
+            const storedFoods = [];
+            let w = 0;
+            for (let i = 0; i < this.foods.length; i++) {
+                const food = this.foods[i];
+                if (food.pos.x >= fromZone.x && food.pos.x <= fromZone.x + fromZone.width &&
+                    food.pos.y >= fromZone.y && food.pos.y <= fromZone.y + fromZone.height) {
+                    storedFoods.push(food);
+                } else {
+                    this.foods[w++] = food;
+                }
+            }
+            this.foods.length = w;
+
+            const storedEnemies = [];
+            w = 0;
+            for (let i = 0; i < this.enemies.length; i++) {
+                const enemy = this.enemies[i];
+                if (enemy.homeZone && enemy.homeZone.x === fromZone.x && enemy.homeZone.y === fromZone.y &&
+                    enemy.isAlive && !enemy.isDying) {
+                    storedEnemies.push(enemy);
+                } else {
+                    this.enemies[w++] = enemy;
+                }
+            }
+            this.enemies.length = w;
+
+            if (storedFoods.length > 0 || storedEnemies.length > 0) {
+                zm.zoneEntityCache.set(fromZoneId, { foods: storedFoods, enemies: storedEnemies });
+            }
+        }
+
+        // 恢复目标区域的缓存实体
+        const toZone = zm.zones[toZoneId - 1];
+        if (toZone) {
+            const cached = zm.zoneEntityCache.get(toZoneId);
+            if (cached) {
+                for (const food of cached.foods) this.foods.push(food);
+                for (const enemy of cached.enemies) this.enemies.push(enemy);
+                zm.zoneEntityCache.delete(toZoneId);
+                this.debugLogger._log('ZONE_ENTER', `进入区域 ${toZoneId} (恢复 ${cached.foods.length} 宝珠, ${cached.enemies.length} 敌人)`, {}, this.gameTime);
+            } else {
+                this.debugLogger._log('ZONE_ENTER', `进入区域 ${toZoneId}`, {}, this.gameTime);
+            }
+        }
+    }
+
+    /**
+     * Phase E: 检查回访已通关区域的隐藏奖励
+     */
+    _checkRevisitReward(player) {
+        const zm = this.zoneManager;
+        const zoneId = zm.currentZoneId;
+        const zone = zm.zones[zoneId - 1];
+        if (!zone || zone.status !== 'completed') return;
+        if (zm.revisitRewards.has(zoneId)) return;
+
+        // 首次回访已通关区域 → 给隐藏奖励
+        zm.revisitRewards.add(zoneId);
+        const cx = player.head ? player.head.x : 400;
+        const cy = player.head ? player.head.y : 2800;
+        // 生成3个高级宝珠作为奖励
+        const rewardTypes = CONFIG.FOOD_TYPES.filter(t => t.score >= 30 && t.score <= 120);
+        for (let i = 0; i < 3; i++) {
+            const rType = rewardTypes[i % rewardTypes.length];
+            const reward = Food.inZone(zone, rType);
+            this.foods.push(reward);
+        }
+        this.floatingTexts.push(FloatingText.acquire(cx, cy - 50, '🎁 回访奖励！', '#ffd700'));
+        for (let k = 0; k < 20; k++) {
+            this.particles.push(Particle.acquire(cx + (Math.random() - 0.5) * 60, cy + (Math.random() - 0.5) * 60, '#ffd700'));
+        }
+        this.debugLogger._log('REVISIT_REWARD', `🎁 区域 ${zoneId} 回访奖励`, {}, this.gameTime);
     }
 
     // 生成敌人（Phase C: 区域化生成）
