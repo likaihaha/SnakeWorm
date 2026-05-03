@@ -328,6 +328,23 @@ class BackgroundEditor {
         if (parentGroup) targetType = parentGroup.id;
       }
 
+      // 如果没命中形状，检查是否点击在某个组的包围框内
+      if ((!targetType || targetType === 'background') && this.bg) {
+        for (const group of (this.config.groups || [])) {
+          const children = group.children
+            .map(id => this.config.shapes?.find(s => s.id === id.replace('shape_', '')))
+            .filter(s => s && s.visible !== false && !s.locked);
+          if (children.length > 0) {
+            const bounds = this.bg.getGroupBounds(children);
+            if (x >= bounds.x && x <= bounds.x + bounds.width &&
+                y >= bounds.y && y <= bounds.y + bounds.height) {
+              targetType = group.id;
+              break;
+            }
+          }
+        }
+      }
+
       // Shift+点击：多选/取消选择
       if (e.shiftKey && targetType && targetType.startsWith('shape_')) {
         const idx = this.selectedElements.indexOf(targetType);
