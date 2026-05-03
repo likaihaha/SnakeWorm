@@ -235,7 +235,11 @@ class BackgroundEditor {
             this.canvas.style.cursor = this._getCursorForHandle(groupHandle);
             return;
           }
+        } else {
+          console.warn('[组交互] 组找到但无有效子元素:', this.selectedElement);
         }
+      } else {
+        console.warn('[组交互] 未找到组:', this.selectedElement, 'groups:', (this.config.groups || []).map(g => g.id));
       }
     }
 
@@ -1932,14 +1936,19 @@ class BackgroundEditor {
           this.bg.drawGroupTransform(this.ctx, multiShapes);
         } else if (this.selectedElement && this.selectedElement.startsWith('group_')) {
           // 组选中：绘制组变换控制器（绿色大框，基于组中心变换）
-          const group = (this.config.groups || []).find(g => g.id === this.selectedElement);
+          const allGroups = this.config.groups || [];
+          const group = allGroups.find(g => g.id === this.selectedElement);
           if (group) {
             const children = group.children
               .map(id => this.config.shapes?.find(s => s.id === id.replace('shape_', '')))
               .filter(s => s && s.visible !== false && !s.locked);
             if (children.length > 0) {
               this.bg.drawGroupTransform(this.ctx, children);
+            } else {
+              console.warn('[组渲染] 组找到但无有效子元素:', this.selectedElement, 'children:', group.children, 'shapes count:', this.config.shapes?.length);
             }
+          } else {
+            console.warn('[组渲染] 未找到组:', this.selectedElement, 'groups:', allGroups.map(g => g.id));
           }
         } else if (this.selectedElement && this.selectedElement.startsWith('shape_')) {
           const shapeId = this.selectedElement.replace('shape_', '');
