@@ -2146,6 +2146,7 @@ export class Game {
      * 绘制波纹特效（在世界坐标中绘制）
      */
     drawRipples() {
+        const ctx = this.canvas.getContext('2d');
         for (const r of this.ripples) {
             ctx.save();
             ctx.beginPath();
@@ -2943,6 +2944,7 @@ export class Game {
     }
 
     draw() {
+        const ctx = this.canvas.getContext('2d');
         // 更新相机跟随玩家头部（或demo模式下跟随第一个虫虫）
         const player = this.worms[0];
         const camDt = this._lastDt || 0.016; // dt来自update()
@@ -3077,6 +3079,7 @@ export class Game {
     }
 
     drawGrid() {
+        const ctx = this.canvas.getContext('2d');
         // 在可见视口范围内平铺网格瓦片
         const size = this.gridTileSize;
         const startX = Math.floor(this.camera.x / size) * size;
@@ -3097,6 +3100,7 @@ export class Game {
      * 绘制地图边界指示（虚线，非红色边框）
      */
     drawMapBorder() {
+        const ctx = this.canvas.getContext('2d');
         ctx.save();
         ctx.setLineDash([20, 15]);
         ctx.strokeStyle = 'rgba(78, 204, 163, 0.15)';
@@ -3108,6 +3112,7 @@ export class Game {
     }
 
     drawFPS() {
+        const ctx = this.canvas.getContext('2d');
         ctx.save();
         ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
         ctx.fillRect(5, 5, 60, 20);
@@ -3122,6 +3127,7 @@ export class Game {
      * 绘制胜利画面
      */
     drawVictoryScreen() {
+        const ctx = this.canvas.getContext('2d');
         const W = CONFIG.CANVAS_WIDTH;
         const H = CONFIG.CANVAS_HEIGHT;
         const cx = W / 2;
