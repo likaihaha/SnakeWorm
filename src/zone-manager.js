@@ -230,6 +230,72 @@ export class ZoneManager {
     }
 
     /**
+     * 检查当前区域是否满足通关条件（Phase D）
+     * @param {number} zoneId - 当前区域ID
+     * @param {object} ctx - 上下文 {enemies, gameTime, score, playerLength}
+     * @returns {{completed: boolean, reason: string}}
+     */
+    checkZoneCompletion(zoneId, ctx) {
+        const zone = this.zones[zoneId - 1];
+        if (!zone || zone.status === ZONE_STATUS.COMPLETED) return { completed: false, reason: '' };
+
+        // 安全区自动通关（停留3秒后）
+        if (zone.zoneType === ZONE_TYPE.SAFE) {
+            if (ctx.gameTime > 3) {
+                return { completed: true, reason: '安全区 — 自动通过' };
+            }
+            return { completed: false, reason: '' };
+        }
+
+        // Boss 关卡：清除所有敌人
+        if (zone.zoneType === ZONE_TYPE.BOSS) {
+            const enemiesInZone = (ctx.enemies || []).filter(e => {
+                if (!e.isAlive || e.isDying) return false;
+                if (e.homeZone) return e.homeZone.x === zone.x && e.homeZone.y === zone.y;
+                return e.pos.x >= zone.x && e.pos.x <= zone.x + zone.width &&
+                       e.pos.y >= zone.y && e.pos.y <= zone.y + zone.height;
+            });
+            if (enemiesInZone.length === 0 && ctx.gameTime > 5) {
+                return { completed: true, reason: 'Boss 击败！' };
+            }
+            return { completed: false, reason: `剩余敌人: ${enemiesInZone.length}` };
+        }
+
+        // 门条件区域：通过 Barrier 条件即算通关
+        if (zone.gateType !== GATE_TYPE.NONE) {
+            const playerState = {
+                score: ctx.score || 0,
+                length: ctx.playerLength || 0,
+                juvenileCount: ctx.juvenileCount || 0,
+                adultCount: ctx.adultCount || 0,
+                killCount: this.killCount,
+            };
+            const check = this.canEnterNextZone(zoneId - 1, playerState);
+            if (check.canEnter) {
+                return { completed: true, reason: check.reason };
+            }
+            return { completed: false, reason: check.reason };
+        }
+
+        // 普通区域：区域内无敌人生存的敌人即通关
+        const enemiesInZone = (ctx.enemies || []).filter(e => {
+            if (!e.isAlive || e.isDying) return false;
+            if (e.homeZone) return e.homeZone.x === zone.x && e.homeZone.y === zone.y;
+            return e.pos.x >= zone.x && e.pos.x <= zone.x + zone.width &&
+                   e.pos.y >= zone.y && e.pos.y <= zone.y + zone.height;
+        });
+        // 战斗层和技巧层需要清除敌人
+        if (zone.enemyMultiplier >= 1.0 && enemiesInZone.length > 0) {
+            return { completed: false, reason: `剩余敌人: ${enemiesInZone.length}` };
+        }
+        // 基础层和策略层：存在即通关（无敌人或敌人已清除）
+        if (zone.enemyMultiplier < 1.0 || enemiesInZone.length === 0) {
+            return { completed: true, reason: '区域探索完成' };
+        }
+        return { completed: false, reason: '' };
+    }
+
+    /**
      * 记录击杀
      */
     recordKill() {
@@ -309,7 +375,7 @@ export class ZoneManager {
     }
 
     /**
-     * 保存进度到 localStorage
+     * 保存进度到 localStorage（Phase D: 扩展存储）
      */
     saveProgress() {
         try {
@@ -319,13 +385,15 @@ export class ZoneManager {
                 visitedZones: [...this.visitedZones],
                 completedZones: [...this.completedZones],
                 zoneStatuses: this.zones.map(z => z.status),
+                totalScore: this.totalScore || 0,
+                maxLengthReached: this.maxLengthReached || 0,
             };
             localStorage.setItem('snakeworm_zones', JSON.stringify(data));
         } catch (e) { /* 忽略存储错误 */ }
     }
 
     /**
-     * 从 localStorage 恢复进度
+     * 从 localStorage 恢复进度（Phase D: 扩展存储）
      */
     loadProgress() {
         try {
@@ -336,6 +404,8 @@ export class ZoneManager {
             this.killCount = data.killCount || 0;
             this.visitedZones = new Set(data.visitedZones || [1]);
             this.completedZones = new Set(data.completedZones || []);
+            this.totalScore = data.totalScore || 0;
+            this.maxLengthReached = data.maxLengthReached || 0;
             if (data.zoneStatuses) {
                 for (let i = 0; i < Math.min(this.zones.length, data.zoneStatuses.length); i++) {
                     this.zones[i].status = data.zoneStatuses[i];

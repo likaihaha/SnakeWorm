@@ -356,6 +356,16 @@ export class DebugLogger {
         }, gameTime);
     }
 
+    /**
+     * 区域通关
+     */
+    logZoneComplete(zoneId, reason, gameTime) {
+        if (!this.active) return;
+        this._log('ZONE_COMPLETE', `✅ 区域 ${zoneId} 通关`, {
+            原因: reason,
+        }, gameTime);
+    }
+
     // ========== 内部方法 ==========
 
     _log(type, message, details = {}, gameTime) {

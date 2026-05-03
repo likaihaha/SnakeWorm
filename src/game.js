@@ -1211,9 +1211,30 @@ export class Game {
             gate.update(dt, this.worms);
         }
         
-        // 8.7 Phase A: 更新区域系统
+        // 8.7 Phase A+D: 更新区域系统 + 通关检测
         if (player && player.isAlive) {
             this.zoneManager.getCurrentZone(player);
+            // Phase D: 检查当前区域是否通关
+            const completionResult = this.zoneManager.checkZoneCompletion(this.zoneManager.currentZoneId, {
+                enemies: this.enemies,
+                gameTime: this.gameTime,
+                score: this.score,
+                playerLength: player.segments.length,
+                juvenileCount: this.worms.filter(w => w.isAlive && w.isJuvenile).length,
+                adultCount: this.worms.filter(w => w.isAlive && w.isAdult).length,
+            });
+            if (completionResult.completed) {
+                this.zoneManager.completeZone(this.zoneManager.currentZoneId);
+                // 通关提示
+                const cx = player.head ? player.head.x : 400;
+                const cy = player.head ? player.head.y : 2800;
+                this.floatingTexts.push(FloatingText.acquire(cx, cy - 40, `✅ 区域 ${this.zoneManager.currentZoneId} 通关！`, '#44ff44'));
+                // 通关粒子
+                for (let k = 0; k < 15; k++) {
+                    this.particles.push(Particle.acquire(cx, cy, '#44ff44'));
+                }
+                this.debugLogger.logZoneComplete(this.zoneManager.currentZoneId, completionResult.reason, this.gameTime);
+            }
             // 定期保存进度（每10秒）
             if (Math.floor(this.gameTime) % 10 === 0 && Math.floor(this.gameTime) !== Math.floor(this.gameTime - dt)) {
                 this.zoneManager.saveProgress();
@@ -2610,6 +2631,13 @@ export class Game {
         this.isMouseDown = false;  // 停止连续射击
         this.debugLogger.logGameOver(reason, this.gameTime);
         this.state = GAME_STATE.GAME_OVER;
+
+        // Phase D: 保存区域进度（死亡不丢失）
+        if (this.zoneManager) {
+            this.zoneManager.totalScore = Math.max(this.zoneManager.totalScore || 0, this.score);
+            this.zoneManager.maxLengthReached = Math.max(this.zoneManager.maxLengthReached || 0, this.maxLengthReached);
+            this.zoneManager.saveProgress();
+        }
         const player = this.worms.find(w => w.isPlayer);
         
         // 保存死亡长度
