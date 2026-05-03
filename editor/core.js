@@ -545,7 +545,7 @@ class BackgroundEditor {
       }
     }
 
-    this.markDirty();
+    this.rebuild();
   }
 
   _getCursorForHandle(handle) {
