@@ -1927,6 +1927,11 @@ class BackgroundEditor {
               .map(id => this.config.shapes?.find(s => s.id === id.replace('shape_', '')))
               .filter(s => s && s.visible !== false);
             for (const s of tsChildren) {
+              if (this._rotDbg !== Math.round(Date.now() / 200)) {
+                this._rotDbg = Math.round(Date.now() / 200);
+                const b = this.bg.getShapeBounds(s);
+                console.log(`[重绘] ${s.type} x:${s.x?.toFixed(4)} y:${s.y?.toFixed(4)} bounds:(${Math.round(b.x)},${Math.round(b.y)}) rot:${s.rotation||0}`);
+              }
               this.bg._drawSingleShape(this.ctx, s, false);
             }
           }
