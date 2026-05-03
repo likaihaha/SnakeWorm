@@ -1989,6 +1989,13 @@ class BackgroundEditor {
           this.bg.draw(this.ctx);
         }
 
+        // DEBUG: 显示selectedElement
+        this.ctx.save();
+        this.ctx.fillStyle = '#ff0';
+        this.ctx.font = '14px monospace';
+        this.ctx.fillText(`sel:${this.selectedElement}`, 10, 20);
+        this.ctx.restore();
+
         // 绘制网格和参考线
         if (this.canvasManager) {
           this.canvasManager.drawGrid(this.ctx, this.canvas.width, this.canvas.height);
