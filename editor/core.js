@@ -578,6 +578,8 @@ class BackgroundEditor {
 
   handleCanvasMouseMove(e) {
     const { x, y } = this._getCanvasMouse(e);
+    this._lastMouseX = x;
+    this._lastMouseY = y;
     const relX = x / this.canvas.width;
     const relY = y / this.canvas.height;
 
@@ -1966,6 +1968,13 @@ class BackgroundEditor {
         // 有组被选中时，跳过静态画布，全部直接绘制
         if (this.selectedElement && this.selectedElement.startsWith('group_')) {
           this._redrawAll(this.ctx);
+          // DEBUG: 用鼠标位置画方块
+          if (this._lastMouseX !== undefined) {
+            this.ctx.save();
+            this.ctx.fillStyle = '#0ff';
+            this.ctx.fillRect(this._lastMouseX - 15, this._lastMouseY - 15, 30, 30);
+            this.ctx.restore();
+          }
         } else {
           this.bg.draw(this.ctx);
         }
