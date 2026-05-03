@@ -552,7 +552,14 @@ class BackgroundEditor {
       if (id.startsWith('group_')) {
         // 组用drawGroupDirect绘制（含变换），不用_renderStaticLayer
         const group = groups.find(g => g.id === id);
-        if (group) bg.drawGroupDirect(ctx, group);
+        if (group) {
+          bg.drawGroupDirect(ctx, group);
+          // DEBUG: 组绘制后画绿色标记
+          ctx.save();
+          ctx.fillStyle = '#0f0';
+          ctx.fillRect(10, 80, 30, 30);
+          ctx.restore();
+        }
       } else if (id.startsWith('shape_')) {
         const sid = id.replace('shape_', '');
         const s = shapes.find(sh => sh.id === sid);
