@@ -1611,6 +1611,27 @@ class EditableDynamicBG {
     }
   }
 
+  // 组变换专用：直接在目标画布上绘制组（绕过静态画布缓存）
+  drawGroupDirect(ctx, group) {
+    const gx = (group.x || 0.5) * this.w;
+    const gy = (group.y || 0.5) * this.h;
+    const gr = (group.rotation || 0) * Math.PI / 180;
+    const gs = group.scale || 1;
+    ctx.save();
+    ctx.translate(gx, gy);
+    if (gr) ctx.rotate(gr);
+    if (gs !== 1) ctx.scale(gs, gs);
+    ctx.translate(-gx, -gy);
+    for (const childId of group.children) {
+      const sid = childId.replace('shape_', '');
+      const s = (this.cfg.shapes || []).find(sh => sh.id === sid);
+      if (s && s.visible !== false) {
+        this._drawSingleShape(ctx, s, false);
+      }
+    }
+    ctx.restore();
+  }
+
   // ===================== Transform 控制器 =====================
   getShapeBounds(s) {
     const w = this.w, h = this.h;

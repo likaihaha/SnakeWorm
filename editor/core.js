@@ -1939,6 +1939,14 @@ class BackgroundEditor {
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
         this.bg.draw(this.ctx);
 
+        // 选中组时，直接在主画布上绘制组（覆盖静态画布的旧位置）
+        if (this.selectedElement && this.selectedElement.startsWith('group_')) {
+          const selGroup = (this.config.groups || []).find(g => g.id === this.selectedElement);
+          if (selGroup) {
+            this.bg.drawGroupDirect(this.ctx, selGroup);
+          }
+        }
+
         // 绘制网格和参考线
         if (this.canvasManager) {
           this.canvasManager.drawGrid(this.ctx, this.canvas.width, this.canvas.height);
