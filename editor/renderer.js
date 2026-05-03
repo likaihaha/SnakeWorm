@@ -1652,6 +1652,14 @@ class EditableDynamicBG {
 
       this._drawSingleShape(ctx, s, false);
 
+      // DEBUG: 在变换后位置画蓝色边框
+      ctx.save();
+      ctx.strokeStyle = '#00f';
+      ctx.lineWidth = 3;
+      const dbgBounds = this.getShapeBounds(s);
+      ctx.strokeRect(dbgBounds.x, dbgBounds.y, dbgBounds.width, dbgBounds.height);
+      ctx.restore();
+
       // 恢复原始位置
       s.x = origX;
       s.y = origY;
