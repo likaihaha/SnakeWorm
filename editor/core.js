@@ -535,6 +535,28 @@ class BackgroundEditor {
     this.markDirty();
   }
 
+  // 直接在目标画布上绘制所有内容（含组变换）
+  _redrawAll(ctx) {
+    const bg = this.bg;
+    if (!bg) return;
+    const cfg = bg.cfg;
+    const order = cfg.layerOrder || [];
+    const shapes = cfg.shapes || [];
+    const groups = cfg.groups || [];
+
+    for (const id of order) {
+      if (id === 'background') continue;
+      if (id.startsWith('group_')) {
+        const group = groups.find(g => g.id === id);
+        if (group) bg.drawGroupDirect(ctx, group);
+      } else if (id.startsWith('shape_')) {
+        const sid = id.replace('shape_', '');
+        const s = shapes.find(sh => sh.id === sid);
+        if (s && s.visible !== false) bg._drawSingleShape(ctx, s, false);
+      }
+    }
+  }
+
   _getCursorForHandle(handle) {
     const map = {
       'move': 'move',
@@ -1937,14 +1959,12 @@ class BackgroundEditor {
       if (this.bg) {
         this.bg.update(dt);
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-        this.bg.draw(this.ctx);
 
-        // 选中组时，直接在主画布上绘制组（覆盖静态画布的旧位置）
+        // 有组被选中时，跳过静态画布，全部直接绘制
         if (this.selectedElement && this.selectedElement.startsWith('group_')) {
-          const selGroup = (this.config.groups || []).find(g => g.id === this.selectedElement);
-          if (selGroup) {
-            this.bg.drawGroupDirect(this.ctx, selGroup);
-          }
+          this._redrawAll(this.ctx);
+        } else {
+          this.bg.draw(this.ctx);
         }
 
         // 绘制网格和参考线
