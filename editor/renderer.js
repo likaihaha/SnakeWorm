@@ -1611,28 +1611,53 @@ class EditableDynamicBG {
     }
   }
 
-  // 组变换专用：直接在目标画布上绘制组（绕过静态画布缓存）
+  // 组变换专用：直接修改形状位置绘制（不依赖ctx变换）
   drawGroupDirect(ctx, group) {
     const gx = (group.x || 0.5) * this.w;
     const gy = (group.y || 0.5) * this.h;
     const gr = (group.rotation || 0) * Math.PI / 180;
     const gs = group.scale || 1;
-    console.log(`[drawGroupDirect] x:${group.x?.toFixed(4)} y:${group.y?.toFixed(4)} gx:${Math.round(gx)} gy:${Math.round(gy)} scale:${gs}`);
-    ctx.save();
-    ctx.translate(gx, gy);
-    if (gr) ctx.rotate(gr);
-    if (gs !== 1) ctx.scale(gs, gs);
-    ctx.translate(-gx, -gy);
+    const cos = Math.cos(gr), sin = Math.sin(gr);
+
     for (const childId of group.children) {
       const sid = childId.replace('shape_', '');
       const s = (this.cfg.shapes || []).find(sh => sh.id === sid);
-      if (s && s.visible !== false) {
-        const b = this.getShapeBounds(s);
-        console.log(`[drawGroupDirect] child:${s.type} bounds:(${Math.round(b.x)},${Math.round(b.y)})`);
-        this._drawSingleShape(ctx, s, false);
+      if (!s || s.visible === false) continue;
+
+      // 保存原始位置
+      const origX = s.x, origY = s.y, origPoints = s.points;
+      const origRotation = s.rotation;
+
+      // 计算变换后的位置
+      if (s.x !== undefined && s.y !== undefined) {
+        // 以组中心为原点，缩放+旋转
+        const dx = (s.x * this.w - gx) * gs;
+        const dy = (s.y * this.h - gy) * gs;
+        s.x = (gx + dx * cos - dy * sin) / this.w;
+        s.y = (gy + dx * sin + dy * cos) / this.h;
       }
+      if (s.points) {
+        s.points = s.points.map(p => {
+          const dx = (p[0] * this.w - gx) * gs;
+          const dy = (p[1] * this.h - gy) * gs;
+          return [
+            (gx + dx * cos - dy * sin) / this.w,
+            (gy + dx * sin + dy * cos) / this.h
+          ];
+        });
+      }
+      if (s.rotation !== undefined && gr) {
+        s.rotation = s.rotation + gr * 180 / Math.PI;
+      }
+
+      this._drawSingleShape(ctx, s, false);
+
+      // 恢复原始位置
+      s.x = origX;
+      s.y = origY;
+      s.points = origPoints;
+      s.rotation = origRotation;
     }
-    ctx.restore();
   }
 
   // ===================== Transform 控制器 =====================

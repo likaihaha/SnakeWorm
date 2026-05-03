@@ -567,11 +567,8 @@ class BackgroundEditor {
       ctx.save();
       ctx.fillStyle = '#f00';
       ctx.beginPath();
-      ctx.arc(gx, gy, 10, 0, Math.PI * 2);
+      ctx.arc(gx, gy, 8, 0, Math.PI * 2);
       ctx.fill();
-      ctx.fillStyle = '#fff';
-      ctx.font = '12px monospace';
-      ctx.fillText(`G(${Math.round(gx)},${Math.round(gy)})`, gx + 14, gy + 4);
       ctx.restore();
     }
   }
