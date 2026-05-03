@@ -671,8 +671,8 @@ class BackgroundEditor {
     // 处理 Transform 拖拽
     if (!this.transformState) return;
 
-    // 多选变换
-    if (this.transformState.isGroup) {
+    // 多选/组变换
+    if (this.transformState.isGroup || this.transformState.isGroupTransform) {
       this._handleGroupTransform(x, y);
       return;
     }
