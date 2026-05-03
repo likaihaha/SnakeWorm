@@ -21,6 +21,7 @@ import { FamilyGate } from './family-gate.js';
 import { ZoneManager } from './zone-manager.js';
 import { Barrier, generateBarriers } from './barrier.js';
 import { createBoss, BOSS_STATE } from './boss.js';
+import { Obstacle, OBSTACLE_TYPE, generateObstacles } from './obstacle.js';
 
 export class Game {
     constructor() {
@@ -63,6 +64,10 @@ export class Game {
         // === Phase 3a: Boss系统 ===
         this.bosses = [];  // 当前Boss列表
         this.bossSpawned = new Set();  // 已召唤Boss的区域ID（防止重复召唤）
+
+        // === Phase 3b: 障碍物系统 ===
+        this.obstacles = [];  // 当前区域障碍物列表
+        this.obstaclesGenerated = new Set();  // 已生成障碍物的区域ID
 
         // === Phase A: ZoneManager 关卡区域系统 ===
         this.zoneManager = new ZoneManager();
@@ -656,6 +661,8 @@ export class Game {
         this.enemies = [];           // 清理敌人
         this.bosses = [];            // 清理Boss
         this.bossSpawned.clear();    // 清理Boss召唤记录
+        this.obstacles = [];         // 清理障碍物
+        this.obstaclesGenerated.clear();  // 清理障碍物生成记录
         this.particles = [];         // 清理粒子
         this.floatingTexts.forEach(ft => FloatingText.release(ft));
         this.floatingTexts = [];     // 清理浮动文字
@@ -902,11 +909,12 @@ export class Game {
         for (const worm of this.worms) {
             if (!worm.isAlive || worm.segments.length === 0) continue;
             
-            // 传递敌人、断尾、家族门和 Barrier 引用给AI
+            // 传递敌人、断尾、家族门、Barrier和障碍物引用给AI
             worm._enemies = this.enemies;
             worm._brokenTails = this.brokenTails;
             worm._familyGates = this.familyGates;
             worm._barriers = this.barriers;
+            worm._obstacles = this.obstacles;
 
             if (worm.isPlayer) {
                 // 出场动画期间，继续执行updateEntering，跳过普通update
@@ -1216,6 +1224,9 @@ export class Game {
 
         // 8.5 更新敌人系统
         this.updateEnemies(dt, player);
+
+        // 8.5b Phase 3b: 更新障碍物系统
+        this.updateObstacles(dt, player);
         
         // 8.6 Phase 3: 更新家族门
         for (const gate of this.familyGates) {
@@ -1458,6 +1469,52 @@ export class Game {
                             } else {
                                 this.floatingTexts.push(FloatingText.acquire(enemyHead.x, enemyHead.y - 20, `HIT! ${enemy.health}/${enemy.maxHealth}`, '#4dabf7'));
                                 this.debugLogger.logEnemyHit(enemy, enemy.health, this.gameTime);
+                            }
+                            hit = true;
+                            break;
+                        }
+                    }
+                }
+
+                // Phase 3b: 检测子弹击中障碍物
+                if (!hit) {
+                    for (const obs of this.obstacles) {
+                        if (!obs.isAlive) continue;
+                        const result = obs.checkBulletHit(bullet.pos, bullet.radius);
+                        if (result === 'hit') {
+                            // 岩石被击中
+                            const destroyed = obs.takeDamage();
+                            for (let k = 0; k < 4; k++) {
+                                this.particles.push(Particle.acquire(bullet.pos.x, bullet.pos.y, '#888888'));
+                            }
+                            if (destroyed) {
+                                this.floatingTexts.push(FloatingText.acquire(obs.pos.x, obs.pos.y - 20, '💥 碎裂!', '#aaaaaa'));
+                            } else {
+                                this.floatingTexts.push(FloatingText.acquire(obs.pos.x, obs.pos.y - 20, `${obs.health}/${obs.maxHealth}`, '#aaaaaa'));
+                            }
+                            hit = true;
+                            break;
+                        } else if (result === 'reflect') {
+                            // 水晶刺反射子弹
+                            const dx = bullet.pos.x - obs.pos.x;
+                            const dy = bullet.pos.y - obs.pos.y;
+                            const dd = Math.sqrt(dx * dx + dy * dy);
+                            if (dd > 0) {
+                                bullet.velocity.x = (dx / dd) * bullet.velocity.length();
+                                bullet.velocity.y = (dy / dd) * bullet.velocity.length();
+                                // 延长子弹寿命以继续飞行
+                                bullet.life = Math.max(bullet.life, 0.5);
+                            }
+                            for (let k = 0; k < 3; k++) {
+                                this.particles.push(Particle.acquire(bullet.pos.x, bullet.pos.y, '#c77dff'));
+                            }
+                            this.floatingTexts.push(FloatingText.acquire(bullet.pos.x, bullet.pos.y - 15, '反射!', '#c77dff'));
+                            // 不设hit=true，子弹继续飞
+                            break;
+                        } else if (result === 'absorb') {
+                            // 岩浆池/虚空裂隙吸收子弹
+                            for (let k = 0; k < 3; k++) {
+                                this.particles.push(Particle.acquire(bullet.pos.x, bullet.pos.y, obs.cfg.COLOR));
                             }
                             hit = true;
                             break;
@@ -2196,8 +2253,18 @@ export class Game {
             }
             this.bosses.length = bw;
 
-            if (storedFoods.length > 0 || storedEnemies.length > 0 || storedBosses.length > 0) {
-                zm.zoneEntityCache.set(fromZoneId, { foods: storedFoods, enemies: storedEnemies, bosses: storedBosses });
+            // Phase 3b: 缓存障碍物
+            const storedObstacles = [];
+            this.obstacles = this.obstacles.filter(obs => {
+                if (obs.homeZone && obs.homeZone.x === fromZone.x && obs.homeZone.y === fromZone.y) {
+                    storedObstacles.push(obs);
+                    return false;
+                }
+                return true;
+            });
+
+            if (storedFoods.length > 0 || storedEnemies.length > 0 || storedBosses.length > 0 || storedObstacles.length > 0) {
+                zm.zoneEntityCache.set(fromZoneId, { foods: storedFoods, enemies: storedEnemies, bosses: storedBosses, obstacles: storedObstacles });
             }
         }
 
@@ -2211,8 +2278,11 @@ export class Game {
                 if (cached.bosses) {
                     for (const boss of cached.bosses) this.bosses.push(boss);
                 }
+                if (cached.obstacles) {
+                    for (const obs of cached.obstacles) this.obstacles.push(obs);
+                }
                 zm.zoneEntityCache.delete(toZoneId);
-                this.debugLogger._log('ZONE_ENTER', `进入区域 ${toZoneId} (恢复 ${cached.foods.length} 宝珠, ${cached.enemies.length} 敌人, ${(cached.bosses||[]).length} Boss)`, {}, this.gameTime);
+                this.debugLogger._log('ZONE_ENTER', `进入区域 ${toZoneId} (恢复 ${cached.foods.length} 宝珠, ${cached.enemies.length} 敌人, ${(cached.bosses||[]).length} Boss, ${(cached.obstacles||[]).length} 障碍物)`, {}, this.gameTime);
             } else {
                 this.debugLogger._log('ZONE_ENTER', `进入区域 ${toZoneId}`, {}, this.gameTime);
             }
@@ -2453,6 +2523,157 @@ export class Game {
         this.bosses.length = bw;
     }
 
+    // === Phase 3b: 障碍物系统 ===
+    updateObstacles(dt, player) {
+        if (!player || !player.isAlive) return;
+
+        // 障碍物生成：进入新区域时按配置生成
+        const currentZone = this.zoneManager ? this.zoneManager.zones[this.zoneManager.currentZoneId - 1] : null;
+        if (currentZone && !this.obstaclesGenerated.has(currentZone.id) && currentZone.obstacleCount > 0) {
+            this.obstaclesGenerated.add(currentZone.id);
+            const types = currentZone.obstacleTypes || [];
+            const count = currentZone.obstacleCount || 0;
+            if (types.length > 0 && count > 0) {
+                const newObs = generateObstacles(currentZone, types, count);
+                for (const obs of newObs) {
+                    this.obstacles.push(obs);
+                }
+                if (newObs.length > 0) {
+                    this.debugLogger._log('OBSTACLE_SPAWN', `区域 ${currentZone.id} 生成 ${newObs.length} 个障碍物`, {}, this.gameTime);
+                }
+            }
+        }
+
+        // 更新障碍物动画和伤害计时器
+        for (const obs of this.obstacles) {
+            obs.update(dt);
+            obs.updateDamageTimers(dt);
+        }
+
+        // 障碍物与所有虫虫的碰撞检测
+        const allWorms = this.worms.filter(w => w.isAlive && w.segments.length > 0);
+        for (const obs of this.obstacles) {
+            if (!obs.isAlive) continue;
+
+            for (const worm of allWorms) {
+                if (worm.invincibleTimer > 0) continue;  // 无敌虫虫不受影响
+
+                const headPos = worm.head;
+                if (!headPos) continue;
+
+                // 固体障碍物碰撞（岩石/水晶刺）—— 推开虫虫
+                if (obs.type === OBSTACLE_TYPE.ROCK || obs.type === OBSTACLE_TYPE.CRYSTAL_SPIKE) {
+                    for (let s = 0; s < worm.segments.length; s++) {
+                        const seg = worm.segments[s];
+                        const push = obs.checkSolidCollision(seg, CONFIG.SEGMENT_RADIUS);
+                        if (push) {
+                            // 推开段
+                            seg.x += push.nx * push.overlap;
+                            seg.y += push.ny * push.overlap;
+                            // 头部碰撞有额外效果
+                            if (s === 0 && worm.isPlayer) {
+                                // 减速效果
+                                if (!worm._obstacleSlowTimer || worm._obstacleSlowTimer <= 0) {
+                                    worm._obstacleSlowTimer = 0.3;
+                                    // 轻微减速
+                                    if (worm.slowStacks < 1) {
+                                        worm.slowStacks = 1;
+                                        worm.slowTimer = 0.3;
+                                        worm.updateSpeed();
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // 荆棘：减速+周期伤害
+                if (obs.type === OBSTACLE_TYPE.THORN) {
+                    if (obs.checkCollision(headPos, CONFIG.SEGMENT_RADIUS)) {
+                        // 减速
+                        if (worm.slowStacks < 2) {
+                            worm.slowStacks++;
+                            worm.slowTimer = obs.cfg.SLOW_DURATION;
+                            worm.updateSpeed();
+                        }
+                        // 周期伤害
+                        if (obs.shouldDamage(worm)) {
+                            if (worm.segments.length > 3) {
+                                worm.segments.pop();
+                                worm.targetLength = worm.segments.length;
+                                if (worm.isPlayer) worm.syncBlueToBody();
+                                this.floatingTexts.push(FloatingText.acquire(headPos.x, headPos.y - 20, '🌿 荆棘!', '#4a8a3a'));
+                                for (let k = 0; k < 4; k++) {
+                                    this.particles.push(Particle.acquire(headPos.x, headPos.y, '#4a8a3a'));
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // 岩浆池：周期伤害
+                if (obs.type === OBSTACLE_TYPE.LAVA_POOL) {
+                    if (obs.checkCollision(headPos, CONFIG.SEGMENT_RADIUS)) {
+                        if (obs.shouldDamage(worm)) {
+                            if (worm.segments.length > 3) {
+                                worm.segments.pop();
+                                worm.targetLength = worm.segments.length;
+                                if (worm.isPlayer) worm.syncBlueToBody();
+                                this.floatingTexts.push(FloatingText.acquire(headPos.x, headPos.y - 20, '🔥 灼烧!', '#ff4500'));
+                                for (let k = 0; k < 5; k++) {
+                                    this.particles.push(Particle.acquire(headPos.x, headPos.y, '#ff4500'));
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // 虚空裂隙：拉扯+伤害
+                if (obs.type === OBSTACLE_TYPE.VOID_RIFT) {
+                    // 拉扯所有段
+                    for (const seg of worm.segments) {
+                        const pull = obs.getPullForce(seg);
+                        if (pull) {
+                            seg.x += pull.fx;
+                            seg.y += pull.fy;
+                        }
+                    }
+                    // 核心范围内周期伤害
+                    if (obs.checkCollision(headPos, CONFIG.SEGMENT_RADIUS)) {
+                        if (obs.shouldDamage(worm)) {
+                            if (worm.segments.length > 3) {
+                                worm.segments.pop();
+                                worm.targetLength = worm.segments.length;
+                                if (worm.isPlayer) worm.syncBlueToBody();
+                                this.floatingTexts.push(FloatingText.acquire(headPos.x, headPos.y - 20, '🌀 虚空!', '#c7ceea'));
+                                for (let k = 0; k < 5; k++) {
+                                    this.particles.push(Particle.acquire(headPos.x, headPos.y, '#c7ceea'));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 障碍物与敌人的碰撞（只做固体推开）
+            if (obs.type === OBSTACLE_TYPE.ROCK || obs.type === OBSTACLE_TYPE.CRYSTAL_SPIKE) {
+                for (const enemy of this.enemies) {
+                    if (!enemy.isAlive || enemy.isDying) continue;
+                    if (!enemy.segments || enemy.segments.length === 0) continue;
+                    const eHead = enemy.segments[0];
+                    const push = obs.checkSolidCollision(eHead, enemy.size);
+                    if (push) {
+                        eHead.x += push.nx * push.overlap;
+                        eHead.y += push.ny * push.overlap;
+                    }
+                }
+            }
+        }
+
+        // 清理已销毁的障碍物（紧凑过滤）
+        this.obstacles = this.obstacles.filter(obs => obs.isAlive || obs.fragments.length > 0);
+    }
+
     // 幼体成年逻辑（提取重复代码）
     matureJuvenile(worm) {
         worm.isJuvenile = false;
@@ -2677,6 +2898,8 @@ export class Game {
         for (let i = 0; i < this.enemies.length; i++) this.enemies[i].draw(ctx);
         // Phase 3a: 绘制Boss
         for (let i = 0; i < this.bosses.length; i++) this.bosses[i].draw(ctx);
+        // Phase 3b: 绘制障碍物
+        for (let i = 0; i < this.obstacles.length; i++) this.obstacles[i].draw(ctx);
         for (let i = 0; i < this.deadBodies.length; i++) this.deadBodies[i].draw(ctx);
 
         // 绘制screen模式的对象（发光）

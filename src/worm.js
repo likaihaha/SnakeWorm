@@ -506,8 +506,8 @@ export class Worm {
             const newX = head.x + this.velocity.x * speedDt;
             const newY = head.y + this.velocity.y * speedDt;
 
-            // Phase 3: 家族门 + Phase B: Barrier 门 阻挡检测
-            if (this._familyGates || this._barriers) {
+            // Phase 3: 家族门 + Phase B: Barrier 门 + Phase 3b: 障碍物 阻挡检测
+            if (this._familyGates || this._barriers || this._obstacles) {
                 let blocked = false;
                 if (this._familyGates) {
                     for (const gate of this._familyGates) {
@@ -517,6 +517,21 @@ export class Worm {
                 if (!blocked && this._barriers) {
                     for (const barrier of this._barriers) {
                         if (barrier.isBlocking(this)) { blocked = true; break; }
+                    }
+                }
+                // Phase 3b: 固体障碍物阻挡
+                if (!blocked && this._obstacles) {
+                    for (const obs of this._obstacles) {
+                        if (!obs.isAlive) continue;
+                        if (obs.type === 'rock' || obs.type === 'crystalSpike') {
+                            const dx = newX - obs.pos.x;
+                            const dy = newY - obs.pos.y;
+                            const dist = Math.sqrt(dx * dx + dy * dy);
+                            if (dist < obs.radius + 10) {
+                                blocked = true;
+                                break;
+                            }
+                        }
                     }
                 }
                 if (blocked) {
@@ -559,6 +574,7 @@ export class Worm {
         if (this.magnetTimer > 0) this.magnetTimer -= dt;
         if (this.purpleParticleTimer > 0) this.purpleParticleTimer -= dt;
         if (this.protectingTimer > 0) this.protectingTimer -= dt;
+        if (this._obstacleSlowTimer > 0) this._obstacleSlowTimer -= dt;
 
         // 更新空闲波动相位（始终保持生命感波动）
         this.idleWavePhase += dt * 4;

@@ -57,16 +57,22 @@ for (let i = 0; i < 25; i++) {
     let theme = 'default';
 
     // 难度分层
+    let obstacleTypes = [];
+    let obstacleCount = 0;
     if (levelNum <= 5) {
         // 基础层：移动、吃宝珠、躲避
         enemyMultiplier = 0.5;
         foodMultiplier = 1.5;
         theme = 'forest';
+        obstacleTypes = ['rock', 'thorn'];
+        obstacleCount = levelNum === 1 ? 0 : Math.min(levelNum, 3);  // 安全区无障碍，后面逐步增加
     } else if (levelNum <= 10) {
         // 战斗层：引入敌人
         enemyMultiplier = 1.5;
         foodMultiplier = 1.0;
         theme = 'cave';
+        obstacleTypes = ['rock', 'thorn', 'crystalSpike'];
+        obstacleCount = 3;
         if (levelNum === 6) {
             zoneType = ZONE_TYPE.GATE;
             gateType = GATE_TYPE.SCORE;
@@ -77,6 +83,8 @@ for (let i = 0; i < 25; i++) {
         enemyMultiplier = 1.2;
         foodMultiplier = 0.8;
         theme = 'crystal';
+        obstacleTypes = ['crystalSpike', 'rock'];
+        obstacleCount = 4;
         if (levelNum === 11) {
             zoneType = ZONE_TYPE.GATE;
             gateType = GATE_TYPE.LENGTH;
@@ -87,6 +95,8 @@ for (let i = 0; i < 25; i++) {
         enemyMultiplier = 2.0;
         foodMultiplier = 0.6;
         theme = 'lava';
+        obstacleTypes = ['lavaPool', 'rock'];
+        obstacleCount = 4;
         if (levelNum === 16) {
             zoneType = ZONE_TYPE.GATE;
             gateType = GATE_TYPE.JUVENILE;
@@ -97,11 +107,19 @@ for (let i = 0; i < 25; i++) {
         enemyMultiplier = 2.5;
         foodMultiplier = 0.5;
         theme = 'void';
+        obstacleTypes = ['voidRift', 'crystalSpike'];
+        obstacleCount = 5;
         if (levelNum === 21) {
             zoneType = ZONE_TYPE.GATE;
             gateType = GATE_TYPE.KILL;
             gateThreshold = 5;
         }
+    }
+
+    // Boss 关卡障碍物较少（Boss本身就是挑战）
+    if ([5, 10, 15, 20, 25].includes(levelNum)) {
+        zoneType = ZONE_TYPE.BOSS;
+        obstacleCount = 2;  // Boss区域少量障碍物增加战术性
     }
 
     // Boss 关卡
@@ -129,6 +147,8 @@ for (let i = 0; i < 25; i++) {
         enemyMultiplier,
         foodMultiplier,
         theme,
+        obstacleTypes,
+        obstacleCount,
         status: levelNum === 1 ? ZONE_STATUS.UNLOCKED : ZONE_STATUS.LOCKED,
         enemies: [],
         foods: [],
@@ -143,9 +163,10 @@ export class ZoneManager {
         this.visitedZones = new Set([1]);
         this.completedZones = new Set();
         // Phase E: 区域实体懒加载
-        this.zoneEntityCache = new Map();  // zoneId -> {foods: [], enemies: []} 暂存离区实体
+        this.zoneEntityCache = new Map();  // zoneId -> {foods: [], enemies: [], bosses: [], obstacles: []} 暂存离区实体
         this.activeZoneIds = new Set([1]);  // 当前活跃区域（玩家+相邻）
         this.revisitRewards = new Set();  // 已领取回访奖励的区域
+        this.obstaclesGenerated = new Set();  // 已生成障碍物的区域ID
         this.totalScore = 0;
         this.maxLengthReached = 0;
     }

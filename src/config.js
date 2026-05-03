@@ -5,7 +5,7 @@
  */
 
 export const CONFIG = {
-    VERSION: '1.77',
+    VERSION: '1.78',
     CANVAS_WIDTH: 800, CANVAS_HEIGHT: 600,   // 视口大小（屏幕显示区域）
     MAP_WIDTH: 4000, MAP_HEIGHT: 3000,        // 世界地图大小（5×5倍）
     BORDER_MARGIN: 30,                        // 地图边界死亡区宽度（用于尸体/宝珠生成等）
@@ -118,6 +118,65 @@ export const CONFIG = {
         ZONE_PADDING: 40,          // 实体在区域内离边界的最小距离
         LOCK_ENEMY_TO_ZONE: true,  // 敌人锁定在生成区域内
         BULLET_DISAPPEAR_AT_ZONE: true, // 子弹到达区域边界自动消失
+    },
+    // === Phase 3b 障碍物系统 ===
+    OBSTACLE: {
+        // 岩石 - 固体障碍，阻挡移动，可被子弹击碎
+        ROCK: {
+            RADIUS: 28,
+            HEALTH: 3,
+            COLOR: '#5a6e5a',
+            BORDER_COLOR: '#3a4a3a',
+            CRACK_COLOR: '#2a3a2a',
+            SPAWN_PER_ZONE: 3,       // 每区域生成数量
+        },
+        // 荆棘 - 减速+周期伤害，可通过
+        THORN: {
+            RADIUS: 32,
+            SLOW_FACTOR: 0.4,        // 减速比例
+            SLOW_DURATION: 1.5,      // 减速持续时间（秒）
+            DAMAGE_INTERVAL: 0.8,    // 伤害间隔（秒）
+            DAMAGE: 1,               // 每次伤害（扣一节）
+            COLOR: '#2d5a1e',
+            VINE_COLOR: '#4a8a3a',
+            THORN_COLOR: '#8a3a3a',
+            SPAWN_PER_ZONE: 2,
+        },
+        // 水晶刺 - 固体障碍，反射子弹，不可破坏
+        CRYSTAL_SPIKE: {
+            RADIUS: 24,
+            COLOR: '#9d4edd',
+            CORE_COLOR: '#e0aaff',
+            SHIMMER_SPEED: 2.0,      // 闪烁速度
+            SPAWN_PER_ZONE: 3,
+        },
+        // 岩浆池 - 持续伤害区域，可通过（有伤害）
+        LAVA_POOL: {
+            RADIUS: 45,
+            DAMAGE_INTERVAL: 1.0,    // 伤害间隔（秒）
+            DAMAGE: 1,
+            COLOR: '#ff4500',
+            GLOW_COLOR: '#ff6b35',
+            BUBBLE_COUNT: 5,         // 气泡数量
+            SPAWN_PER_ZONE: 2,
+        },
+        // 虚空裂隙 - 拉扯附近虫虫+周期伤害
+        VOID_RIFT: {
+            RADIUS: 35,
+            PULL_RADIUS: 150,        // 吸引半径
+            PULL_FORCE: 1.2,         // 吸引力度
+            DAMAGE_INTERVAL: 1.2,    // 伤害间隔
+            DAMAGE: 1,
+            COLOR: '#1a0a2e',
+            RING_COLOR: '#c7ceea',
+            PULSE_SPEED: 1.5,
+            SPAWN_PER_ZONE: 2,
+        },
+        // 障碍物不生成的区域边界padding
+        SPAWN_PADDING: 60,
+        // 最少/最多障碍物数
+        MIN_PER_ZONE: 1,
+        MAX_PER_ZONE: 6,
     },
     // === Phase 3a Boss系统 ===
     BOSS: {
