@@ -1619,6 +1619,7 @@ class EditableDynamicBG {
     const gr = (group.rotation || 0) * Math.PI / 180;
     const gs = group.scale || 1;
     const cos = Math.cos(gr), sin = Math.sin(gr);
+    console.log(`[GDD] group.x:${group.x?.toFixed(4)} gcx:${Math.round(gx)} id:${group.id}`);
 
     for (const childId of group.children) {
       const sid = childId.replace('shape_', '');
@@ -1638,6 +1639,9 @@ class EditableDynamicBG {
       ctx.save();
       ctx.fillStyle = '#f00';
       ctx.fillRect(wx - 20, wy - 20, 40, 40);
+      ctx.fillStyle = '#fff';
+      ctx.font = '10px monospace';
+      ctx.fillText(`${Math.round(wx)},${Math.round(wy)}`, wx - 18, wy + 35);
       ctx.restore();
     }
   }
