@@ -328,10 +328,14 @@ class BackgroundEditor {
 
       // 如果点击的元素属于某个组，选中该组
       let targetType = unlockedHit?.type || null;
+      let hitGroup = null;
       if (targetType && targetType.startsWith('shape_')) {
         const shapeId = targetType.replace('shape_', '');
         const parentGroup = (this.config.groups || []).find(g => g.children.includes(targetType));
-        if (parentGroup) targetType = parentGroup.id;
+        if (parentGroup) {
+          targetType = parentGroup.id;
+          hitGroup = parentGroup;
+        }
       }
 
       // 如果没命中形状，检查是否点击在某个组的包围框内
@@ -345,6 +349,7 @@ class BackgroundEditor {
             if (x >= bounds.x && x <= bounds.x + bounds.width &&
                 y >= bounds.y && y <= bounds.y + bounds.height) {
               targetType = group.id;
+              hitGroup = group;
               break;
             }
           }
@@ -367,6 +372,26 @@ class BackgroundEditor {
         this.updatePropertyPanel();
       } else if (targetType) {
         this.selectElement(targetType);
+        // 点击命中组时，立即开始拖拽（不需要第二次点击）
+        if (hitGroup && this.bg) {
+          const children = hitGroup.children
+            .map(id => this.config.shapes?.find(s => s.id === id.replace('shape_', '')))
+            .filter(s => s && s.visible !== false && !s.locked);
+          if (children.length > 0) {
+            const groupBounds = this.bg.getGroupBounds(children, hitGroup);
+            this.transformState = {
+              mode: 'move',
+              isGroupTransform: true,
+              groupId: hitGroup.id,
+              startX: x,
+              startY: y,
+              groupBounds: { ...groupBounds },
+              startGroupProps: { x: hitGroup.x || 0.5, y: hitGroup.y || 0.5, rotation: hitGroup.rotation || 0, scale: hitGroup.scale || 1 },
+              startPropsMap: new Map(children.map(s => [s.id, { ...s }]))
+            };
+            this.canvas.style.cursor = 'move';
+          }
+        }
       } else {
         this.selectElement(null);
       }
@@ -1966,19 +1991,8 @@ class BackgroundEditor {
         this.bg.update(dt);
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
-        // 有组被选中时，跳过静态画布，全部直接绘制
-        if (this.selectedElement && this.selectedElement.startsWith('group_')) {
-          this._redrawAll(this.ctx);
-          // DEBUG: 用鼠标位置画方块
-          if (this._lastMouseX !== undefined) {
-            this.ctx.save();
-            this.ctx.fillStyle = '#0ff';
-            this.ctx.fillRect(this._lastMouseX - 15, this._lastMouseY - 15, 30, 30);
-            this.ctx.restore();
-          }
-        } else {
-          this.bg.draw(this.ctx);
-        }
+        // 统一绘制所有图层（渲染器的 _renderStaticLayer 已正确处理组变换）
+        this.bg.draw(this.ctx);
 
         // 绘制网格和参考线
         if (this.canvasManager) {

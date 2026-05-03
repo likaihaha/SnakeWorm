@@ -5,7 +5,7 @@
  */
 
 export const CONFIG = {
-    VERSION: '1.85',
+    VERSION: '1.88',
     CANVAS_WIDTH: 800, CANVAS_HEIGHT: 600,   // 视口大小（屏幕显示区域）
     MAP_WIDTH: 4000, MAP_HEIGHT: 3000,        // 世界地图大小（5×5倍）
     BORDER_MARGIN: 30,                        // 地图边界死亡区宽度（用于尸体/宝珠生成等）
@@ -299,7 +299,7 @@ export const CONFIG = {
     DIGGABLE_WALL: {
         CELL_SIZE: 14,             // 每个泥块单元的像素大小（缩小一半）
         THICKNESS: 168,            // 墙体厚度
-        DIG_SPEED: 60,             // 每秒挖掘进度（极快，1口≈1帧即挖掉）
+        DIG_SPEED: 0.6,            // 每秒挖掘进度（需持续推墙约1.7秒才能挖穿一格，有明显障碍感）
         DIG_RADIUS: 1,             // 挖掘半径（以单元格为单位，1=只挖接触格）
         ORB_CHANCE: 0.15,          // 每个单元格嵌入宝珠的概率
         COLOR: '#1a3a1a',          // 泥墙基础色（forest主题reef色）

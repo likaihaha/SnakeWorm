@@ -226,6 +226,76 @@ export class DiggableWall {
     }
 
     /**
+     * 子弹击中泥墙的处理
+     * @param {{x: number, y: number}} pos - 子弹世界坐标
+     * @param {number} radius - 子弹半径
+     * @returns {{ hit: boolean, releasedFoods: Food[] }}
+     */
+    bulletHit(pos, radius) {
+        if (!this.active) return { hit: false, releasedFoods: [] };
+
+        // 快速AABB排除
+        const margin = radius + 5;
+        if (pos.x < this.wallX - margin || pos.x > this.wallX + this.wallW + margin ||
+            pos.y < this.wallY - margin || pos.y > this.wallY + this.wallH + margin) {
+            return { hit: false, releasedFoods: [] };
+        }
+
+        const { col, row } = this._worldToCell(pos.x, pos.y);
+        if (col < 0 || col >= this.cols || row < 0 || row >= this.rows) {
+            return { hit: false, releasedFoods: [] };
+        }
+
+        const cell = this.cells[col][row];
+        if (!cell._inReef || cell.dug) return { hit: false, releasedFoods: [] };
+
+        const cellSize = DW.CELL_SIZE;
+        const cellCenterX = cell.worldX + cellSize / 2;
+        const cellCenterY = cell.worldY + cellSize / 2;
+
+        // 子弹伤害（2发挖穿一个cell）
+        cell.hp -= 0.5;
+        cell.crackPhase += 0.3;
+
+        // 产生泥块粒子
+        for (let k = 0; k < DW.DEBRIS_COUNT; k++) {
+            this.debris.push(new DebrisParticle(
+                cellCenterX + (Math.random() - 0.5) * cellSize,
+                cellCenterY + (Math.random() - 0.5) * cellSize
+            ));
+        }
+
+        const releasedFoods = [];
+
+        // 被子弹击碎
+        if (cell.hp <= 0) {
+            cell.dug = true;
+            cell.hp = 0;
+
+            // 大量泥块飞溅
+            for (let k = 0; k < DW.DEBRIS_COUNT * 3; k++) {
+                this.debris.push(new DebrisParticle(
+                    cellCenterX + (Math.random() - 0.5) * cellSize,
+                    cellCenterY + (Math.random() - 0.5) * cellSize
+                ));
+            }
+
+            // 释放宝珠
+            if (cell.orbType && !cell.orbEaten) {
+                cell.orbEaten = true;
+                const orb = new Food(cellCenterX, cellCenterY, cell.orbType);
+                orb.inactiveTimer = 0.3;
+                releasedFoods.push(orb);
+            }
+        }
+
+        // 检查墙壁是否完全挖穿
+        this._checkComplete();
+
+        return { hit: true, releasedFoods };
+    }
+
+    /**
      * 检查某个世界坐标点是否在未挖穿的墙壁单元内
      */
     isBlocked(worldX, worldY) {
@@ -239,9 +309,11 @@ export class DiggableWall {
     /**
      * 检查虫虫头部是否与墙壁碰撞并执行挖掘
      * @param {Worm} worm - 虫虫对象
+     * @param {number} [dt=1/60] - 帧间隔（秒）
      * @returns {{ blocked: boolean, digging: boolean, debrisParticles: DebrisParticle[], releasedFoods: Food[] }}
      */
-    dig(worm) {
+    dig(worm, dt) {
+        if (dt === undefined) dt = 1/60;
         if (!this.active || !worm.head) return { blocked: false, digging: false, debrisParticles: [], releasedFoods: [] };
 
         const hx = worm.head.x;
@@ -285,7 +357,7 @@ export class DiggableWall {
                     const cellDist = Math.abs(c - centerCell.col) + Math.abs(r - centerCell.row);
                     if (cellDist <= digRadius) {
                         digging = true;
-                        cell.hp -= DW.DIG_SPEED * (1 / 60);  // 按帧率调整
+                        cell.hp -= DW.DIG_SPEED * dt;  // 按实际帧率调整
 
                         // 产生裂纹效果（hp降低时）
                         cell.crackPhase += 0.1;
@@ -330,6 +402,79 @@ export class DiggableWall {
         this._checkComplete();
 
         return { blocked, digging, debrisParticles: newDebris, releasedFoods };
+    }
+
+    /**
+     * 获取指定方向的挖掘深度（从入口侧算起，已挖穿的最远cell列/行数）
+     * 用于镜头跟随挖掘进度：每挖穿一个cell，镜头同步移动一个cell的距离
+     *
+     * @param {number} dx - 挖掘方向X（1=向右, -1=向左, 0=无）
+     * @param {number} dy - 挖掘方向Y（1=向下, -1=向上, 0=无）
+     * @returns {{ depth: number, totalDepth: number, fraction: number }}
+     */
+    getDigDepthFromDir(dx, dy) {
+        if (!this.active) {
+            const total = this.orientation === 'vertical' ? this.cols : this.rows;
+            return { depth: total, totalDepth: total, fraction: 1 };
+        }
+
+        if (this.orientation === 'vertical') {
+            const total = this.cols;
+            if (dx === 1) {
+                // 从左往右挖：找入口侧（col=0）开始最远挖穿列
+                let maxDugCol = -1;
+                for (let c = 0; c < this.cols; c++) {
+                    for (let r = 0; r < this.rows; r++) {
+                        if (this.cells[c][r]._inReef && this.cells[c][r].dug) {
+                            if (c > maxDugCol) maxDugCol = c;
+                        }
+                    }
+                }
+                const depth = maxDugCol + 1;
+                return { depth, totalDepth: total, fraction: total > 0 ? depth / total : 0 };
+            } else if (dx === -1) {
+                // 从右往左挖：找出口侧（col=cols-1）开始最远挖穿列
+                let minDugCol = this.cols;
+                for (let c = 0; c < this.cols; c++) {
+                    for (let r = 0; r < this.rows; r++) {
+                        if (this.cells[c][r]._inReef && this.cells[c][r].dug) {
+                            if (c < minDugCol) minDugCol = c;
+                        }
+                    }
+                }
+                const depth = this.cols - minDugCol;
+                return { depth, totalDepth: total, fraction: total > 0 ? depth / total : 0 };
+            }
+            return { depth: 0, totalDepth: total, fraction: 0 };
+        } else {
+            const total = this.rows;
+            if (dy === 1) {
+                // 从上往下挖
+                let maxDugRow = -1;
+                for (let c = 0; c < this.cols; c++) {
+                    for (let r = 0; r < this.rows; r++) {
+                        if (this.cells[c][r]._inReef && this.cells[c][r].dug) {
+                            if (r > maxDugRow) maxDugRow = r;
+                        }
+                    }
+                }
+                const depth = maxDugRow + 1;
+                return { depth, totalDepth: total, fraction: total > 0 ? depth / total : 0 };
+            } else if (dy === -1) {
+                // 从下往上挖
+                let minDugRow = this.rows;
+                for (let c = 0; c < this.cols; c++) {
+                    for (let r = 0; r < this.rows; r++) {
+                        if (this.cells[c][r]._inReef && this.cells[c][r].dug) {
+                            if (r < minDugRow) minDugRow = r;
+                        }
+                    }
+                }
+                const depth = this.rows - minDugRow;
+                return { depth, totalDepth: total, fraction: total > 0 ? depth / total : 0 };
+            }
+            return { depth: 0, totalDepth: total, fraction: 0 };
+        }
     }
 
     /**
@@ -522,6 +667,9 @@ export function generateDiggableWalls(zoneManager) {
     const walls = [];
     const zones = zoneManager.zones;
 
+    // Boss区域（5/10/15/20）不设过不去的墙
+    const BOSS_ZONE_IDS = new Set([5, 10, 15, 20]);
+
     // 在所有相邻区域对之间生成墙壁
     for (let i = 0; i < zones.length - 1; i++) {
         const current = zones[i];
@@ -531,6 +679,9 @@ export function generateDiggableWalls(zoneManager) {
         const dx = next.col - current.col;
         const dy = next.row - current.row;
         if (Math.abs(dx) + Math.abs(dy) !== 1) continue;
+
+        // Boss区域不生成墙壁
+        if (BOSS_ZONE_IDS.has(current.id) || BOSS_ZONE_IDS.has(next.id)) continue;
 
         const wall = new DiggableWall(current, next);
         if (wall.active) {

@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "Bash(npm:*)",
+      "Bash(claude mcp:*)",
+      "Bash(reg query:*)",
+      "Bash(where claude:*)",
+      "Bash(npx chrome-devtools-mcp@latest:*)",
+      "Bash(\"G:/NodeJSCache/node_global/claude.bat\" mcp:*)"
+    ]
+  }
+}

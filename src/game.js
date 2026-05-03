@@ -25,6 +25,7 @@ import { Obstacle, OBSTACLE_TYPE, generateObstacles } from './obstacle.js';
 import { getThemeConfig } from './theme-configs.js';
 import { MiniMap } from './minimap.js';
 import { DiggableWall, generateDiggableWalls } from './diggable-wall.js';
+import { ZoneDecorations } from './zone-decorations.js';
 
 export class Game {
     constructor() {
@@ -83,6 +84,10 @@ export class Game {
 
         // === Phase 3c: 可挖掘墙壁系统 ===
         this.diggableWalls = generateDiggableWalls(this.zoneManager);
+
+        // === 海底生态边界墙系统 ===
+        this.zoneDecorations = new ZoneDecorations(this.zoneManager);
+
         this.playerDeathLength = 0;  // 玩家死亡时的长度（用于显示）
         this.maxLengthReached = 0;  // 玩家达到过的最大长度（用于排行榜）
         this.waitingForPlayer = false;  // 等待玩家鼠标移入白圈
@@ -781,6 +786,12 @@ export class Game {
         this.diggableWalls = generateDiggableWalls(this.zoneManager);
         this.zoneManager.zoneEntityCache.clear();
 
+        // 重置镜头到初始区域（区域1）
+        this.camera = new Camera();
+        if (this.zoneManager.zones.length > 0) {
+            this.camera.setInitialZone(this.zoneManager.zones[0]);
+        }
+
         document.getElementById('gameOver').style.display = 'none';
         this.updateUI();
     }
@@ -1392,13 +1403,16 @@ export class Game {
         for (const wall of this.diggableWalls) {
             wall.update(dt);
         }
+        // 8.10 更新海底生态边界墙
+        this.zoneDecorations.update(dt);
+
         // 虫虫挖掘墙壁检测
         for (const worm of this.worms) {
             if (!worm.isAlive || worm.segments.length === 0) continue;
             worm.isDigging = false;  // 重置挖掘状态
             for (const wall of this.diggableWalls) {
                 if (!wall.active) continue;
-                const result = wall.dig(worm);
+                const result = wall.dig(worm, dt);
                 if (result.digging) {
                     worm.isDigging = true;
                     worm.mouthCloseTimer = 0;  // 清除吃宝珠的闭嘴，让挖掘嘴巴动画生效
@@ -1604,6 +1618,30 @@ export class Game {
                     }
                 }
 
+                // Phase 3c: 检测子弹击中可挖掘墙壁
+                if (!hit) {
+                    for (const wall of this.diggableWalls) {
+                        if (!wall.active) continue;
+                        const result = wall.bulletHit(bullet.pos, bullet.radius);
+                        if (result.hit) {
+                            // 沙雾粒子效果（通用粒子，由game.js管理）
+                            for (let k = 0; k < 5; k++) {
+                                this.particles.push(Particle.acquire(
+                                    bullet.pos.x + (Math.random() - 0.5) * 12,
+                                    bullet.pos.y + (Math.random() - 0.5) * 12,
+                                    CONFIG.DIGGABLE_WALL.COLOR_LIGHT
+                                ));
+                            }
+                            // 释放的宝珠加入食物列表
+                            for (const food of result.releasedFoods) {
+                                this.foods.push(food);
+                            }
+                            hit = true;
+                            break;
+                        }
+                    }
+                }
+
                 // Phase 3b: 检测子弹击中障碍物
                 if (!hit) {
                     for (const obs of this.obstacles) {
@@ -1758,7 +1796,7 @@ export class Game {
         }
 
         // 9.5 紫色粒子特效（当玩家有purpleParticleTimer时）
-        if (player.purpleParticleTimer > 0) {
+        if (player && player.purpleParticleTimer > 0) {
             // 在玩家头部位置创建紫色粒子
             const headPos = player.head;
             for (let i = 0; i < 2; i++) {
@@ -2881,6 +2919,28 @@ export class Game {
 
         // 清理已销毁的障碍物（紧凑过滤）
         this.obstacles = this.obstacles.filter(obs => obs.isAlive || obs.fragments.length > 0);
+
+        // 海底生态边界墙碰撞检测
+        for (const worm of this.worms) {
+            if (!worm.isAlive || worm.segments.length === 0) continue;
+            const result = this.zoneDecorations.checkWormCollision(worm);
+            if (result && result.damage) {
+                if (worm.segments.length > 3) {
+                    worm.segments.pop();
+                    worm.targetLength = worm.segments.length;
+                    if (worm.isPlayer) worm.syncBlueToBody();
+                }
+                const headPos = worm.head;
+                if (headPos) {
+                    this.floatingTexts.push(FloatingText.acquire(headPos.x, headPos.y - 20, result.text, result.color));
+                    for (let k = 0; k < 4; k++) {
+                        this.particles.push(Particle.acquire(headPos.x, headPos.y, result.color));
+                    }
+                }
+            }
+            // 沙层互动碰撞（不造成伤害，只产生粒子和形变）
+            this.zoneDecorations.checkSandCollision(worm);
+        }
     }
 
     // 幼体成年逻辑（提取重复代码）
@@ -3079,13 +3139,36 @@ export class Game {
         // 更新相机跟随玩家头部（或demo模式下跟随第一个虫虫）
         const player = this.worms[0];
         const camDt = this._lastDt || 0.016; // dt来自update()
+
+        // 基于镜头锁定区域计算下一区域（路径中的下一个）
+        const lockedZone = this.camera._lockedZone;
+        let nextZoneInPath = null;
+        if (lockedZone && lockedZone.id < 25) {
+            nextZoneInPath = this.zoneManager.zones[lockedZone.id]; // zones[0]=id1, zones[n-1]=id n, so zones[lockedZone.id] has id=lockedZone.id+1
+        }
+
+        // 查找锁定区域与下一区域之间的可挖掘墙壁（用于镜头挖掘同步）
+        let activeWallForCamera = null;
+        if (lockedZone && nextZoneInPath) {
+            for (const wall of this.diggableWalls) {
+                if (!wall.active) continue;
+                if ((wall.fromZone === lockedZone && wall.toZone === nextZoneInPath) ||
+                    (wall.fromZone === nextZoneInPath && wall.toZone === lockedZone)) {
+                    activeWallForCamera = wall;
+                    break;
+                }
+            }
+        }
+
         if (player && player.isAlive && player.head) {
-            this.camera.follow(player.head.x, player.head.y, camDt);
+            const playerZone = this.zoneManager.getZoneAt(player.head.x, player.head.y);
+            this.camera.follow(player.head.x, player.head.y, camDt, playerZone, nextZoneInPath, activeWallForCamera);
         } else if (this.state === GAME_STATE.IDLE && this.worms.length > 0) {
             // Demo模式：跟随第一个存活虫虫
             for (const w of this.worms) {
                 if (w.isAlive && w.head) {
-                    this.camera.follow(w.head.x, w.head.y, camDt);
+                    const wZone = this.zoneManager.getZoneAt(w.head.x, w.head.y);
+                    this.camera.follow(w.head.x, w.head.y, camDt, wZone, nextZoneInPath, activeWallForCamera);
                     break;
                 }
             }
@@ -3195,6 +3278,9 @@ export class Game {
         for (const barrier of this.barriers) {
             barrier.draw(ctx, this.gameTime);
         }
+
+        // 海底生态边界墙（覆盖虫虫以表现墙壁效果）
+        this.zoneDecorations.draw(ctx);
 
         // 绘制地图边界（在世界坐标中）
         this.drawMapBorder();

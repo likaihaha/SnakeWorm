@@ -288,6 +288,13 @@ export class ZoneManager {
         if (zone) {
             zone.status = ZONE_STATUS.COMPLETED;
             this.completedZones.add(zoneId);
+            // Boss关通过后，自动解锁下一个区域（打开通往下一区域的障碍门）
+            if (zone.zoneType === ZONE_TYPE.BOSS && zoneId < 25) {
+                const nextZone = this.zones[zoneId]; // zones[zoneId] = id zoneId+1
+                if (nextZone && nextZone.status === ZONE_STATUS.LOCKED) {
+                    nextZone.status = ZONE_STATUS.UNLOCKED;
+                }
+            }
         }
     }
 

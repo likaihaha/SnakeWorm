@@ -263,11 +263,18 @@ class EditableDynamicBG {
     for (const id of order) {
       this._renderStaticLayer(ctx, id);
     }
-    // 渲染不在 layerOrder 中的 shapes
+    // 渲染不在 layerOrder 中的 shapes（排除属于组的子元素）
     const shapes = this.cfg.shapes || [];
+    const groups = this.cfg.groups || [];
+    const groupedChildIds = new Set();
+    for (const g of groups) {
+      for (const childId of (g.children || [])) {
+        groupedChildIds.add(childId);
+      }
+    }
     for (const s of shapes) {
       const sid = 'shape_' + s.id;
-      if (!orderSet.has(sid) && s.visible !== false) {
+      if (!orderSet.has(sid) && !groupedChildIds.has(sid) && s.visible !== false) {
         // 这些形状不需要data属性
         const noDataNeeded = ['rectangle', 'circle', 'polygon', 'polyline', 'path', 'mountain', 'rock', 'particles'].includes(s.type);
         if (noDataNeeded || (s.data && s.data.length > 0)) {
@@ -380,16 +387,37 @@ class EditableDynamicBG {
         } else if (id.startsWith('group_')) {
           const group = (c.groups || []).find(g => g.id === id);
           if (group) {
-            ctx.save();
-            const gx = (group.x || 0.5) * this.w;
-            const gy = (group.y || 0.5) * this.h;
             const gr = (group.rotation || 0) * Math.PI / 180;
             const gs = group.scale || 1;
-            // 绕组中心旋转+缩放（不影响组中心的世界位置）
-            ctx.translate(gx, gy);
+
+            // 计算子元素原始包围盒中心（组创建时的位置）
+            const shapes = c.shapes || [];
+            let ominX = Infinity, ominY = Infinity, omaxX = -Infinity, omaxY = -Infinity;
+            for (const childId of group.children) {
+              const sid = childId.replace('shape_', '');
+              const s = shapes.find(sh => sh.id === sid);
+              if (!s || s.visible === false) continue;
+              const b = this.getShapeBounds(s);
+              if (b.width <= 0 && b.height <= 0) continue;
+              ominX = Math.min(ominX, b.x); ominY = Math.min(ominY, b.y);
+              omaxX = Math.max(omaxX, b.x + b.width); omaxY = Math.max(omaxY, b.y + b.height);
+            }
+            if (ominX === Infinity) return;
+
+            const origCX = (ominX + omaxX) / 2;
+            const origCY = (ominY + omaxY) / 2;
+            const newCX = (group.x || 0.5) * this.w;
+            const newCY = (group.y || 0.5) * this.h;
+
+            ctx.save();
+            // 1. 平移到新组中心
+            ctx.translate(newCX, newCY);
+            // 2. 绕新组中心旋转+缩放
             if (gr) ctx.rotate(gr);
             if (gs !== 1) ctx.scale(gs, gs);
-            ctx.translate(-gx, -gy);
+            // 3. 平移回原始中心（让子形状在旋转/缩放后正确偏移）
+            ctx.translate(-origCX, -origCY);
+
             for (const childId of group.children) {
               this._renderStaticLayer(ctx, childId);
             }
@@ -1611,43 +1639,51 @@ class EditableDynamicBG {
     }
   }
 
-  // 虚拟点组渲染：创建临时副本绘制，不动原始形状
+  // 虚拟点组渲染：应用组变换（平移+旋转+缩放）绘制子形状
   drawGroupDirect(ctx, group, shapesOverride) {
     const gw = this.w, gh = this.h;
-    const gcx = (group.x || 0.5) * gw;
-    const gcy = (group.y || 0.5) * gh;
     const gr = (group.rotation || 0) * Math.PI / 180;
     const gs = group.scale || 1;
-    const cos = Math.cos(gr), sin = Math.sin(gr);
     const shapes = shapesOverride || this.cfg.shapes || [];
-    console.log(`[GDD] group.x:${group.x?.toFixed(4)} gcx:${Math.round(gcx)} id:${group.id}`);
+
+    // compute original children bounding box center
+    let ominX = Infinity, ominY = Infinity, omaxX = -Infinity, omaxY = -Infinity;
+    for (const childId of group.children) {
+      const sid = childId.replace('shape_', '');
+      const s = shapes.find(sh => sh.id === sid);
+      if (!s || s.visible === false) continue;
+      const b = this.getShapeBounds(s);
+      if (b.width <= 0 && b.height <= 0) continue;
+      ominX = Math.min(ominX, b.x); ominY = Math.min(ominY, b.y);
+      omaxX = Math.max(omaxX, b.x + b.width); omaxY = Math.max(omaxY, b.y + b.height);
+    }
+    if (ominX === Infinity) return;
+
+    const origCX = (ominX + omaxX) / 2;
+    const origCY = (ominY + omaxY) / 2;
+    const newCX = (group.x || 0.5) * gw;
+    const newCY = (group.y || 0.5) * gh;
+
+    ctx.save();
+    ctx.translate(newCX, newCY);
+    if (gr) ctx.rotate(gr);
+    if (gs !== 1) ctx.scale(gs, gs);
+    ctx.translate(-origCX, -origCY);
 
     for (const childId of group.children) {
       const sid = childId.replace('shape_', '');
       const orig = shapes.find(sh => sh.id === sid);
       if (!orig || orig.visible === false) continue;
-
-      // 计算变换后位置
-      const origBounds = this.getShapeBounds(orig);
-      const ox = origBounds.x + origBounds.width / 2;
-      const oy = origBounds.y + origBounds.height / 2;
-      const dx = ox - gcx, dy = oy - gcy;
-      const rdx = dx * gs, rdy = dy * gs;
-      const wx = gcx + rdx * cos - rdy * sin;
-      const wy = gcy + rdx * sin + rdy * cos;
-
-      // DEBUG: 直接画红色矩形在变换后位置
-      ctx.save();
-      ctx.fillStyle = '#f00';
-      ctx.fillRect(wx - 20, wy - 20, 40, 40);
-      ctx.fillStyle = '#fff';
-      ctx.font = '10px monospace';
-      ctx.fillText(`${Math.round(wx)},${Math.round(wy)}`, wx - 18, wy + 35);
-      ctx.restore();
+      const noDataNeeded = ['rectangle', 'circle', 'polygon', 'polyline', 'path', 'mountain', 'rock', 'particles'].includes(orig.type);
+      if (noDataNeeded || (orig.data && orig.data.length > 0)) {
+        this._drawSingleShape(ctx, orig, false);
+      }
     }
+
+    ctx.restore();
   }
 
-  // ===================== Transform 控制器 =====================
+    // ===================== Transform 控制器 =====================
   getShapeBounds(s) {
     const w = this.w, h = this.h;
     switch (s.type) {
@@ -1800,47 +1836,110 @@ class EditableDynamicBG {
   // ===== 多选变换控制器 =====
 
   getGroupBounds(shapes, group) {
+    if (!group) {
+      // 无组：纯多选，返回原始 bounds
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      for (const s of shapes) {
+        const b = this.getShapeBounds(s);
+        if (b.width <= 0 && b.height <= 0) continue;
+        minX = Math.min(minX, b.x); minY = Math.min(minY, b.y);
+        maxX = Math.max(maxX, b.x + b.width); maxY = Math.max(maxY, b.y + b.height);
+      }
+      if (minX === Infinity) return { x: 0, y: 0, width: 0, height: 0 };
+      return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+    }
+
+    // 有组：计算原始包围盒中心，然后应用 T(newCenter) * R * S * T(-origCenter)
+    let ominX = Infinity, ominY = Infinity, omaxX = -Infinity, omaxY = -Infinity;
+    for (const s of shapes) {
+      const b = this.getShapeBounds(s);
+      if (b.width <= 0 && b.height <= 0) continue;
+      ominX = Math.min(ominX, b.x); ominY = Math.min(ominY, b.y);
+      omaxX = Math.max(omaxX, b.x + b.width); omaxY = Math.max(omaxY, b.y + b.height);
+    }
+    if (ominX === Infinity) return { x: 0, y: 0, width: 0, height: 0 };
+
+    const origCX = (ominX + omaxX) / 2;
+    const origCY = (ominY + omaxY) / 2;
+    const newCX = (group.x || 0.5) * this.w;
+    const newCY = (group.y || 0.5) * this.h;
+    const gr = (group.rotation || 0) * Math.PI / 180;
+    const gs = group.scale || 1;
+    const cos = Math.cos(gr), sin = Math.sin(gr);
+
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
     for (const s of shapes) {
       const b = this.getShapeBounds(s);
       if (b.width <= 0 && b.height <= 0) continue;
-      minX = Math.min(minX, b.x);
-      minY = Math.min(minY, b.y);
-      maxX = Math.max(maxX, b.x + b.width);
-      maxY = Math.max(maxY, b.y + b.height);
-    }
-    if (minX === Infinity) return { x: 0, y: 0, width: 0, height: 0 };
-
-    // 如果有组变换，对4个角应用旋转+缩放后重新计算AABB
-    if (group && (group.rotation || group.scale !== 1)) {
-      const gx = (group.x || 0.5) * this.w;
-      const gy = (group.y || 0.5) * this.h;
-      const gr = (group.rotation || 0) * Math.PI / 180;
-      const gs = group.scale || 1;
-      const cos = Math.cos(gr), sin = Math.sin(gr);
       const corners = [
-        { x: minX, y: minY }, { x: maxX, y: minY },
-        { x: maxX, y: maxY }, { x: minX, y: maxY }
+        { x: b.x, y: b.y }, { x: b.x + b.width, y: b.y },
+        { x: b.x + b.width, y: b.y + b.height }, { x: b.x, y: b.y + b.height }
       ];
-      minX = Infinity; minY = Infinity; maxX = -Infinity; maxY = -Infinity;
       for (const c of corners) {
-        const rx = (c.x - gx) * gs, ry = (c.y - gy) * gs;
-        const wx = gx + rx * cos - ry * sin;
-        const wy = gy + rx * sin + ry * cos;
+        // T(-origCenter): 偏移到原始中心
+        const dx = c.x - origCX, dy = c.y - origCY;
+        // R * S: 旋转+缩放
+        const rx = dx * gs, ry = dy * gs;
+        const wx = newCX + rx * cos - ry * sin;
+        const wy = newCY + rx * sin + ry * cos;
         minX = Math.min(minX, wx); minY = Math.min(minY, wy);
         maxX = Math.max(maxX, wx); maxY = Math.max(maxY, wy);
       }
     }
+    if (minX === Infinity) return { x: 0, y: 0, width: 0, height: 0 };
     return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
   }
 
   drawGroupTransform(ctx, shapes, group) {
-    const bounds = this.getGroupBounds(shapes, group);
-    if (bounds.width <= 0 && bounds.height <= 0) return;
+    // 计算缩放后的 bounds（不含旋转）——控制器的"本地"形状
+    let ominX = Infinity, ominY = Infinity, omaxX = -Infinity, omaxY = -Infinity;
+    for (const s of shapes) {
+      const b = this.getShapeBounds(s);
+      if (b.width <= 0 && b.height <= 0) continue;
+      ominX = Math.min(ominX, b.x); ominY = Math.min(ominY, b.y);
+      omaxX = Math.max(omaxX, b.x + b.width); omaxY = Math.max(omaxY, b.y + b.height);
+    }
+    if (ominX === Infinity) return;
+
+    const origCX = (ominX + omaxX) / 2;
+    const origCY = (ominY + omaxY) / 2;
+    const newCX = group ? (group.x || 0.5) * this.w : origCX;
+    const newCY = group ? (group.y || 0.5) * this.h : origCY;
+    const gs = group ? (group.scale || 1) : 1;
+    const gr = group ? ((group.rotation || 0) * Math.PI / 180) : 0;
+
+    // 缩放后的包围盒（不含旋转）
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const s of shapes) {
+      const b = this.getShapeBounds(s);
+      if (b.width <= 0 && b.height <= 0) continue;
+      const corners = [
+        { x: b.x, y: b.y }, { x: b.x + b.width, y: b.y },
+        { x: b.x + b.width, y: b.y + b.height }, { x: b.x, y: b.y + b.height }
+      ];
+      for (const c of corners) {
+        const dx = c.x - origCX, dy = c.y - origCY;
+        const sx = dx * gs, sy = dy * gs;
+        const wx = newCX + sx;
+        const wy = newCY + sy;
+        minX = Math.min(minX, wx); minY = Math.min(minY, wy);
+        maxX = Math.max(maxX, wx); maxY = Math.max(maxY, wy);
+      }
+    }
+    if (minX === Infinity) return;
+
+    const bounds = { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
 
     ctx.save();
 
-    // 外框（绿色虚线区分多选）
+    // 绕组中心旋转整个控制器
+    if (gr) {
+      ctx.translate(newCX, newCY);
+      ctx.rotate(gr);
+      ctx.translate(-newCX, -newCY);
+    }
+
+    // 外框（绿色虚线）
     ctx.strokeStyle = '#3fb950';
     ctx.lineWidth = 1.5;
     ctx.setLineDash([6, 3]);
@@ -1884,14 +1983,56 @@ class EditableDynamicBG {
   }
 
   getGroupTransformHandle(mx, my, shapes, group) {
-    const bounds = this.getGroupBounds(shapes, group);
-    if (bounds.width <= 0 && bounds.height <= 0) return null;
+    // 计算缩放后的 bounds（不含旋转）——与 drawGroupTransform 一致
+    let ominX = Infinity, ominY = Infinity, omaxX = -Infinity, omaxY = -Infinity;
+    for (const s of shapes) {
+      const b = this.getShapeBounds(s);
+      if (b.width <= 0 && b.height <= 0) continue;
+      ominX = Math.min(ominX, b.x); ominY = Math.min(ominY, b.y);
+      omaxX = Math.max(omaxX, b.x + b.width); omaxY = Math.max(omaxY, b.y + b.height);
+    }
+    if (ominX === Infinity) return null;
+
+    const origCX = (ominX + omaxX) / 2;
+    const origCY = (ominY + omaxY) / 2;
+    const newCX = group ? (group.x || 0.5) * this.w : origCX;
+    const newCY = group ? (group.y || 0.5) * this.h : origCY;
+    const gs = group ? (group.scale || 1) : 1;
+    const gr = group ? ((group.rotation || 0) * Math.PI / 180) : 0;
+
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const s of shapes) {
+      const b = this.getShapeBounds(s);
+      if (b.width <= 0 && b.height <= 0) continue;
+      const corners = [
+        { x: b.x, y: b.y }, { x: b.x + b.width, y: b.y },
+        { x: b.x + b.width, y: b.y + b.height }, { x: b.x, y: b.y + b.height }
+      ];
+      for (const c of corners) {
+        const dx = c.x - origCX, dy = c.y - origCY;
+        const sx = dx * gs, sy = dy * gs;
+        minX = Math.min(minX, newCX + sx); minY = Math.min(minY, newCY + sy);
+        maxX = Math.max(maxX, newCX + sx); maxY = Math.max(maxY, newCY + sy);
+      }
+    }
+    if (minX === Infinity) return null;
+    const bounds = { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+
+    // 将鼠标坐标逆旋转到控制器的本地坐标系
+    let lx = mx, ly = my;
+    if (gr) {
+      const cos = Math.cos(-gr), sin = Math.sin(-gr);
+      const dx = mx - newCX, dy = my - newCY;
+      lx = newCX + dx * cos - dy * sin;
+      ly = newCY + dx * sin + dy * cos;
+    }
+
     const handleSize = 12;
 
     // 旋转手柄
     const rotX = bounds.x + bounds.width / 2;
     const rotY = bounds.y - 25;
-    if (Math.abs(mx - rotX) <= handleSize / 2 + 2 && Math.abs(my - rotY) <= handleSize / 2 + 2) {
+    if (Math.abs(lx - rotX) <= handleSize / 2 + 2 && Math.abs(ly - rotY) <= handleSize / 2 + 2) {
       return 'rotate';
     }
 
@@ -1907,14 +2048,14 @@ class EditableDynamicBG {
       { x: bounds.x, y: bounds.y + bounds.height / 2, name: 'resize-w' },
     ];
     for (const h of hs) {
-      if (Math.abs(mx - h.x) <= handleSize / 2 && Math.abs(my - h.y) <= handleSize / 2) {
+      if (Math.abs(lx - h.x) <= handleSize / 2 && Math.abs(ly - h.y) <= handleSize / 2) {
         return h.name;
       }
     }
 
     // 内部 = 移动
-    if (mx >= bounds.x && mx <= bounds.x + bounds.width &&
-        my >= bounds.y && my <= bounds.y + bounds.height) {
+    if (lx >= bounds.x && lx <= bounds.x + bounds.width &&
+        ly >= bounds.y && ly <= bounds.y + bounds.height) {
       return 'move';
     }
 
