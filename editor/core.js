@@ -544,6 +544,12 @@ class BackgroundEditor {
     const shapes = cfg.shapes || [];
     const groups = cfg.groups || [];
 
+    // DEBUG: 画大标记确认_redrawAll被调用
+    ctx.save();
+    ctx.fillStyle = 'rgba(255,0,0,0.3)';
+    ctx.fillRect(0, 0, 50, 50);
+    ctx.restore();
+
     for (const id of order) {
       if (id === 'background') {
         bg._renderStaticLayer(ctx, id);
