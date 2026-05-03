@@ -1917,24 +1917,14 @@ class BackgroundEditor {
       if (this.bg) {
         this.bg.update(dt);
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-        this.bg.draw(this.ctx);
 
-        // 组变换进行中时，直接重绘组内元素（绕过静态画布缓存）
+        // 组变换进行中时，跳过静态画布，全部直接重绘
         if (this.transformState && this.transformState.isGroupTransform) {
-          const tsGroup = (this.config.groups || []).find(g => g.id === this.selectedElement);
-          if (tsGroup) {
-            const tsChildren = tsGroup.children
-              .map(id => this.config.shapes?.find(s => s.id === id.replace('shape_', '')))
-              .filter(s => s && s.visible !== false);
-            for (const s of tsChildren) {
-              if (this._rotDbg !== Math.round(Date.now() / 200)) {
-                this._rotDbg = Math.round(Date.now() / 200);
-                const b = this.bg.getShapeBounds(s);
-                console.log(`[重绘] ${s.type} x:${s.x?.toFixed(4)} y:${s.y?.toFixed(4)} bounds:(${Math.round(b.x)},${Math.round(b.y)}) rot:${s.rotation||0}`);
-              }
-              this.bg._drawSingleShape(this.ctx, s, false);
-            }
-          }
+          // 重绘静态层（使用当前shape属性）
+          this.bg.refreshStatic();
+          this.bg.draw(this.ctx);
+        } else {
+          this.bg.draw(this.ctx);
         }
 
         // 绘制网格和参考线
