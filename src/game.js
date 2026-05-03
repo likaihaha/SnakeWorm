@@ -22,6 +22,7 @@ import { ZoneManager } from './zone-manager.js';
 import { Barrier, generateBarriers } from './barrier.js';
 import { createBoss, BOSS_STATE } from './boss.js';
 import { Obstacle, OBSTACLE_TYPE, generateObstacles } from './obstacle.js';
+import { getThemeConfig } from './theme-configs.js';
 
 export class Game {
     constructor() {
@@ -73,6 +74,7 @@ export class Game {
         this.zoneManager = new ZoneManager();
         this.zoneManager.loadProgress();
         this.showZoneDebug = false;  // Ctrl+Z 切换区域调试视图
+        // Phase 3c: 背景主题在 bg 创建后设置（见下方 _initZoneTheme 调用）
         
         // === Phase B: Barrier 门系统 ===
         this.barriers = generateBarriers(this.zoneManager);
@@ -103,10 +105,23 @@ export class Game {
 
         // 动态程序化背景（视口大小，覆盖屏幕即可）
         this.bg = new DynamicBG(CONFIG.CANVAS_WIDTH, CONFIG.CANVAS_HEIGHT);
+        // Phase 3c: 根据已存档区域设置初始背景主题
+        this._currentTheme = 'default';
+        {
+            const savedZone = this.zoneManager.zones[this.zoneManager.currentZoneId - 1];
+            if (savedZone) {
+                const savedCfg = getThemeConfig(savedZone.theme);
+                if (savedCfg) {
+                    this.bg.applyConfig(savedCfg);
+                    this._currentTheme = savedZone.theme;
+                }
+            }
+        }
+        // 仅在使用默认主题时加载 JSON 配置（JSON 是深度海洋场景）
         fetch('src/dynamic-bg-config.json')
             .then(r => r.json())
-            .then(cfg => this.bg.applyConfig(cfg))
-            .catch(err => console.warn('动态背景配置加载失败，使用默认配置', err));
+            .then(cfg => { if (this._currentTheme === 'default') this.bg.applyConfig(cfg); })
+            .catch(() => {});
         // FPS相关
         this.showFPS = CONFIG.SHOW_FPS;
         this.targetFPS = CONFIG.TARGET_FPS;
@@ -689,6 +704,12 @@ export class Game {
         this.fireCooldown = 0;  // 重置射击冷却
         this.screenShake = { intensity: 0, duration: 0, timer: 0 };  // 重置屏幕震动
         this.ripples = [];  // 重置波纹
+
+        // Phase 3c: 重置背景主题到初始（Zone 1 = forest）
+        this._currentTheme = 'default';
+        const initThemeCfg = getThemeConfig('forest');
+        if (initThemeCfg) this.bg.applyConfig(initThemeCfg);
+        this._currentTheme = 'forest';
 
         // 玩家虫虫从框外左边开始（完全不可见）
         const spawnX = 400;   // 左下方偏高
@@ -2211,6 +2232,19 @@ export class Game {
      */
     _handleZoneTransition(fromZoneId, toZoneId, player) {
         const zm = this.zoneManager;
+
+        // Phase 3c: 主题背景切换
+        const toZoneTheme = zm.zones[toZoneId - 1]?.theme || 'default';
+        if (toZoneTheme !== this._currentTheme) {
+            const themeCfg = getThemeConfig(toZoneTheme);
+            if (themeCfg) {
+                this.bg.transitionTo(themeCfg, 1.2);  // 1.2秒平滑过渡
+            } else {
+                // 没有专用配置（default），使用默认配置快速切换
+                this.bg.applyConfig(this.bg._defaultConfig());
+            }
+            this._currentTheme = toZoneTheme;
+        }
         // 暂存离开区域的食物和敌人
         const fromZone = zm.zones[fromZoneId - 1];
         if (fromZone) {

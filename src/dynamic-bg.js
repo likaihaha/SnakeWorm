@@ -12,9 +12,32 @@ export class DynamicBG {
         this._init();
     }
 
-    /** 应用外部配置并重新初始化 */
+    /** 应用外部配置并重新初始化（无过渡） */
     applyConfig(cfg) {
         this.cfg = cfg;
+        this._init();
+    }
+
+    /**
+     * 平滑过渡到新配置
+     * @param {object} newCfg - 新的配置对象
+     * @param {number} duration - 过渡时间（秒），默认 1.0
+     */
+    transitionTo(newCfg, duration = 1.0) {
+        if (this._transition) return; // 已在过渡中，忽略
+        // 保存旧静态层快照
+        const oldStaticCanvas = document.createElement('canvas');
+        oldStaticCanvas.width = this.w;
+        oldStaticCanvas.height = this.h;
+        oldStaticCanvas.getContext('2d').drawImage(this.staticCanvas, 0, 0);
+        this._transition = {
+            oldCanvas: oldStaticCanvas,
+            newCfg,
+            duration,
+            elapsed: 0,
+        };
+        // 预渲染新静态层
+        this.cfg = newCfg;
         this._init();
     }
 
@@ -658,6 +681,10 @@ export class DynamicBG {
     // ==================== 动态渲染（每帧调用） ====================
     update(dt) {
         this.t += dt;
+        // 推进过渡计时器
+        if (this._transition) {
+            this._transition.elapsed += dt;
+        }
         const cj = this.cfg.jellyfish;
         if (cj.visible) {
             const j = this.jellyfish;
@@ -702,8 +729,25 @@ export class DynamicBG {
     }
 
     draw(ctx) {
-        // 1. 绘制静态层
-        ctx.drawImage(this.staticCanvas, 0, 0);
+        // 1. 绘制静态层（带过渡混合）
+        if (this._transition) {
+            const tr = this._transition;
+            const progress = Math.min(tr.elapsed / tr.duration, 1);
+            const alpha = this._easeInOutCubic(progress);
+            // 先画旧层（逐渐淡出）
+            ctx.globalAlpha = 1 - alpha;
+            ctx.drawImage(tr.oldCanvas, 0, 0);
+            // 再画新层（逐渐淡入）
+            ctx.globalAlpha = alpha;
+            ctx.drawImage(this.staticCanvas, 0, 0);
+            ctx.globalAlpha = 1;
+            // 过渡完成
+            if (progress >= 1) {
+                this._transition = null;
+            }
+        } else {
+            ctx.drawImage(this.staticCanvas, 0, 0);
+        }
 
         // 2. 远景山脉微视差
         if (this.cfg.mountains.visible) this._drawMountains(ctx);
@@ -867,5 +911,10 @@ export class DynamicBG {
         }
         ctx.globalAlpha = 1;
         ctx.restore();
+    }
+
+    // ==================== 缓动函数 ====================
+    _easeInOutCubic(t) {
+        return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
     }
 }
