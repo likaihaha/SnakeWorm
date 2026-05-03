@@ -548,6 +548,48 @@ class BackgroundEditor {
     this.markDirty();
   }
 
+  // 直接在主画布上绘制所有形状（绕过静态画布缓存）
+  _drawAllShapesDirect(ctx) {
+    const bg = this.bg;
+    if (!bg) return;
+    const cfg = bg.cfg;
+    const order = cfg.layerOrder || [];
+    const orderSet = new Set(order);
+    const shapes = cfg.shapes || [];
+
+    // 绘制背景
+    if (cfg.background?.visible) {
+      ctx.fillStyle = cfg.background.color0 || '#1a1a2e';
+      ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+    }
+
+    // 按 layerOrder 绘制
+    for (const id of order) {
+      if (id === 'background') continue;
+      if (id.startsWith('group_')) {
+        const group = (cfg.groups || []).find(g => g.id === id);
+        if (group) {
+          for (const childId of group.children) {
+            const sid = childId.replace('shape_', '');
+            const s = shapes.find(sh => sh.id === sid);
+            if (s && s.visible !== false) bg._drawSingleShape(ctx, s, false);
+          }
+        }
+      } else if (id.startsWith('shape_')) {
+        const sid = id.replace('shape_', '');
+        const s = shapes.find(sh => sh.id === sid);
+        if (s && s.visible !== false) bg._drawSingleShape(ctx, s, false);
+      }
+    }
+    // 绘制不在 layerOrder 中的形状
+    for (const s of shapes) {
+      const sid = 'shape_' + s.id;
+      if (!orderSet.has(sid) && s.visible !== false) {
+        bg._drawSingleShape(ctx, s, false);
+      }
+    }
+  }
+
   _getCursorForHandle(handle) {
     const map = {
       'move': 'move',
@@ -1918,11 +1960,9 @@ class BackgroundEditor {
         this.bg.update(dt);
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
-        // 组变换进行中时，跳过静态画布，全部直接重绘
+        // 组变换进行中时，完全绕过静态画布，直接在主画布上绘制
         if (this.transformState && this.transformState.isGroupTransform) {
-          // 重绘静态层（使用当前shape属性）
-          this.bg.refreshStatic();
-          this.bg.draw(this.ctx);
+          this._drawAllShapesDirect(this.ctx);
         } else {
           this.bg.draw(this.ctx);
         }
