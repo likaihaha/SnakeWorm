@@ -23,6 +23,7 @@ import { Barrier, generateBarriers } from './barrier.js';
 import { createBoss, BOSS_STATE } from './boss.js';
 import { Obstacle, OBSTACLE_TYPE, generateObstacles } from './obstacle.js';
 import { getThemeConfig } from './theme-configs.js';
+import { MiniMap } from './minimap.js';
 
 export class Game {
     constructor() {
@@ -92,6 +93,12 @@ export class Game {
 
         // 相机系统
         this.camera = new Camera();
+
+        // 小地图系统
+        this.miniMap = new MiniMap(this.zoneManager);
+
+        // 胜利画面状态
+        this.victory = false;
 
         // 空间网格分区（使用地图尺寸）
         this.spatialGrid = new SpatialGrid(CONFIG.MAP_WIDTH, CONFIG.MAP_HEIGHT, 40);
@@ -439,6 +446,19 @@ export class Game {
         
         // 键盘事件
         document.addEventListener('keydown', (e) => {
+            // Phase 4a: 胜利画面按键处理
+            if (this.victory) {
+                if (e.key === 'r' || e.key === 'R') {
+                    this._victoryParticles = null;
+                    this.restart();
+                    this.waitingForPlayer = true;
+                } else if (e.key === 'Escape') {
+                    this._victoryParticles = null;
+                    this.victory = false;
+                    this.backToStartScreen();
+                }
+                return;
+            }
             if (e.key === 'Escape') {
                 if (this.state === GAME_STATE.PLAYING) {
                     this.pauseGame();
@@ -711,6 +731,10 @@ export class Game {
         if (initThemeCfg) this.bg.applyConfig(initThemeCfg);
         this._currentTheme = 'forest';
 
+        // Phase 4a: 重置胜利状态
+        this.victory = false;
+        this.victoryStats = null;
+
         // 玩家虫虫从框外左边开始（完全不可见）
         const spawnX = 400;   // 左下方偏高
         const spawnY = 2800;
@@ -824,6 +848,10 @@ export class Game {
 
             // 按目标帧率执行更新
             while (this.fpsAccumulator >= targetInterval) {
+                // Phase 4a: 胜利画面期间暂停游戏逻辑，但仍更新背景动画
+                if (this.victory) {
+                    break;
+                }
                 if (this.state === GAME_STATE.PLAYING || this.state === GAME_STATE.GAME_OVER) {
                     // 游戏结束但还有尸体需要处理时，继续更新；观战模式下也持续更新
                     if (this.state === GAME_STATE.PLAYING || this.deadBodies.length > 0 || this.playerDeadWaitingForBodies || this.spectating) {
@@ -1290,6 +1318,17 @@ export class Game {
                     this.particles.push(Particle.acquire(cx, cy, '#44ff44'));
                 }
                 this.debugLogger.logZoneComplete(newZoneId, completionResult.reason, this.gameTime);
+                // Phase 4a: Zone 25 通关触发胜利画面
+                if (newZoneId === 25 && !this.victory) {
+                    this.victory = true;
+                    this.victoryStats = {
+                        time: this.gameTime,
+                        score: this.score,
+                        kills: this.zoneManager.killCount,
+                        maxLength: this.maxLengthReached,
+                    };
+                    this.debugLogger._log('VICTORY', '虫后击败！游戏胜利！', this.victoryStats, this.gameTime);
+                }
             }
             // 定期保存进度（每10秒）
             if (Math.floor(this.gameTime) % 10 === 0 && Math.floor(this.gameTime) !== Math.floor(this.gameTime - dt)) {
@@ -1692,6 +1731,9 @@ export class Game {
         // 11.5 更新屏幕震动和波纹
         this.updateScreenShake(dt);
         this.updateRipples(dt);
+
+        // 11.6 更新小地图
+        this.miniMap.update(dt);
 
         // 12. 更新 UI
         this.updateUI();
@@ -2993,6 +3035,19 @@ export class Game {
         }
         // Phase A: 区域 HUD 信息
         this.zoneManager.drawHUD(ctx, CONFIG.CANVAS_WIDTH, CONFIG.CANVAS_HEIGHT);
+        // Phase 4a: 小地图
+        if (this.state === GAME_STATE.PLAYING || this.state === GAME_STATE.GAME_OVER) {
+            const player = this.worms[0];
+            if (player && player.isAlive && player.head) {
+                this.miniMap.draw(ctx, player.head.x, player.head.y);
+            } else {
+                this.miniMap.draw(ctx);
+            }
+        }
+        // Phase 4a: 胜利画面
+        if (this.victory) {
+            this.drawVictoryScreen();
+        }
     }
 
     preRenderGrid() {
@@ -3061,6 +3116,128 @@ export class Game {
         ctx.textAlign = 'left';
         ctx.fillText(`${this.fpsDisplay} FPS`, 10, 18);
         ctx.restore();
+    }
+
+    /**
+     * 绘制胜利画面
+     */
+    drawVictoryScreen() {
+        const W = CONFIG.CANVAS_WIDTH;
+        const H = CONFIG.CANVAS_HEIGHT;
+        const cx = W / 2;
+        const cy = H / 2;
+
+        // 半透明金色覆盖层
+        ctx.save();
+        ctx.fillStyle = 'rgba(10, 5, 0, 0.82)';
+        ctx.fillRect(0, 0, W, H);
+
+        // 标题
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.font = 'bold 48px "Microsoft YaHei", sans-serif';
+        ctx.fillStyle = '#ffd700';
+        ctx.shadowColor = '#ffd700';
+        ctx.shadowBlur = 30;
+        ctx.fillText('🎉 游戏胜利！', cx, cy - 140);
+        ctx.shadowBlur = 0;
+
+        // 副标题
+        ctx.font = '20px "Microsoft YaHei", sans-serif';
+        ctx.fillStyle = '#ffec99';
+        ctx.fillText('虫后已被击败，旋律虫虫的传说永存！', cx, cy - 85);
+
+        // 统计面板
+        const stats = this.victoryStats || {};
+        const panelX = cx - 160;
+        const panelY = cy - 40;
+        const panelW = 320;
+        const panelH = 160;
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+        ctx.strokeStyle = 'rgba(255, 215, 0, 0.5)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        if (ctx.roundRect) {
+            ctx.roundRect(panelX, panelY, panelW, panelH, 10);
+        } else {
+            ctx.rect(panelX, panelY, panelW, panelH);
+        }
+        ctx.fill();
+        ctx.stroke();
+
+        const totalSec = Math.floor(stats.time || 0);
+        const min = Math.floor(totalSec / 60);
+        const sec = totalSec % 60;
+        const timeStr = `${String(min).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+
+        const statsRows = [
+            ['⏱️ 通关时间', timeStr],
+            ['🏆 最终分数', `${stats.score || 0}`],
+            ['💀 击杀数', `${stats.kills || 0}`],
+            ['📏 最大长度', `${stats.maxLength || 0} 节`],
+        ];
+        ctx.font = '16px "Microsoft YaHei", sans-serif';
+        ctx.textAlign = 'left';
+        for (let i = 0; i < statsRows.length; i++) {
+            const row = statsRows[i];
+            const ry = panelY + 30 + i * 35;
+            ctx.fillStyle = '#ccc';
+            ctx.fillText(row[0], panelX + 20, ry);
+            ctx.textAlign = 'right';
+            ctx.fillStyle = '#ffd700';
+            ctx.font = 'bold 16px "Microsoft YaHei", sans-serif';
+            ctx.fillText(row[1], panelX + panelW - 20, ry);
+            ctx.textAlign = 'left';
+            ctx.font = '16px "Microsoft YaHei", sans-serif';
+        }
+
+        // 按钮提示
+        ctx.textAlign = 'center';
+        ctx.font = '16px "Microsoft YaHei", sans-serif';
+        ctx.fillStyle = 'rgba(255,255,255,0.6)';
+        ctx.fillText('按 R 再来一次 · 按 ESC 返回菜单', cx, cy + 160);
+
+        // 庆祝粒子（在覆盖层上方画）
+        this._drawVictoryParticles();
+
+        ctx.restore();
+    }
+
+    /**
+     * 胜利画面粒子动画
+     */
+    _drawVictoryParticles() {
+        if (!this._victoryParticles) {
+            this._victoryParticles = [];
+            const colors = ['#ffd700', '#ff6b6b', '#4ecca3', '#4dabf7', '#c77dff', '#ff8c42'];
+            for (let i = 0; i < 60; i++) {
+                this._victoryParticles.push({
+                    x: Math.random() * CONFIG.CANVAS_WIDTH,
+                    y: -20 - Math.random() * 400,
+                    vx: (Math.random() - 0.5) * 2,
+                    vy: 1.5 + Math.random() * 2,
+                    size: 2 + Math.random() * 4,
+                    color: colors[Math.floor(Math.random() * colors.length)],
+                    life: Math.random(),
+                    wobble: Math.random() * Math.PI * 2,
+                });
+            }
+        }
+        for (const p of this._victoryParticles) {
+            p.y += p.vy;
+            p.x += p.vx + Math.sin(p.wobble + p.y * 0.02) * 0.5;
+            if (p.y > CONFIG.CANVAS_HEIGHT + 10) {
+                p.y = -10;
+                p.x = Math.random() * CONFIG.CANVAS_WIDTH;
+            }
+            ctx.globalAlpha = 0.7;
+            ctx.fillStyle = p.color;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        ctx.globalAlpha = 1;
+    }
     }
 
     /**
