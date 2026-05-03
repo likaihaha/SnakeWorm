@@ -385,7 +385,7 @@ class EditableDynamicBG {
             const gy = (group.y || 0.5) * this.h;
             const gr = (group.rotation || 0) * Math.PI / 180;
             const gs = group.scale || 1;
-            console.log(`[渲染组] id:${group.id} x:${group.x} y:${group.y} rot:${group.rotation} scale:${group.scale} gx:${Math.round(gx)} gy:${Math.round(gy)}`);
+            // 绕组中心旋转+缩放（不影响组中心的世界位置）
             ctx.translate(gx, gy);
             if (gr) ctx.rotate(gr);
             if (gs !== 1) ctx.scale(gs, gs);
@@ -1617,6 +1617,7 @@ class EditableDynamicBG {
     const gy = (group.y || 0.5) * this.h;
     const gr = (group.rotation || 0) * Math.PI / 180;
     const gs = group.scale || 1;
+    console.log(`[drawGroupDirect] x:${group.x?.toFixed(4)} y:${group.y?.toFixed(4)} gx:${Math.round(gx)} gy:${Math.round(gy)} scale:${gs}`);
     ctx.save();
     ctx.translate(gx, gy);
     if (gr) ctx.rotate(gr);

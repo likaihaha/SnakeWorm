@@ -545,7 +545,11 @@ class BackgroundEditor {
     const groups = cfg.groups || [];
 
     for (const id of order) {
-      if (id === 'background') continue;
+      if (id === 'background') {
+        // 绘制背景
+        bg._renderStaticLayer(ctx, id);
+        continue;
+      }
       if (id.startsWith('group_')) {
         const group = groups.find(g => g.id === id);
         if (group) bg.drawGroupDirect(ctx, group);
