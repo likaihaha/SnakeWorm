@@ -1026,6 +1026,39 @@ export class Game {
                 this.musicSystem.playCelebrateSound(worm.head ? worm.head.x : 400);
             }
 
+            // === Phase 2 性格行为：勇敢挡刀音效 ===
+            if (worm._pendingGuardSound) {
+                worm._pendingGuardSound = false;
+                this.musicSystem.playBirthChime(worm.head ? worm.head.x : 400);
+            }
+
+            // === Phase 2 性格行为：侦察兵发现宝珠提示 ===
+            if (worm._pendingScoutFlash) {
+                worm._pendingScoutFlash = false;
+                // 给母体一个浮动文字提示
+                if (worm.parentWorm && worm.parentWorm.isAlive && worm.parentWorm.head) {
+                    this.floatingTexts.push(FloatingText.acquire(
+                        worm.parentWorm.head.x, worm.parentWorm.head.y - 30,
+                        '🔍 发现宝珠！', '#4ecdc4'
+                    ));
+                }
+                // 存储方向指示数据（供绘制层使用）
+                if (worm.scoutTarget) {
+                    worm._scoutIndicator = {
+                        target: { x: worm.scoutTarget.x, y: worm.scoutTarget.y },
+                        timer: 3.0
+                    };
+                }
+            }
+
+            // === Phase 2 侦察兵方向指示：衰减计时器 ===
+            if (worm._scoutIndicator) {
+                worm._scoutIndicator.timer -= dt;
+                if (worm._scoutIndicator.timer <= 0) {
+                    worm._scoutIndicator = null;
+                }
+            }
+
             // === Phase 1 亲子情感：幼体死亡动画完成后清理 ===
             if (worm.isJuvenile && worm.deathPhase === 'gone') {
                 // 创建灰色尸体下沉
@@ -1810,6 +1843,71 @@ export class Game {
         // 发射音效（立体声定位）
         const headX = player.segments[0] ? player.segments[0].x : 400;
         this.musicSystem.playNote(800, 50, undefined, undefined, headX);
+
+        // === Phase 2 合击攻击：成年后代协同射击 ===
+        this._triggerComboAttack(player, mouthAngle);
+    }
+
+    /**
+     * 合击攻击：玩家射击时，附近的成年后代自动协同射击
+     * @param {Worm} player - 玩家虫虫
+     * @param {number} baseAngle - 玩家射击角度（弧度）
+     */
+    _triggerComboAttack(player, baseAngle) {
+        const comboRange = CONFIG.FAMILY.COMBO_RANGE;
+        const comboCooldown = CONFIG.FAMILY.COMBO_COOLDOWN;
+        const comboSpread = CONFIG.FAMILY.COMBO_SPREAD;
+
+        let comboIndex = 0;  // 用于交替偏移方向
+        for (const worm of this.worms) {
+            if (!worm.isAlive || !worm.isAdult || worm.isPlayer) continue;
+            if (worm.isGuardingPosition) continue;  // 驻守中的不合击
+            if (worm.comboCooldown > 0) continue;    // 冷却中
+            if (!worm.blueSegments || worm.blueSegments <= 0) continue;
+            if (!worm.bulletCount || worm.bulletCount <= 0) continue;
+            if (worm.segments.length < 2) continue;
+
+            // 距离检测
+            const dist = worm.head.dist(player.head);
+            if (dist > comboRange) continue;
+
+            // 计算合击方向（与母体大致相同，加微小扇形偏移）
+            const spreadDir = comboIndex % 2 === 0 ? 1 : -1;
+            const comboAngle = baseAngle + spreadDir * comboSpread * (1 + comboIndex * 0.3);
+            const direction = new Vector(Math.cos(comboAngle), Math.sin(comboAngle));
+            const bpx = worm.head.x + Math.cos(comboAngle) * (CONFIG.SEGMENT_RADIUS + 5);
+            const bpy = worm.head.y + Math.sin(comboAngle) * (CONFIG.SEGMENT_RADIUS + 5);
+
+            this.bullets.push(new Bullet(bpx, bpy, direction));
+            worm.bulletCount--;
+            worm.comboCooldown = comboCooldown;
+
+            // 消耗蓝色段
+            for (let i = 0; i < worm.blueStrengths.length; i++) {
+                if (worm.blueStrengths[i] > 0) {
+                    worm.blueStrengths[i]--;
+                    if (worm.blueStrengths[i] === 0) {
+                        worm.blueSegments--;
+                        worm.blueStrengths.splice(i, 1);
+                        if (worm.segments.length > 3) {
+                            worm.segments.pop();
+                            worm.targetLength = worm.segments.length;
+                        }
+                        worm.syncBlueToBody();
+                    }
+                    break;
+                }
+            }
+
+            // 合击特效：成年后代头部金色粒子
+            for (let k = 0; k < 4; k++) {
+                this.particles.push(Particle.acquire(worm.head.x, worm.head.y, '#ffd700'));
+            }
+            // 浮动文字
+            this.floatingTexts.push(FloatingText.acquire(worm.head.x, worm.head.y - 25, '⚔️合击！', '#ffd700'));
+
+            comboIndex++;
+        }
     }
     
     /**
@@ -2997,6 +3095,48 @@ export class Game {
         // 恢复source-over模式绘制UI
         ctx.globalCompositeOperation = 'source-over';
         for (let i = 0; i < this.floatingTexts.length; i++) this.floatingTexts[i].draw(ctx);
+
+        // === Phase 2 侦察兵方向指示箭头（在母体附近画箭头指向宝珠方向） ===
+        for (const worm of this.worms) {
+            if (!worm.isAlive || !worm._scoutIndicator) continue;
+            const indicator = worm._scoutIndicator;
+            if (!worm.parentWorm || !worm.parentWorm.isAlive) continue;
+            const parentHead = worm.parentWorm.head;
+            if (!parentHead) continue;
+
+            const target = indicator.target;
+            const dx = target.x - parentHead.x;
+            const dy = target.y - parentHead.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist < 10) continue;
+
+            // 箭头距离母体头部的距离
+            const arrowDist = 50;
+            const nx = dx / dist;
+            const ny = dy / dist;
+            const ax = parentHead.x + nx * arrowDist;
+            const ay = parentHead.y + ny * arrowDist;
+
+            const alpha = Math.min(1.0, indicator.timer / 0.5) * (0.5 + 0.3 * Math.sin(Date.now() * 0.008));
+            const arrowLen = 12;
+            const arrowWid = 6;
+            const angle = Math.atan2(dy, dx);
+
+            ctx.save();
+            ctx.globalAlpha = alpha;
+            ctx.fillStyle = '#4ecdc4';
+            ctx.beginPath();
+            // 箭头尖端
+            ctx.moveTo(ax + Math.cos(angle) * arrowLen, ay + Math.sin(angle) * arrowLen);
+            // 左翼（向后偏转150度）
+            ctx.lineTo(ax + Math.cos(angle + 2.6) * arrowWid, ay + Math.sin(angle + 2.6) * arrowWid);
+            // 右翼（向后偏转-150度）
+            ctx.lineTo(ax + Math.cos(angle - 2.6) * arrowWid, ay + Math.sin(angle - 2.6) * arrowWid);
+            ctx.closePath();
+            ctx.fill();
+            ctx.globalAlpha = 1.0;
+            ctx.restore();
+        }
 
         // 绘制波纹特效
         this.drawRipples();

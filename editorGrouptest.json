@@ -1,0 +1,154 @@
+{
+  "canvas": {
+    "width": 960,
+    "height": 540
+  },
+  "background": {
+    "visible": true,
+    "gradientType": "radial",
+    "centerX": 0.5,
+    "centerY": 0.5,
+    "radius": 0.8,
+    "angle": 90,
+    "color0": "#1a1a2e",
+    "color1": "#16213e",
+    "color2": "#0f3460"
+  },
+  "ambient": {
+    "visible": false
+  },
+  "river": {
+    "visible": false
+  },
+  "leftRock": {
+    "visible": false
+  },
+  "rightRock": {
+    "visible": false
+  },
+  "vents": {
+    "visible": false
+  },
+  "fog": {
+    "visible": false
+  },
+  "vignette": {
+    "visible": false
+  },
+  "jellyfish": {
+    "visible": false
+  },
+  "particles": {
+    "visible": false
+  },
+  "magma": {
+    "visible": false
+  },
+  "glints": {
+    "visible": false
+  },
+  "mountains": {
+    "visible": false
+  },
+  "shapes": [
+    {
+      "id": "1777792861499",
+      "type": "rectangle",
+      "visible": true,
+      "locked": false,
+      "opacity": 1,
+      "x": 0.7906713426829016,
+      "y": 0.8293596535095,
+      "width": 0.4,
+      "height": 0.3,
+      "fill": "rgba(88, 166, 255, 0.3)",
+      "stroke": "rgba(88, 166, 255, 0.8)",
+      "strokeWidth": 2,
+      "cornerRadius": 0,
+      "rotation": 63.86638762155326,
+      "blendMode": "source-over",
+      "textureScaleX": 1,
+      "textureScaleY": 1,
+      "effects": [],
+      "_selectedPointIndex": -1
+    },
+    {
+      "id": "1777792863227",
+      "type": "polygon",
+      "visible": true,
+      "locked": false,
+      "opacity": 1,
+      "x": 0.7912178566317202,
+      "y": 0.810318443163917,
+      "sides": 5,
+      "radius": 0.2,
+      "fill": "rgba(88, 166, 255, 0.3)",
+      "stroke": "rgba(88, 166, 255, 0.8)",
+      "strokeWidth": 2,
+      "rotation": 84.60683796826982,
+      "blendMode": "source-over",
+      "textureScaleX": 1,
+      "textureScaleY": 1,
+      "effects": [],
+      "_selectedPointIndex": -1
+    },
+    {
+      "id": "1777793000178",
+      "type": "rectangle",
+      "visible": true,
+      "locked": false,
+      "opacity": 1,
+      "x": 0.13854166666666665,
+      "y": 0.15925925925925924,
+      "width": 0.4,
+      "height": 0.3,
+      "fill": "rgba(88, 166, 255, 0.3)",
+      "stroke": "rgba(88, 166, 255, 0.8)",
+      "strokeWidth": 2,
+      "cornerRadius": 0,
+      "rotation": 0,
+      "blendMode": "source-over",
+      "textureScaleX": 1,
+      "textureScaleY": 1,
+      "effects": [],
+      "_selectedPointIndex": -1
+    },
+    {
+      "id": "1777793002653",
+      "type": "rectangle",
+      "visible": true,
+      "locked": false,
+      "opacity": 1,
+      "x": 0.07708333333333331,
+      "y": 0.39259259259259255,
+      "width": 0.15625000000000003,
+      "height": 0.3,
+      "fill": "rgba(88, 166, 255, 0.3)",
+      "stroke": "rgba(88, 166, 255, 0.8)",
+      "strokeWidth": 2,
+      "cornerRadius": 0,
+      "rotation": 0,
+      "blendMode": "source-over",
+      "textureScaleX": 1,
+      "textureScaleY": 1,
+      "effects": [],
+      "_selectedPointIndex": -1
+    }
+  ],
+  "layerOrder": [
+    "background",
+    "group_1777792899681",
+    "shape_1777793000178",
+    "shape_1777793002653"
+  ],
+  "groups": [
+    {
+      "id": "group_1777792899681",
+      "name": "组 1",
+      "children": [
+        "shape_1777792863227",
+        "shape_1777792861499"
+      ]
+    }
+  ]
+}

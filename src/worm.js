@@ -109,6 +109,7 @@ export class Worm {
         this.parentWorm = null;  // 父代引用
         this.juvenileHitCount = 0;  // 幼体被击中次数
         this.adultHitCount = 0;  // 成年体被击中次数
+        this.comboCooldown = 0;  // 成年后代合击冷却
         this.juvenileFearTimer = 0;  // 幼体害怕状态计时器
         this.juvenileFollowTarget = null;  // 幼体跟随目标
         this.juvenileOrbitPhase = Math.random() * Math.PI * 2;  // 幼体环绕尾部的角度
@@ -145,6 +146,7 @@ export class Worm {
         this.isScouting = false;      // 好奇：是否正在侦察
         this.scoutFlashTimer = 0;     // 好奇：发现宝珠闪烁计时器
         this.mimicryData = { rushes: 0, dodges: 0, totalSamples: 0 }; // 模仿机制数据
+        this.mimicryResolved = false;  // 模仿机制是否已触发（只触发一次）
 
         // === Phase 3 羁绊深度：成年后代与驻守系统 ===
         this.isAdult = false;           // 是否已进化为成年后代
@@ -575,6 +577,7 @@ export class Worm {
         if (this.purpleParticleTimer > 0) this.purpleParticleTimer -= dt;
         if (this.protectingTimer > 0) this.protectingTimer -= dt;
         if (this._obstacleSlowTimer > 0) this._obstacleSlowTimer -= dt;
+        if (this.comboCooldown > 0) this.comboCooldown -= dt;  // 合击冷却
 
         // 更新空闲波动相位（始终保持生命感波动）
         this.idleWavePhase += dt * 4;
@@ -974,6 +977,39 @@ export class Worm {
                 const speed = this.parentWorm.speed || 0;
                 if (speed > 4) this.mimicryData.rushes++;
                 else if (speed < 3) this.mimicryData.dodges++;
+            }
+        }
+
+        // === Phase 2 性格模仿机制：采样足够后判断母体行为倾向 ===
+        if (!this.mimicryResolved && this.mimicryData.totalSamples >= CONFIG.PERSONALITY.MIMICRY_THRESHOLD) {
+            this.mimicryResolved = true;
+            const { rushes, dodges } = this.mimicryData;
+            let parentStyle = null; // 母体行为倾向
+            if (rushes > dodges * 1.5) {
+                parentStyle = 'brave';   // 冲锋型 → 勇敢
+            } else if (dodges > rushes * 1.5) {
+                parentStyle = 'gentle';  // 躲闪型 → 温柔
+            } else if (rushes < 3 && dodges < 3) {
+                parentStyle = 'curious'; // 静止多 → 好奇（爱观察）
+            } else {
+                parentStyle = 'naughty'; // 混合型 → 淘气
+            }
+            // 如果母体行为倾向与当前性格不同，有 60% 概率切换
+            if (parentStyle && parentStyle !== this.personality && Math.random() < 0.6) {
+                const oldLabel = this.personality ? CONFIG.PERSONALITY.TYPES[this.personality]?.label : '无';
+                const newLabel = CONFIG.PERSONALITY.TYPES[parentStyle]?.label || parentStyle;
+                this.personality = parentStyle;
+                // 浮动文字提示
+                if (typeof game !== 'undefined' && game.floatingTexts) {
+                    game.floatingTexts.push(FloatingText.acquire(
+                        this.head.x, this.head.y - 30,
+                        `${CONFIG.PERSONALITY.TYPES[parentStyle]?.emoji || ''} 性格模仿→${newLabel}`,
+                        CONFIG.PERSONALITY.TYPES[parentStyle]?.color || '#ffe66d'
+                    ));
+                }
+                if (typeof game !== 'undefined' && game.debugLogger) {
+                    game.debugLogger.logEvent('mimicry', `幼体模仿母体：${oldLabel}→${newLabel}（冲锋${rushes}/躲闪${dodges}）`, game.gameTime);
+                }
             }
         }
 
