@@ -1943,7 +1943,13 @@ class BackgroundEditor {
               .map(id => this.config.shapes?.find(s => s.id === id.replace('shape_', '')))
               .filter(s => s && s.visible !== false && !s.locked);
             if (children.length > 0) {
-              this.bg.drawGroupTransform(this.ctx, children);
+              const bounds = this.bg.getGroupBounds(children);
+              console.log('[组渲染] children:', children.length, 'bounds:', bounds, 'selectedElement:', this.selectedElement);
+              if (bounds.width > 0 || bounds.height > 0) {
+                this.bg.drawGroupTransform(this.ctx, children);
+              } else {
+                console.warn('[组渲染] bounds为0，跳过绘制');
+              }
             } else {
               console.warn('[组渲染] 组找到但无有效子元素:', this.selectedElement, 'children:', group.children, 'shapes count:', this.config.shapes?.length);
             }
