@@ -1625,36 +1625,20 @@ class EditableDynamicBG {
       const orig = (this.cfg.shapes || []).find(sh => sh.id === sid);
       if (!orig || orig.visible === false) continue;
 
-      // 浅拷贝原始形状
-      const s = { ...orig };
+      // 计算变换后位置
+      const origBounds = this.getShapeBounds(orig);
+      const ox = origBounds.x + origBounds.width / 2;
+      const oy = origBounds.y + origBounds.height / 2;
+      const dx = ox - gcx, dy = oy - gcy;
+      const rdx = dx * gs, rdy = dy * gs;
+      const wx = gcx + rdx * cos - rdy * sin;
+      const wy = gcy + rdx * sin + rdy * cos;
 
-      // 变换 x/y（以组中心为原点旋转+缩放）
-      if (s.x !== undefined && s.y !== undefined) {
-        const ox = s.x * gw, oy = s.y * gh;
-        const dx = ox - gcx, dy = oy - gcy;
-        const rdx = dx * gs, rdy = dy * gs;
-        s.x = (gcx + rdx * cos - rdy * sin) / gw;
-        s.y = (gcy + rdx * sin + rdy * cos) / gh;
-      }
-
-      // 变换 points
-      if (orig.points) {
-        s.points = orig.points.map(p => {
-          const dx = p[0] * gw - gcx, dy = p[1] * gh - gcy;
-          const rdx = dx * gs, rdy = dy * gs;
-          return [
-            (gcx + rdx * cos - rdy * sin) / gw,
-            (gcy + rdx * sin + rdy * cos) / gh
-          ];
-        });
-      }
-
-      // 变换 rotation
-      if (s.rotation !== undefined && gr) {
-        s.rotation = s.rotation + gr * 180 / Math.PI;
-      }
-
-      this._drawSingleShape(ctx, s, false);
+      // DEBUG: 直接画红色矩形在变换后位置
+      ctx.save();
+      ctx.fillStyle = '#f00';
+      ctx.fillRect(wx - 20, wy - 20, 40, 40);
+      ctx.restore();
     }
   }
 
