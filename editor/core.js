@@ -417,21 +417,24 @@ class BackgroundEditor {
       if (ts.mode === 'move') {
         const newX = Math.max(0, Math.min(1, sp.x + dx / w));
         const newY = Math.max(0, Math.min(1, sp.y + dy / h));
-        if (Math.round(dx) % 20 === 0 && dx !== 0) {
-          console.log(`[组移动] dx:${Math.round(dx)} dy:${Math.round(dy)} sp.x:${sp.x.toFixed(3)} sp.y:${sp.y.toFixed(3)} -> x:${newX.toFixed(3)} y:${newY.toFixed(3)} w:${w}`);
-        }
         group.x = newX;
         group.y = newY;
+        // 强制刷新静态画布
+        if (this.bg && this.bg.refreshStatic) {
+          this.bg.refreshStatic();
+        }
       } else if (ts.mode.startsWith('resize-')) {
         const dir = ts.mode.replace('resize-', '');
         let s = 1;
         if (dir.includes('e') || dir.includes('w')) s = (gb.width + dx) / gb.width;
         if (dir.includes('n') || dir.includes('s')) s = (gb.height + dy) / gb.height;
         group.scale = Math.max(0.1, Math.min(3, sp.scale * s));
+        if (this.bg && this.bg.refreshStatic) this.bg.refreshStatic();
       } else if (ts.mode === 'rotate') {
         const gcx = gb.x + gb.width / 2, gcy = gb.y + gb.height / 2;
         const angle = Math.atan2(y - gcy, x - gcx) - Math.atan2(ts.startY - gcy, ts.startX - gcx);
         group.rotation = sp.rotation + angle * 180 / Math.PI;
+        if (this.bg && this.bg.refreshStatic) this.bg.refreshStatic();
       }
 
       this.markDirty();
