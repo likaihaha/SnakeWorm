@@ -519,15 +519,20 @@ class BackgroundEditor {
 
       for (const [id, sp] of map) {
         const shape = this.config.shapes.find(s => s.id === id);
-        if (!shape) continue;
+        if (!shape) { console.log('[旋转] shape not found:', id); continue; }
 
         if (fromCenter) {
           // 组模式：围绕组中心旋转位置 + 自身旋转
           if (shape.type === 'rectangle' || shape.type === 'circle' || shape.type === 'polygon' || shape.type === 'particles') {
             const spx = sp.x * w, spy = sp.y * h;
             const rx = spx - gcx, ry = spy - gcy;
-            shape.x = Math.max(0, Math.min(1, (gcx + rx * cos - ry * sin) / w));
-            shape.y = Math.max(0, Math.min(1, (gcy + rx * sin + ry * cos) / h));
+            const newX = (gcx + rx * cos - ry * sin) / w;
+            const newY = (gcy + rx * sin + ry * cos) / h;
+            if (this._lastRotLog !== Math.round(deg)) {
+              console.log(`[旋转] ${shape.type} sp:(${sp.x.toFixed(3)},${sp.y.toFixed(3)}) -> (${newX.toFixed(3)},${newY.toFixed(3)})`);
+            }
+            shape.x = Math.max(0, Math.min(1, newX));
+            shape.y = Math.max(0, Math.min(1, newY));
           } else if (shape.points && sp.points) {
             shape.points = sp.points.map(p => {
               const px = p[0] * w, py = p[1] * h;
