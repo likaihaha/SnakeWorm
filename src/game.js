@@ -3207,6 +3207,7 @@ export class Game {
      * 胜利画面粒子动画
      */
     _drawVictoryParticles() {
+        const ctx = this.canvas.getContext('2d');
         if (!this._victoryParticles) {
             this._victoryParticles = [];
             const colors = ['#ffd700', '#ff6b6b', '#4ecca3', '#4dabf7', '#c77dff', '#ff8c42'];
@@ -3238,12 +3239,12 @@ export class Game {
         }
         ctx.globalAlpha = 1;
     }
-    }
 
     /**
      * 绘制自定义鼠标光标：有蓝色弹舱时显示瞄准镜，否则显示圆环
      */
     drawCustomCursor() {
+        const ctx = this.canvas.getContext('2d');
         if (!this.mouseInCanvas) return;
         if (this.isTouchDevice) return;  // 触摸设备不显示光标
         
