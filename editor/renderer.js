@@ -1627,6 +1627,8 @@ class EditableDynamicBG {
       const sid = childId.replace('shape_', '');
       const s = (this.cfg.shapes || []).find(sh => sh.id === sid);
       if (s && s.visible !== false) {
+        const b = this.getShapeBounds(s);
+        console.log(`[drawGroupDirect] child:${s.type} bounds:(${Math.round(b.x)},${Math.round(b.y)})`);
         this._drawSingleShape(ctx, s, false);
       }
     }
