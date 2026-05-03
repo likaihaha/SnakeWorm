@@ -5,7 +5,7 @@
  */
 
 export const CONFIG = {
-    VERSION: '1.76',
+    VERSION: '1.77',
     CANVAS_WIDTH: 800, CANVAS_HEIGHT: 600,   // 视口大小（屏幕显示区域）
     MAP_WIDTH: 4000, MAP_HEIGHT: 3000,        // 世界地图大小（5×5倍）
     BORDER_MARGIN: 30,                        // 地图边界死亡区宽度（用于尸体/宝珠生成等）
@@ -119,6 +119,119 @@ export const CONFIG = {
         LOCK_ENEMY_TO_ZONE: true,  // 敌人锁定在生成区域内
         BULLET_DISAPPEAR_AT_ZONE: true, // 子弹到达区域边界自动消失
     },
+    // === Phase 3a Boss系统 ===
+    BOSS: {
+        // 通用参数
+        HIT_FLASH_DURATION: 0.3,
+        KNOCKBACK_SPEED: 10,
+        KNOCKBACK_DECAY: 0.9,
+        KNOCKBACK_DURATION: 0.3,
+        INVINCIBLE_TIME: 0.5,  // 受击后无敌时间
+        DEATH_DURATION: 3.0,  // Boss死亡动画时间
+
+        // Zone 5 - 巨型蚯蚓（森林）
+        WORM: {
+            HEALTH: 8,
+            SIZE: 25,
+            SEGMENTS: 12,
+            SEG_SPACING: 18,
+            SPEED: 2.0,
+            CHARGE_SPEED: 8.0,
+            CHARGE_DISTANCE: 300,
+            BURROW_DURATION: 1.5,
+            BURROW_WARN_TIME: 0.8,
+            PHASE2_SPEED_MULT: 1.3,
+            PHASE2_CHARGE_MULT: 1.5,
+            COLOR: '#4a7c59',
+            EYE_COLOR: '#ff6b6b',
+        },
+
+        // Zone 10 - 暗影蛛母（洞穴）
+        SPIDER: {
+            HEALTH: 12,
+            SIZE: 30,
+            SPEED: 1.5,
+            WEB_RANGE: 250,
+            WEB_SLOW_DURATION: 3.0,
+            WEB_SLOW_FACTOR: 0.4,
+            WEB_COOLDOWN: 4.0,
+            SPAWN_COUNT: 3,
+            SPAWN_INTERVAL: 8.0,
+            SPAWN_SIZE: 8,
+            SPAWN_HEALTH: 1,
+            PHASE2_SPAWN_MULT: 2,
+            COLOR: '#2d1b4e',
+            EYE_COLOR: '#ff00ff',
+            LEG_COUNT: 8,
+            LEG_LENGTH: 35,
+        },
+
+        // Zone 15 - 晶石守卫（水晶）
+        CRYSTAL: {
+            HEALTH: 15,
+            SIZE: 20,
+            CORE_SIZE: 15,
+            SHARD_COUNT: 4,
+            SHARD_RADIUS: 50,
+            SHARD_SIZE: 10,
+            ORBIT_SPEED: 2.0,
+            PROJECTILE_SPEED: 5.0,
+            PROJECTILE_COOLDOWN: 2.0,
+            PROJECTILE_COUNT: 3,
+            PHASE2_ORBIT_MULT: 1.5,
+            PHASE2_PROJ_MULT: 2,
+            COLOR: '#c77dff',
+            CORE_COLOR: '#e0aaff',
+            SHARD_COLOR: '#9d4edd',
+        },
+
+        // Zone 20 - 炎龙蜥（岩浆）
+        LIZARD: {
+            HEALTH: 18,
+            SIZE: 28,
+            SEGMENTS: 15,
+            SEG_SPACING: 20,
+            SPEED: 2.5,
+            BREATH_RANGE: 200,
+            BREATH_ANGLE: Math.PI / 3,  // 60度扇形
+            BREATH_DURATION: 2.0,
+            BREATH_COOLDOWN: 3.0,
+            LAVA_DURATION: 5.0,
+            LAVA_DAMAGE_INTERVAL: 1.0,
+            PHASE2_SPEED_MULT: 1.4,
+            PHASE2_BREATH_MULT: 1.5,
+            COLOR: '#ff4500',
+            EYE_COLOR: '#ffd700',
+            LAVA_COLOR: '#ff6b35',
+        },
+
+        // Zone 25 - 虫后（终极）
+        QUEEN: {
+            HEALTH: 25,
+            SIZE: 35,
+            SPEED: 1.8,
+            // 阶段1：召唤+冲锋
+            PHASE1_CHARGE_SPEED: 7.0,
+            PHASE1_CHARGE_COOLDOWN: 5.0,
+            PHASE1_SPAWN_COUNT: 4,
+            // 阶段2：弹幕+护盾
+            PHASE2_SHARD_COUNT: 6,
+            PHASE2_SHARD_RADIUS: 60,
+            PHASE2_ORBIT_SPEED: 2.5,
+            PHASE2_PROJECTILE_SPEED: 6.0,
+            PHASE2_PROJECTILE_COOLDOWN: 1.5,
+            PHASE2_PROJECTILE_COUNT: 5,
+            // 阶段3：全机制+狂暴
+            PHASE3_SPEED_MULT: 1.5,
+            PHASE3_CHARGE_MULT: 1.3,
+            PHASE3_PROJ_MULT: 1.5,
+            PHASE3_SPAWN_INTERVAL: 4.0,
+            COLOR: '#8b0000',
+            EYE_COLOR: '#ffd700',
+            QUEEN_COLOR: '#ff1493',
+        },
+    },
+
     PARTICLE: {
         SPEED_MIN: 2,
         SPEED_SPREAD: 3,

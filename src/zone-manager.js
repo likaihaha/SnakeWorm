@@ -288,8 +288,19 @@ export class ZoneManager {
             return { completed: false, reason: '' };
         }
 
-        // Boss 关卡：清除所有敌人
+        // Boss 关卡：检查Boss是否已死亡
         if (zone.zoneType === ZONE_TYPE.BOSS) {
+            // 优先检查Boss列表
+            if (ctx.bosses !== undefined) {
+                const bossesAlive = (ctx.bosses || []).filter(b => b.isAlive && b.state !== 'dead');
+                if (bossesAlive.length === 0 && ctx.gameTime > 5 && ctx.bossesSpawned) {
+                    return { completed: true, reason: 'Boss 击败！' };
+                }
+                if (bossesAlive.length > 0) {
+                    return { completed: false, reason: `Boss HP: ${bossesAlive[0].health}/${bossesAlive[0].maxHealth}` };
+                }
+            }
+            // 降级：清除所有普通敌人
             const enemiesInZone = (ctx.enemies || []).filter(e => {
                 if (!e.isAlive || e.isDying) return false;
                 if (e.homeZone) return e.homeZone.x === zone.x && e.homeZone.y === zone.y;

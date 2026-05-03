@@ -20,6 +20,7 @@ import { Camera } from './camera.js';
 import { FamilyGate } from './family-gate.js';
 import { ZoneManager } from './zone-manager.js';
 import { Barrier, generateBarriers } from './barrier.js';
+import { createBoss, BOSS_STATE } from './boss.js';
 
 export class Game {
     constructor() {
@@ -58,6 +59,10 @@ export class Game {
         this.enemies = [];  // 敌人列表
         this.familyGates = [];  // 家族门列表
         this.enemySpawnTimer = 0;  // 敌人生成计时器
+
+        // === Phase 3a: Boss系统 ===
+        this.bosses = [];  // 当前Boss列表
+        this.bossSpawned = new Set();  // 已召唤Boss的区域ID（防止重复召唤）
 
         // === Phase A: ZoneManager 关卡区域系统 ===
         this.zoneManager = new ZoneManager();
@@ -649,6 +654,8 @@ export class Game {
         this.deadBodies = [];
         this.foods = [];
         this.enemies = [];           // 清理敌人
+        this.bosses = [];            // 清理Boss
+        this.bossSpawned.clear();    // 清理Boss召唤记录
         this.particles = [];         // 清理粒子
         this.floatingTexts.forEach(ft => FloatingText.release(ft));
         this.floatingTexts = [];     // 清理浮动文字
@@ -1237,6 +1244,8 @@ export class Game {
                 playerLength: player.segments.length,
                 juvenileCount: this.worms.filter(w => w.isAlive && w.isJuvenile).length,
                 adultCount: this.worms.filter(w => w.isAlive && w.isAdult).length,
+                bosses: this.bosses,
+                bossesSpawned: this.bossSpawned.has(newZoneId),
             });
             if (completionResult.completed) {
                 this.zoneManager.completeZone(newZoneId);
@@ -2032,6 +2041,9 @@ export class Game {
     updateEnemies(dt, player) {
         // 生成敌人
         this.spawnEnemies(dt, player);
+
+        // === Phase 3a: Boss系统 ===
+        this.updateBosses(dt, player);
         
         // 更新敌人（紧凑过滤替代splice）
         const juveniles = this.worms.filter(w => w.isAlive && w.isJuvenile && (!w.deathPhase || w.deathPhase === 'none'));
@@ -2171,8 +2183,21 @@ export class Game {
             }
             this.enemies.length = w;
 
-            if (storedFoods.length > 0 || storedEnemies.length > 0) {
-                zm.zoneEntityCache.set(fromZoneId, { foods: storedFoods, enemies: storedEnemies });
+            // Phase 3a: 缓存Boss
+            const storedBosses = [];
+            let bw = 0;
+            for (let i = 0; i < this.bosses.length; i++) {
+                const boss = this.bosses[i];
+                if (boss.homeZone && boss.homeZone.x === fromZone.x && boss.homeZone.y === fromZone.y) {
+                    storedBosses.push(boss);
+                } else {
+                    this.bosses[bw++] = boss;
+                }
+            }
+            this.bosses.length = bw;
+
+            if (storedFoods.length > 0 || storedEnemies.length > 0 || storedBosses.length > 0) {
+                zm.zoneEntityCache.set(fromZoneId, { foods: storedFoods, enemies: storedEnemies, bosses: storedBosses });
             }
         }
 
@@ -2183,8 +2208,11 @@ export class Game {
             if (cached) {
                 for (const food of cached.foods) this.foods.push(food);
                 for (const enemy of cached.enemies) this.enemies.push(enemy);
+                if (cached.bosses) {
+                    for (const boss of cached.bosses) this.bosses.push(boss);
+                }
                 zm.zoneEntityCache.delete(toZoneId);
-                this.debugLogger._log('ZONE_ENTER', `进入区域 ${toZoneId} (恢复 ${cached.foods.length} 宝珠, ${cached.enemies.length} 敌人)`, {}, this.gameTime);
+                this.debugLogger._log('ZONE_ENTER', `进入区域 ${toZoneId} (恢复 ${cached.foods.length} 宝珠, ${cached.enemies.length} 敌人, ${(cached.bosses||[]).length} Boss)`, {}, this.gameTime);
             } else {
                 this.debugLogger._log('ZONE_ENTER', `进入区域 ${toZoneId}`, {}, this.gameTime);
             }
@@ -2264,6 +2292,165 @@ export class Game {
                 this.debugLogger.logEnemySpawn(newEnemy, this.gameTime);
             }
         }
+    }
+
+    // === Phase 3a: Boss系统 ===
+    updateBosses(dt, player) {
+        if (!player || !player.isAlive) return;
+
+        // Boss生成：进入Boss区域时自动召唤
+        const currentZone = this.zoneManager ? this.zoneManager.zones[this.zoneManager.currentZoneId - 1] : null;
+        if (currentZone && currentZone.zoneType === 'boss' && !this.bossSpawned.has(currentZone.id)) {
+            this.bossSpawned.add(currentZone.id);
+            const boss = createBoss(currentZone.id, currentZone.centerX, currentZone.centerY);
+            if (boss) {
+                boss.homeZone = currentZone;
+                this.bosses.push(boss);
+                this.debugLogger._log('BOSS_SPAWN', `Boss ${boss.bossName} 出现在区域 ${currentZone.id}`, {}, this.gameTime);
+                this.triggerScreenShake(8, 0.8);
+                // 清除区域内普通敌人
+                for (let i = this.enemies.length - 1; i >= 0; i--) {
+                    const e = this.enemies[i];
+                    if (e.homeZone && e.homeZone.x === currentZone.x && e.homeZone.y === currentZone.y) {
+                        e.isAlive = false;
+                    }
+                }
+            }
+        }
+
+        const playerPos = player.head;
+
+        // 更新Boss（紧凑过滤）
+        let bw = 0;
+        for (let i = 0; i < this.bosses.length; i++) {
+            const boss = this.bosses[i];
+            boss.update(dt, playerPos);
+
+            // Boss与玩家子弹碰撞
+            if (boss.isAlive && boss.state !== BOSS_STATE.DYING && boss.state !== BOSS_STATE.SPAWNING) {
+                let bulletW = 0;
+                for (let j = 0; j < this.bullets.length; j++) {
+                    const bullet = this.bullets[j];
+                    let bulletConsumed = false;
+
+                    // 护盾检测（水晶守卫/虫后）
+                    if (boss.checkShieldHit && boss.checkShieldHit(bullet.pos, bullet.radius)) {
+                        bulletConsumed = true;
+                    }
+                    // Boss本体碰撞
+                    else if (boss.checkBulletCollision(bullet.pos, bullet.radius)) {
+                        const bx = boss.pos.x - bullet.pos.x;
+                        const by = boss.pos.y - bullet.pos.y;
+                        const bd = Math.sqrt(bx * bx + by * by);
+                        const hitDir = new Vector(bd > 0 ? bx / bd : 0, bd > 0 ? by / bd : 0);
+                        const killed = boss.takeDamage(hitDir);
+                        bulletConsumed = true;
+                        if (killed) {
+                            this.floatingTexts.push(FloatingText.acquire(boss.pos.x, boss.pos.y - 30, `BOSS KILL!`, '#ffd700'));
+                            this.debugLogger._log('BOSS_KILL', `${boss.bossName} 被击杀`, {}, this.gameTime);
+                            // 掉落大量宝珠
+                            for (let k = 0; k < 10; k++) {
+                                const type = CONFIG.FOOD_TYPES[Math.floor(Math.random() * 3) + 1];
+                                const angle = Math.random() * Math.PI * 2;
+                                const dist = 30 + Math.random() * 60;
+                                const food = new Food(boss.pos.x + Math.cos(angle) * dist, boss.pos.y + Math.sin(angle) * dist, type);
+                                this.foods.push(food);
+                            }
+                        } else {
+                            this.floatingTexts.push(FloatingText.acquire(boss.pos.x, boss.pos.y - 30, `${boss.health}/${boss.maxHealth}`, '#ff8c42'));
+                        }
+                    }
+
+                    if (!bulletConsumed) {
+                        this.bullets[bulletW++] = bullet;
+                    }
+                }
+                this.bullets.length = bulletW;
+            }
+
+            // Boss与玩家碰撞（身体接触伤害）
+            if (boss.isAlive && boss.state !== BOSS_STATE.DYING && player && player.isAlive && !player.isJuvenile) {
+                for (let s = 0; s < player.segments.length; s++) {
+                    if (boss.checkPlayerCollision(player.segments[s], CONFIG.SEGMENT_RADIUS)) {
+                        // 头部碰撞对Boss造成伤害
+                        if (s === 0 && boss.invincibleTimer <= 0) {
+                            const hdx = boss.pos.x - player.head.x;
+                            const hdy = boss.pos.y - player.head.y;
+                            const hd = Math.sqrt(hdx * hdx + hdy * hdy);
+                            const hitDir = new Vector(hd > 0 ? hdx / hd : 0, hd > 0 ? hdy / hd : 0);
+                            boss.takeDamage(hitDir);
+                        }
+                        // Boss对玩家造成伤害
+                        if (player.invincibleTimer <= 0) {
+                            player.adultHitCount++;
+                            if (player.adultHitCount >= CONFIG.FAMILY.ADULT_HITS_TO_LOSE) {
+                                player.adultHitCount = 0;
+                                if (player.segments.length > 3) {
+                                    player.segments.pop();
+                                    player.targetLength = player.segments.length;
+                                    player.syncBlueToBody();
+                                }
+                            }
+                            // 击退玩家
+                            const dx = player.head.x - boss.pos.x;
+                            const dy = player.head.y - boss.pos.y;
+                            const d = Math.sqrt(dx * dx + dy * dy);
+                            player.invincibleTimer = 0.5;
+                        }
+                        break;
+                    }
+                }
+            }
+
+            // 蛛母特殊：蛛网减速检测
+            if (boss.checkWebSlow && playerPos) {
+                const slowFactor = boss.checkWebSlow(playerPos);
+                if (slowFactor < 1 && player.slowStacks < 3) {
+                    player.slowStacks++;
+                    player.slowTimer = CONFIG.BOSS.SPIDER.WEB_SLOW_DURATION;
+                }
+            }
+
+            // 炎龙蜥特殊：火焰吐息和岩浆路径检测
+            if (boss.checkBreathCollision && playerPos) {
+                if (boss.checkBreathCollision(playerPos, CONFIG.SEGMENT_RADIUS)) {
+                    if (player.invincibleTimer <= 0) {
+                        player.adultHitCount += 2;
+                        player.invincibleTimer = 1.0;
+                        if (player.adultHitCount >= CONFIG.FAMILY.ADULT_HITS_TO_LOSE) {
+                            player.adultHitCount = 0;
+                            if (player.segments.length > 3) {
+                                player.segments.pop();
+                                player.targetLength = player.segments.length;
+                                player.syncBlueToBody();
+                            }
+                        }
+                    }
+                }
+            }
+            if (boss.checkLavaCollision && playerPos) {
+                if (boss.checkLavaCollision(playerPos, CONFIG.SEGMENT_RADIUS)) {
+                    if (player.invincibleTimer <= 0) {
+                        player.adultHitCount++;
+                        player.invincibleTimer = 0.8;
+                        if (player.adultHitCount >= CONFIG.FAMILY.ADULT_HITS_TO_LOSE) {
+                            player.adultHitCount = 0;
+                            if (player.segments.length > 3) {
+                                player.segments.pop();
+                                player.targetLength = player.segments.length;
+                                player.syncBlueToBody();
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 保留存活的Boss
+            if (boss.state !== BOSS_STATE.DEAD) {
+                this.bosses[bw++] = boss;
+            }
+        }
+        this.bosses.length = bw;
     }
 
     // 幼体成年逻辑（提取重复代码）
@@ -2488,6 +2675,8 @@ export class Game {
         ctx.globalCompositeOperation = 'source-over';
         for (let i = 0; i < this.brokenTails.length; i++) this.brokenTails[i].draw(ctx);
         for (let i = 0; i < this.enemies.length; i++) this.enemies[i].draw(ctx);
+        // Phase 3a: 绘制Boss
+        for (let i = 0; i < this.bosses.length; i++) this.bosses[i].draw(ctx);
         for (let i = 0; i < this.deadBodies.length; i++) this.deadBodies[i].draw(ctx);
 
         // 绘制screen模式的对象（发光）
