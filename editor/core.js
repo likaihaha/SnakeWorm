@@ -1942,6 +1942,31 @@ class BackgroundEditor {
               .filter(s => s && s.visible !== false && !s.locked);
             if (children.length > 0) {
               this.bg.drawGroupTransform(this.ctx, children);
+
+              // DEBUG: 画组中心红点 + 每个元素中心蓝点
+              if (this.transformState && this.transformState.isGroupTransform) {
+                const gb = this.transformState.groupBounds;
+                const gcx = gb.x + gb.width / 2, gcy = gb.y + gb.height / 2;
+                this.ctx.save();
+                // 红色大圆 = 组中心
+                this.ctx.fillStyle = '#f00';
+                this.ctx.beginPath();
+                this.ctx.arc(gcx, gcy, 8, 0, Math.PI * 2);
+                this.ctx.fill();
+                this.ctx.fillStyle = '#fff';
+                this.ctx.font = '12px monospace';
+                this.ctx.fillText('GROUP CENTER', gcx + 12, gcy + 4);
+                // 蓝色小圆 = 每个元素中心
+                this.ctx.fillStyle = '#0af';
+                for (const s of children) {
+                  const b = this.bg.getShapeBounds(s);
+                  const cx = b.x + b.width / 2, cy = b.y + b.height / 2;
+                  this.ctx.beginPath();
+                  this.ctx.arc(cx, cy, 5, 0, Math.PI * 2);
+                  this.ctx.fill();
+                }
+                this.ctx.restore();
+              }
             }
           }
         } else if (this.selectedElement && this.selectedElement.startsWith('shape_')) {
