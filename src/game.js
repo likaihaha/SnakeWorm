@@ -1754,6 +1754,9 @@ export class Game {
             // 根据节奏配置决定是否生成
             let canSpawn = false;
             switch (type.score) {
+                case 1:  // 海洋雪：始终可用，持续生成
+                    canSpawn = Math.random() < 0.5;
+                    break;
                 case 10:  // 绿色：开局分批生成，之后持续补充
                     if (this.initialGreenSpawned < type.maxCount) {
                         // 开局分批生成：每隔1.5-2.5秒生成1个，错落有致

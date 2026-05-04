@@ -5,7 +5,7 @@
  */
 
 export const CONFIG = {
-    VERSION: '1.88',
+    VERSION: '1.89',
     CANVAS_WIDTH: 800, CANVAS_HEIGHT: 600,   // 视口大小（屏幕显示区域）
     MAP_WIDTH: 4000, MAP_HEIGHT: 3000,        // 世界地图大小（5×5倍）
     BORDER_MARGIN: 30,                        // 地图边界死亡区宽度（用于尸体/宝珠生成等）
@@ -31,7 +31,9 @@ export const CONFIG = {
         { color: '#ffe66d', score: 30, radius: 8, gravity: 0.02, wobble: 0.5, weight: 25, maxCount: 1, respawnTime: 1.0 },
         { color: '#ff8c42', score: 60, radius: 8, gravity: 0.03, wobble: 0.6, weight: 10, maxCount: 2, respawnTime: 1.5 },
         { color: '#4dabf7', score: 120, radius: 8, gravity: 0.04, wobble: 0, weight: 4, maxCount: 2, respawnTime: 1.0 },
-        { color: '#c77dff', score: 300, radius: 8, gravity: 0.05, wobble: 0.7, weight: 1, maxCount: 0, respawnTime: 2.5 }
+        { color: '#c77dff', score: 300, radius: 8, gravity: 0.05, wobble: 0.7, weight: 1, maxCount: 0, respawnTime: 2.5 },
+        // 海洋雪：白色微粒，极小半径，轻微飘落
+        { color: '#e8e8f0', score: 1, radius: 2, gravity: 0.003, wobble: 0.3, weight: 30, maxCount: 20, respawnTime: 2.0 },
     ],
     TARGET_FPS: 60,
     SHOW_FPS: false,

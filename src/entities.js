@@ -309,6 +309,12 @@ export class Food {
         const pulse = Math.sin(this.pulsePhase) * 2;
         const r = this.radius + pulse;
 
+        // === 海洋雪特殊渲染 ===
+        if (this.type.score === 1) {
+            this._drawOceanSnow(ctx, r);
+            return;
+        }
+
         // === 初生动画：白点阶段 ===
         if (this.birthPhase === 'white') {
             // 小白点 + 白色拖尾
@@ -432,5 +438,39 @@ export class Food {
         ctx.fill();
 
         ctx.globalCompositeOperation = 'source-over';
+    }
+
+    /**
+     * 海洋雪特殊渲染：极小的白色微粒，带微弱光晕，像深海中的有机碎屑一样飘落
+     */
+    _drawOceanSnow(ctx, r) {
+        const glowIntensity = 0.3 + 0.2 * Math.sin(this.pulsePhase * 0.5);
+
+        // 微弱的光晕（比正常宝珠柔和得多）
+        ctx.globalCompositeOperation = 'screen';
+        const grd = ctx.createRadialGradient(
+            this.pos.x, this.pos.y, r * 0.5,
+            this.pos.x, this.pos.y, r * 4
+        );
+        grd.addColorStop(0, `rgba(232, 232, 240, ${glowIntensity * 0.5})`);
+        grd.addColorStop(0.5, `rgba(220, 220, 240, ${glowIntensity * 0.2})`);
+        grd.addColorStop(1, 'rgba(220, 220, 240, 0)');
+        ctx.beginPath();
+        ctx.arc(this.pos.x, this.pos.y, r * 4, 0, Math.PI * 2);
+        ctx.fillStyle = grd;
+        ctx.fill();
+
+        // 微粒主体：半透明白色小球
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.beginPath();
+        ctx.arc(this.pos.x, this.pos.y, r, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(240, 240, 250, ${0.5 + glowIntensity * 0.3})`;
+        ctx.fill();
+
+        // 中心高光（很小）
+        ctx.beginPath();
+        ctx.arc(this.pos.x, this.pos.y, r * 0.5, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(255, 255, 255, ${0.6 + glowIntensity * 0.2})`;
+        ctx.fill();
     }
 }
