@@ -299,6 +299,11 @@ export class Game {
         const targetY = head.y + normalizedDir.y * 100;
         this.mousePos = new Vector(targetX, targetY);
         this.mouseInCanvas = true;
+
+        // 修复 iPhone Safari：摇杆有方向时清除 waitingForPlayer，否则蛇永远不动
+        if (this.waitingForPlayer && distance > 5) {
+            this.waitingForPlayer = false;
+        }
     }
 
     setupInput() {
@@ -505,6 +510,10 @@ export class Game {
             const world = this.camera.screenToWorld(screenX, screenY);
             this.mousePos = new Vector(world.x, world.y);
             this.mouseInCanvas = true;
+            // 修复 iPhone Safari：触摸 Canvas 时也清除 waitingForPlayer
+            if (this.waitingForPlayer) {
+                this.waitingForPlayer = false;
+            }
         } else {
             this.mouseInCanvas = false;
         }
