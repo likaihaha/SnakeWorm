@@ -5,6 +5,13 @@
 
 const LOGS = [
     {
+        version: 'v1.90',
+        date: '2026-05-04',
+        items: [
+            '修复 iPhone Safari 摇杆控制不了虫虫：handleJoystickMove() 和 handleTouch() 现在会清除 waitingForPlayer',
+        ]
+    },
+    {
         version: 'v1.89',
         date: '2026-05-04',
         items: [
